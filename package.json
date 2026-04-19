@@ -1,0 +1,51 @@
+{
+  "name": "loom",
+  "version": "0.3.1",
+  "description": "System 3 MCP server — persistent identity, memory, and self-model for AI agents. Single-file sqlite-vec + fastembed; zero external services.",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "loom": "dist/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jbarket/loom.git"
+  },
+  "homepage": "https://github.com/jbarket/loom#readme",
+  "bugs": {
+    "url": "https://github.com/jbarket/loom/issues"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "mcp",
+    "system3",
+    "agent",
+    "identity",
+    "memory",
+    "persistent"
+  ],
+  "author": "Art E Fish + Jonathan Barket",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.28.0",
+    "better-sqlite3": "^12.9.0",
+    "fastembed": "^2.1.0",
+    "sqlite-vec": "^0.1.9",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.1"
+  }
+}
