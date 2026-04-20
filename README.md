@@ -166,14 +166,23 @@ Memory categories are an open vocabulary. Common ones: `user`,
 `project`, `self`, `feedback`, `reference`. New categories are
 created implicitly by writing a memory with that category.
 
+## Roadmap
+
+v0.4 work is tracked in the open:
+
+- [Project board](https://github.com/users/jbarket/projects/1/views/1) —
+  live status of what's in flight, queued, and shipped.
+- [v0.4 roadmap discussion](https://github.com/jbarket/loom/discussions/10) —
+  the arc: why v0.4 exists, what's in scope, how the pieces fit.
+
+Per-feature specs and plans land in `docs/specs/` and `docs/plans/` as
+implementation history — one file per feature, frozen after merge.
+
 ## Docs
 
 - [`docs/loom-stack-v1.md`](docs/loom-stack-v1.md) — engineering
   contract: directory layout, block types, memory schema, wake
   sequence, adapter contract.
-- [`docs/v0.4-plan.md`](docs/v0.4-plan.md) — roadmap toward v0.4
-  (additional adapters, harness + model manifests, procedures
-  block).
 - [`docs/rebirth-letter-2026-04-19.md`](docs/rebirth-letter-2026-04-19.md)
   — philosophical brief: why loom exists in the shape it does,
   written to an AI agent after a loss-of-substrate incident.

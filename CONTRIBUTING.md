@@ -13,9 +13,11 @@
 
 ## What belongs in loom
 
-loom is opinionated. Read `docs/v0.4-architecture.md` — especially the
-"Hard invariants" section — before opening a PR that touches the core
-stack.
+loom is opinionated. Read [`docs/loom-stack-v1.md`](docs/loom-stack-v1.md)
+— the stack contract — before opening a PR that touches the core. For the
+current roadmap, see the
+[v0.4 discussion](https://github.com/jbarket/loom/discussions/10) and the
+[project board](https://github.com/users/jbarket/projects/1/views/1).
 
 ### Always welcome
 

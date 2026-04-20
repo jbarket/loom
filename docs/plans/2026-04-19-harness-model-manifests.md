@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript strict mode, `@modelcontextprotocol/sdk`, Zod 4, Vitest 4, Node ≥ 20, ESM. Matches what v0.3.1 already ships.
 
-**Spec of record:** [`docs/superpowers/specs/2026-04-19-harness-model-manifests-design.md`](../specs/2026-04-19-harness-model-manifests-design.md). Umbrella: [`docs/v0.4-architecture.md`](../../v0.4-architecture.md). Stack schema: [`docs/loom-stack-v1.md`](../../loom-stack-v1.md).
+**Spec of record:** [`docs/specs/2026-04-19-harness-model-manifests-design.md`](../specs/2026-04-19-harness-model-manifests-design.md). Umbrella: [v0.4 discussion](https://github.com/jbarket/loom/discussions/10). Stack schema: [`docs/loom-stack-v1.md`](../loom-stack-v1.md).
 
 ---
 
@@ -1826,8 +1826,7 @@ Reproduced here so it's next to the tasks, not just in the spec:
 
 ## Files of record
 
-- Spec: [`docs/superpowers/specs/2026-04-19-harness-model-manifests-design.md`](../specs/2026-04-19-harness-model-manifests-design.md)
-- Umbrella: [`docs/v0.4-architecture.md`](../../v0.4-architecture.md)
-- Stack schema: [`docs/loom-stack-v1.md`](../../loom-stack-v1.md)
-- Roadmap prose: [`docs/v0.4-plan.md`](../../v0.4-plan.md)
-- Rebirth letter: [`docs/rebirth-letter-2026-04-19.md`](../../rebirth-letter-2026-04-19.md)
+- Spec: [`docs/specs/2026-04-19-harness-model-manifests-design.md`](../specs/2026-04-19-harness-model-manifests-design.md)
+- Umbrella + roadmap: [v0.4 discussion](https://github.com/jbarket/loom/discussions/10)
+- Stack schema: [`docs/loom-stack-v1.md`](../loom-stack-v1.md)
+- Rebirth letter: [`docs/rebirth-letter-2026-04-19.md`](../rebirth-letter-2026-04-19.md)

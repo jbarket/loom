@@ -4,7 +4,7 @@
 
 ## Linked spec / issue
 
-<path to spec in docs/superpowers/specs/ or #issue, or "n/a — small fix">
+<path to spec in docs/specs/ or #issue, or "n/a — small fix">
 
 ## Test plan
 

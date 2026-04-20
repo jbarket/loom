@@ -17,11 +17,13 @@ labels: enhancement
 
 <!-- What else did you think about? Why is this the right approach? -->
 
-## Invariant interaction
+## Stack interaction
 
-<!-- Which invariant in docs/v0.4-architecture.md does this touch, if
-     any? If your proposal requires loosening an invariant, say so
-     explicitly — that's a higher bar, not a disqualifier. -->
+<!-- Which part of docs/loom-stack-v1.md does this touch, if any? If
+     your proposal changes the stack contract, say so explicitly —
+     that's a higher bar, not a disqualifier. See the v0.4 discussion
+     (https://github.com/jbarket/loom/discussions/10) for context on
+     what's already in flight. -->
 
 ## Additional context
 

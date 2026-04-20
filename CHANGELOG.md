@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-Work toward v0.4 — see [docs/v0.4-architecture.md](docs/v0.4-architecture.md)
-for the full arc. This alpha is the first piece.
+### Changed
+
+- Documentation reshuffle: v0.4 arc docs moved out of the repo. The
+  roadmap now lives in the
+  [v0.4 discussion](https://github.com/jbarket/loom/discussions/10) and
+  the [project board](https://github.com/users/jbarket/projects/1/views/1).
+  Per-feature specs and plans moved from `docs/superpowers/{specs,plans}/`
+  to `docs/{specs,plans}/` — tool-neutral paths, same content.
 
 ## [0.4.0-alpha.1] - 2026-04-19
 
