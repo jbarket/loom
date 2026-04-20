@@ -17,11 +17,9 @@ import { fileURLToPath } from 'node:url';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createLoomServer } from './server.js';
 import { resolveContextDir } from './config.js';
+import { SUBCOMMANDS } from './cli/subcommands.js';
 
-const CLI_KEYWORDS = new Set([
-  'wake', 'recall', 'remember', 'forget', 'update',
-  'memory', 'pursuits', 'update-identity', 'bootstrap', 'serve',
-]);
+const CLI_KEYWORDS: ReadonlySet<string> = new Set(SUBCOMMANDS);
 
 function isCliInvocation(argv: string[]): boolean {
   const first = argv[2];

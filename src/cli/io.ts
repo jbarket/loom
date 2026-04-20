@@ -33,20 +33,13 @@ export async function readStdin(stdin: NodeJS.ReadableStream): Promise<string> {
   return Buffer.concat(chunks).toString('utf-8');
 }
 
-export interface EditorInput {
-  cmd: string;
-  tempPath: string;
-}
-
 export async function openEditor(
   env: NodeJS.ProcessEnv,
   subcommand: string,
   initial: string = '',
 ): Promise<string> {
-  const editor = env.VISUAL || env.EDITOR;
-  if (!editor) {
-    throw new Error('no stdin input and $EDITOR not set');
-  }
+  // Spec §"Body input for write commands": $VISUAL ?? $EDITOR ?? 'vi'.
+  const editor = env.VISUAL ?? env.EDITOR ?? 'vi';
   const randomSuffix = Math.random().toString(36).slice(2, 8);
   const tempPath = join(tmpdir(), `loom-${subcommand}-${process.pid}-${randomSuffix}.md`);
   await writeFile(tempPath, initial, 'utf-8');

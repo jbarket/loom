@@ -7,11 +7,7 @@ import { join } from 'node:path';
 import { resolveRepoRoot } from '../config.js';
 import type { IOStreams } from './io.js';
 import { realStreams } from './io.js';
-
-const SUBCOMMANDS = [
-  'wake', 'recall', 'remember', 'forget', 'update',
-  'memory', 'pursuits', 'update-identity', 'bootstrap', 'serve',
-] as const;
+import { SUBCOMMANDS } from './subcommands.js';
 
 const TOP_HELP = `Usage: loom <command> [options]
 

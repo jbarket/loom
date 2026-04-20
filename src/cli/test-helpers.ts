@@ -13,17 +13,22 @@ export interface CaptureResult {
 
 export async function runCliCaptured(
   argv: string[],
-  opts?: { stdin?: string; env?: Record<string, string> },
+  opts?: { stdin?: string; env?: Record<string, string>; contextDir?: string },
 ): Promise<CaptureResult> {
   let stdout = '';
   let stderr = '';
   const stdin = Readable.from([opts?.stdin ?? '']);
+  // Merge: opts.contextDir seeds LOOM_CONTEXT_DIR, but an explicit value in
+  // opts.env wins so callers can still exercise the env-var path directly.
+  const env: Record<string, string> = {};
+  if (opts?.contextDir !== undefined) env.LOOM_CONTEXT_DIR = opts.contextDir;
+  if (opts?.env) Object.assign(env, opts.env);
   const io: IOStreams = {
     stdout: (s) => { stdout += s; },
     stderr: (s) => { stderr += s; },
     stdin,
     stdinIsTTY: opts?.stdin === undefined,
-    env: opts?.env ?? {},
+    env,
   };
   const code = await runCli(argv, io);
   return { stdout, stderr, code };

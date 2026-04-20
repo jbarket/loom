@@ -38,7 +38,7 @@ export function resolveEnv(
 
 /**
  * Extracts global flags from an argv slice, returning the remaining argv.
- * Recognizes: --context-dir, --client, --model, --json (plus short aliases).
+ * Recognizes: --context-dir, --client, --model, --json.
  */
 export function extractGlobalFlags(argv: string[]): {
   flags: RawGlobalFlags;
