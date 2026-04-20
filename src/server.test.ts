@@ -84,7 +84,7 @@ describe('createLoomServer — stack version', () => {
     const contextDir = makeContextDir(tmpDir);
     writeFileSync(join(contextDir, 'LOOM_STACK_VERSION'), '2\n');
 
-    expect(() => createLoomServer({ contextDir })).toThrow(/stack version 2/i);
+    expect(() => createLoomServer({ contextDir })).toThrow(/is version 2/i);
   });
 
   it('throws on boot when LOOM_STACK_VERSION is unparseable', () => {

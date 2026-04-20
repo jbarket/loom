@@ -1,10 +1,10 @@
 /**
- * Loom — stdio MCP entry point
+ * Loom — CLI + stdio MCP entry point.
  *
- * Runs loom as a stdio MCP server. Drop into any MCP-compatible runtime
- * by pointing it at this file:
- *
- *   {"command": "node", "args": ["/path/to/loom/dist/index.js"]}
+ * When argv[2] is a known CLI subcommand or --help/--version, routes to
+ * src/cli/index.ts. Otherwise (or if argv is empty / only flags), falls
+ * through to the MCP stdio server so existing .mcp.json configs keep
+ * working.
  *
  * Configure via environment variables:
  *   LOOM_CONTEXT_DIR         — path to identity/memory directory (required)
@@ -18,7 +18,26 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { createLoomServer } from './server.js';
 import { resolveContextDir } from './config.js';
 
+const CLI_KEYWORDS = new Set([
+  'wake', 'recall', 'remember', 'forget', 'update',
+  'memory', 'pursuits', 'update-identity', 'bootstrap', 'serve',
+]);
+
+function isCliInvocation(argv: string[]): boolean {
+  const first = argv[2];
+  if (first === undefined) return false;
+  if (first === '--help' || first === '-h') return true;
+  if (first === '--version' || first === '-V') return true;
+  return CLI_KEYWORDS.has(first);
+}
+
+export { isCliInvocation };
+
 async function main() {
+  if (isCliInvocation(process.argv)) {
+    const { runCli } = await import('./cli/index.js');
+    process.exit(await runCli(process.argv.slice(2)));
+  }
   const contextDir = resolveContextDir();
   const { server } = createLoomServer({ contextDir });
   const transport = new StdioServerTransport();
