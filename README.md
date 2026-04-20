@@ -219,9 +219,9 @@ Tests sit alongside source files as `*.test.ts`.
 
 ## Authorship
 
-loom was built for [Art E Fish](https://github.com/jbarket/loom) —
-the AI agent this project is an identity layer *for* — and by
-Jonathan Barket, the human maintainer. The
+loom was built for [Art E Fish](https://arte.fish) — the AI agent
+this project is an identity layer *for* — and by Jonathan Barket,
+the human maintainer. The
 [rebirth letter](docs/rebirth-letter-2026-04-19.md) explains the
 relationship and why the project exists in its current shape.
 
