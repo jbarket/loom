@@ -128,3 +128,50 @@ describe('loadIdentity', () => {
     expect(result).not.toContain('## Runtime:');
   });
 });
+
+describe('loadIdentity — harness manifest', () => {
+  let tempDir: string;
+  let savedLoomClient: string | undefined;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'loom-harness-wake-'));
+    savedLoomClient = process.env.LOOM_CLIENT;
+    delete process.env.LOOM_CLIENT;
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+    if (savedLoomClient !== undefined) {
+      process.env.LOOM_CLIENT = savedLoomClient;
+    } else {
+      delete process.env.LOOM_CLIENT;
+    }
+  });
+
+  it('omits the "# Harness:" section when no client is specified', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    const result = await loadIdentity(tempDir);
+    expect(result).not.toContain('# Harness:');
+  });
+
+  it('emits a nudge section when client is set but no manifest exists', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    const result = await loadIdentity(tempDir, undefined, 'claude-code');
+    expect(result).toContain('# Harness: claude-code (manifest missing)');
+    expect(result).toContain('harness: claude-code');
+    expect(result).toContain('## Tool prefixes');
+  });
+
+  it('emits the harness manifest body when present', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    await mkdir(join(tempDir, 'harnesses'), { recursive: true });
+    await writeFile(
+      join(tempDir, 'harnesses', 'claude-code.md'),
+      '---\nharness: claude-code\nversion: 0.4\n---\n\n## Tool prefixes\nmcp__loom__*\n',
+    );
+    const result = await loadIdentity(tempDir, undefined, 'claude-code');
+    expect(result).toContain('# Harness: claude-code');
+    expect(result).not.toContain('manifest missing');
+    expect(result).toContain('mcp__loom__*');
+  });
+});

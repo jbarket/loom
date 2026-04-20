@@ -11,6 +11,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { loadClientAdapter } from '../clients.js';
+import * as harnessBlock from '../blocks/harness.js';
 
 async function readOptional(path: string): Promise<string | null> {
   try {
@@ -22,6 +23,7 @@ async function readOptional(path: string): Promise<string | null> {
 
 export async function loadIdentity(contextDir: string, project?: string, client?: string): Promise<string> {
   const parts: string[] = [];
+  const effectiveClient = client ?? process.env.LOOM_CLIENT;
 
   // Terminal creed — the immutable identity
   const creed = await readOptional(join(contextDir, 'IDENTITY.md'));
@@ -54,6 +56,21 @@ export async function loadIdentity(contextDir: string, project?: string, client?
     }
   }
 
+  // Harness manifest — the shape of the current runtime (stack spec §4.7).
+  if (effectiveClient) {
+    const block = await harnessBlock.read(contextDir, effectiveClient);
+    if (block) {
+      parts.push(`# Harness: ${effectiveClient}\n\n${block.body}`);
+    } else {
+      parts.push(
+        `# Harness: ${effectiveClient} (manifest missing)\n\n` +
+        `No manifest found at ${contextDir}/harnesses/${effectiveClient}.md. ` +
+        `Write one — here's the template:\n\n` +
+        harnessBlock.template(effectiveClient),
+      );
+    }
+  }
+
   // Optional recent-memory summary. The memory store of record is
   // memories.db (sqlite-vec); navigate it via recall(). If a legacy
   // memories/INDEX.md sidecar exists from FS-backend days, surface a
@@ -63,8 +80,7 @@ export async function loadIdentity(contextDir: string, project?: string, client?
     parts.push('# Memories\n\n' + summarizeMemoryIndex(memoryIndex));
   }
 
-  // Runtime-specific context (tool name prefix, notes)
-  const effectiveClient = client ?? process.env.LOOM_CLIENT;
+  // Runtime-specific context (tool name prefix, notes) — legacy `## Runtime:` block.
   if (effectiveClient) {
     const adapter = await loadClientAdapter(contextDir, effectiveClient);
     if (adapter) {
