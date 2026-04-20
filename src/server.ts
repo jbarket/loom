@@ -71,11 +71,15 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
       project: z.string().optional().describe('Project context to load (loads project-specific memories)'),
       client: z.string().optional().describe(
         'Runtime client name for tool-prefix context: "claude-code", "gemini-cli", "hermes", "openclaw", "nemoclaw". ' +
-        'Overrides the LOOM_CLIENT environment variable.'
+        'Overrides the LOOM_CLIENT environment variable.',
+      ),
+      model: z.string().optional().describe(
+        'Model identifier for model-manifest context (e.g. "claude-opus", "gemma4"). ' +
+        'Overrides the LOOM_MODEL environment variable.',
       ),
     },
-    async ({ project, client }) => {
-      const result = await loadIdentity(contextDir, project, client);
+    async ({ project, client, model }) => {
+      const result = await loadIdentity(contextDir, project, client, model);
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );

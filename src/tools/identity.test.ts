@@ -129,6 +129,62 @@ describe('loadIdentity', () => {
   });
 });
 
+describe('loadIdentity — model manifest', () => {
+  let tempDir: string;
+  const originalModelEnv = process.env.LOOM_MODEL;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'loom-model-wake-'));
+    delete process.env.LOOM_MODEL;
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+    if (originalModelEnv === undefined) {
+      delete process.env.LOOM_MODEL;
+    } else {
+      process.env.LOOM_MODEL = originalModelEnv;
+    }
+  });
+
+  it('omits the "# Model:" section when neither env nor param is set', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    const result = await loadIdentity(tempDir);
+    expect(result).not.toContain('# Model:');
+  });
+
+  it('emits a nudge when LOOM_MODEL is set but no manifest exists', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    process.env.LOOM_MODEL = 'claude-opus';
+    const result = await loadIdentity(tempDir);
+    expect(result).toContain('# Model: claude-opus (manifest missing)');
+    expect(result).toContain('model: claude-opus');
+    expect(result).toContain('## Capability notes');
+  });
+
+  it('emits manifest body when the file is present', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    await mkdir(join(tempDir, 'models'), { recursive: true });
+    await writeFile(
+      join(tempDir, 'models', 'claude-opus.md'),
+      '---\nmodel: claude-opus\n---\n\n## Capability notes\nStrong tool use.\n',
+    );
+    process.env.LOOM_MODEL = 'claude-opus';
+    const result = await loadIdentity(tempDir);
+    expect(result).toContain('# Model: claude-opus');
+    expect(result).not.toContain('manifest missing');
+    expect(result).toContain('Strong tool use');
+  });
+
+  it('accepts a model param that overrides LOOM_MODEL', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    process.env.LOOM_MODEL = 'claude-opus';
+    const result = await loadIdentity(tempDir, undefined, undefined, 'claude-haiku');
+    expect(result).toContain('# Model: claude-haiku (manifest missing)');
+    expect(result).not.toContain('# Model: claude-opus');
+  });
+});
+
 describe('loadIdentity — harness manifest', () => {
   let tempDir: string;
   let savedLoomClient: string | undefined;
