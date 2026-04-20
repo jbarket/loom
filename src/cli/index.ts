@@ -71,6 +71,10 @@ export async function runCli(argv: string[], io: IOStreams = realStreams()): Pro
       const { run } = await import('./memory.js');
       return run(rest, io);
     }
+    case 'forget': {
+      const { run } = await import('./forget.js');
+      return run(rest, io);
+    }
     default:
       io.stderr(`Subcommand not implemented yet: ${sub}\n`);
       return 2;
