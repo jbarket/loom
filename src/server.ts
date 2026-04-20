@@ -8,6 +8,7 @@
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { CURRENT_STACK_VERSION, ensureStackVersion, readStackVersion, STACK_VERSION_FILE } from './config.js';
 import { loadIdentity } from './tools/identity.js';
 import { remember } from './tools/remember.js';
 import { recall } from './tools/recall.js';
@@ -34,9 +35,28 @@ export interface LoomServerInstance {
 export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
   const { contextDir } = config;
 
+  // Refuse to boot against a stack this loom build doesn't understand.
+  const onDisk = readStackVersion(contextDir);
+  if (onDisk !== null) {
+    if (Number.isNaN(onDisk)) {
+      throw new Error(
+        `LOOM_STACK_VERSION unparseable at ${contextDir}/${STACK_VERSION_FILE}. ` +
+        `Expected an integer; got raw content.`,
+      );
+    }
+    if (onDisk > CURRENT_STACK_VERSION) {
+      throw new Error(
+        `loom understands stack version ${CURRENT_STACK_VERSION} but found ` +
+        `stack version ${onDisk} at ${contextDir}/${STACK_VERSION_FILE}. ` +
+        `Upgrade loom or pin LOOM_CONTEXT_DIR to an older stack.`,
+      );
+    }
+  }
+  ensureStackVersion(contextDir);
+
   const server = new McpServer({
     name: 'loom',
-    version: '0.3.1', // Keep in sync with package.json
+    version: '0.4.0-alpha.1', // Keep in sync with package.json
   });
 
   // ─── Identity ───────────────────────────────────────────────────────────────
