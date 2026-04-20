@@ -11,6 +11,9 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { loadClientAdapter } from '../clients.js';
+import * as harnessBlock from '../blocks/harness.js';
+import * as modelBlock from '../blocks/model.js';
+import * as proceduresBlock from '../blocks/procedures.js';
 
 async function readOptional(path: string): Promise<string | null> {
   try {
@@ -20,8 +23,15 @@ async function readOptional(path: string): Promise<string | null> {
   }
 }
 
-export async function loadIdentity(contextDir: string, project?: string, client?: string): Promise<string> {
+export async function loadIdentity(
+  contextDir: string,
+  project?: string,
+  client?: string,
+  model?: string,
+): Promise<string> {
   const parts: string[] = [];
+  const effectiveClient = client ?? process.env.LOOM_CLIENT;
+  const effectiveModel = model ?? process.env.LOOM_MODEL;
 
   // Terminal creed — the immutable identity
   const creed = await readOptional(join(contextDir, 'IDENTITY.md'));
@@ -54,6 +64,44 @@ export async function loadIdentity(contextDir: string, project?: string, client?
     }
   }
 
+  // Harness manifest — the shape of the current runtime (stack spec §4.7).
+  if (effectiveClient) {
+    const block = await harnessBlock.read(contextDir, effectiveClient);
+    if (block) {
+      parts.push(`# Harness: ${effectiveClient}\n\n${block.body}`);
+    } else {
+      parts.push(
+        `# Harness: ${effectiveClient} (manifest missing)\n\n` +
+        `No manifest found at ${contextDir}/harnesses/${effectiveClient}.md. ` +
+        `Write one — here's the template:\n\n` +
+        harnessBlock.template(effectiveClient),
+      );
+    }
+  }
+
+  // Model manifest — model-family-specific capability notes (stack spec §4.8).
+  if (effectiveModel) {
+    const block = await modelBlock.read(contextDir, effectiveModel);
+    if (block) {
+      parts.push(`# Model: ${effectiveModel}\n\n${block.body}`);
+    } else {
+      parts.push(
+        `# Model: ${effectiveModel} (manifest missing)\n\n` +
+        `No manifest found at ${contextDir}/models/${effectiveModel}.md. ` +
+        `Write one — here's the template:\n\n` +
+        modelBlock.template(effectiveModel),
+      );
+    }
+  }
+
+  // Procedures — procedural-identity docs (stack spec §4.9).
+  const { blocks: procedures, capWarning } = await proceduresBlock.readAll(contextDir);
+  if (procedures.length > 0) {
+    const body = procedures.map((b) => b.body).join('\n\n---\n\n');
+    const withWarning = capWarning ? `> ${capWarning}\n\n${body}` : body;
+    parts.push(`# Procedures\n\n${withWarning}`);
+  }
+
   // Optional recent-memory summary. The memory store of record is
   // memories.db (sqlite-vec); navigate it via recall(). If a legacy
   // memories/INDEX.md sidecar exists from FS-backend days, surface a
@@ -63,8 +111,7 @@ export async function loadIdentity(contextDir: string, project?: string, client?
     parts.push('# Memories\n\n' + summarizeMemoryIndex(memoryIndex));
   }
 
-  // Runtime-specific context (tool name prefix, notes)
-  const effectiveClient = client ?? process.env.LOOM_CLIENT;
+  // Runtime-specific context (tool name prefix, notes) — legacy `## Runtime:` block.
   if (effectiveClient) {
     const adapter = await loadClientAdapter(contextDir, effectiveClient);
     if (adapter) {

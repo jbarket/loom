@@ -128,3 +128,149 @@ describe('loadIdentity', () => {
     expect(result).not.toContain('## Runtime:');
   });
 });
+
+describe('loadIdentity — model manifest', () => {
+  let tempDir: string;
+  const originalModelEnv = process.env.LOOM_MODEL;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'loom-model-wake-'));
+    delete process.env.LOOM_MODEL;
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+    if (originalModelEnv === undefined) {
+      delete process.env.LOOM_MODEL;
+    } else {
+      process.env.LOOM_MODEL = originalModelEnv;
+    }
+  });
+
+  it('omits the "# Model:" section when neither env nor param is set', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    const result = await loadIdentity(tempDir);
+    expect(result).not.toContain('# Model:');
+  });
+
+  it('emits a nudge when LOOM_MODEL is set but no manifest exists', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    process.env.LOOM_MODEL = 'claude-opus';
+    const result = await loadIdentity(tempDir);
+    expect(result).toContain('# Model: claude-opus (manifest missing)');
+    expect(result).toContain('model: claude-opus');
+    expect(result).toContain('## Capability notes');
+  });
+
+  it('emits manifest body when the file is present', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    await mkdir(join(tempDir, 'models'), { recursive: true });
+    await writeFile(
+      join(tempDir, 'models', 'claude-opus.md'),
+      '---\nmodel: claude-opus\n---\n\n## Capability notes\nStrong tool use.\n',
+    );
+    process.env.LOOM_MODEL = 'claude-opus';
+    const result = await loadIdentity(tempDir);
+    expect(result).toContain('# Model: claude-opus');
+    expect(result).not.toContain('manifest missing');
+    expect(result).toContain('Strong tool use');
+  });
+
+  it('accepts a model param that overrides LOOM_MODEL', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    process.env.LOOM_MODEL = 'claude-opus';
+    const result = await loadIdentity(tempDir, undefined, undefined, 'claude-haiku');
+    expect(result).toContain('# Model: claude-haiku (manifest missing)');
+    expect(result).not.toContain('# Model: claude-opus');
+  });
+});
+
+describe('loadIdentity — harness manifest', () => {
+  let tempDir: string;
+  let savedLoomClient: string | undefined;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'loom-harness-wake-'));
+    savedLoomClient = process.env.LOOM_CLIENT;
+    delete process.env.LOOM_CLIENT;
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+    if (savedLoomClient !== undefined) {
+      process.env.LOOM_CLIENT = savedLoomClient;
+    } else {
+      delete process.env.LOOM_CLIENT;
+    }
+  });
+
+  it('omits the "# Harness:" section when no client is specified', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    const result = await loadIdentity(tempDir);
+    expect(result).not.toContain('# Harness:');
+  });
+
+  it('emits a nudge section when client is set but no manifest exists', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    const result = await loadIdentity(tempDir, undefined, 'claude-code');
+    expect(result).toContain('# Harness: claude-code (manifest missing)');
+    expect(result).toContain('harness: claude-code');
+    expect(result).toContain('## Tool prefixes');
+  });
+
+  it('emits the harness manifest body when present', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    await mkdir(join(tempDir, 'harnesses'), { recursive: true });
+    await writeFile(
+      join(tempDir, 'harnesses', 'claude-code.md'),
+      '---\nharness: claude-code\nversion: 0.4\n---\n\n## Tool prefixes\nmcp__loom__*\n',
+    );
+    const result = await loadIdentity(tempDir, undefined, 'claude-code');
+    expect(result).toContain('# Harness: claude-code');
+    expect(result).not.toContain('manifest missing');
+    expect(result).toContain('mcp__loom__*');
+  });
+});
+
+describe('loadIdentity — procedures', () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'loom-proc-wake-'));
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('omits the "# Procedures" section when procedures/ is missing', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    const result = await loadIdentity(tempDir);
+    expect(result).not.toContain('# Procedures');
+  });
+
+  it('emits procedures joined with --- when present', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    await mkdir(join(tempDir, 'procedures'), { recursive: true });
+    await writeFile(join(tempDir, 'procedures', 'verify.md'), '# Verify\n\nAlways verify.');
+    await writeFile(join(tempDir, 'procedures', 'reflect.md'), '# Reflect\n\nAlways reflect.');
+    const result = await loadIdentity(tempDir);
+    expect(result).toContain('# Procedures');
+    expect(result).toContain('Always verify');
+    expect(result).toContain('Always reflect');
+  });
+
+  it('prepends a cap warning when >10 procedures are present', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    await mkdir(join(tempDir, 'procedures'), { recursive: true });
+    for (let i = 0; i < 11; i++) {
+      await writeFile(
+        join(tempDir, 'procedures', `proc-${i.toString().padStart(2, '0')}.md`),
+        `# ${i}\nbody`,
+      );
+    }
+    const result = await loadIdentity(tempDir);
+    expect(result).toContain('# Procedures');
+    expect(result.toLowerCase()).toContain('cap exceeded');
+  });
+});

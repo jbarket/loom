@@ -18,6 +18,7 @@
 import { resolve, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
 export function resolveContextDir(): string {
   if (process.env.LOOM_CONTEXT_DIR) {
@@ -51,4 +52,33 @@ export function resolveFastEmbedModel(): string {
 
 export function resolveFastEmbedCacheDir(): string | undefined {
   return process.env.LOOM_FASTEMBED_CACHE_DIR || undefined;
+}
+
+// ─── Stack version ────────────────────────────────────────────────────────────
+
+/** The stack schema version this loom build understands. */
+export const CURRENT_STACK_VERSION = 1;
+
+/** The filename at the stack root that records the on-disk schema version. */
+export const STACK_VERSION_FILE = 'LOOM_STACK_VERSION';
+
+/**
+ * Read the stack version stamp at `<contextDir>/LOOM_STACK_VERSION`.
+ * Returns null if the file is missing, or NaN if the content doesn't parse.
+ */
+export function readStackVersion(contextDir: string): number | null {
+  const path = resolve(contextDir, STACK_VERSION_FILE);
+  if (!existsSync(path)) return null;
+  return Number.parseInt(readFileSync(path, 'utf-8').trim(), 10);
+}
+
+/**
+ * Lazy-write the current stack version if the stamp is missing. Does not
+ * overwrite an existing file; the caller is responsible for validating
+ * (and refusing) versions ahead of CURRENT_STACK_VERSION.
+ */
+export function ensureStackVersion(contextDir: string): void {
+  const path = resolve(contextDir, STACK_VERSION_FILE);
+  if (existsSync(path)) return;
+  writeFileSync(path, `${CURRENT_STACK_VERSION}\n`, 'utf-8');
 }

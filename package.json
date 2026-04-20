@@ -1,6 +1,6 @@
 {
   "name": "loom",
-  "version": "0.3.1",
+  "version": "0.4.0-alpha.1",
   "description": "System 3 MCP server — persistent identity, memory, and self-model for AI agents. Single-file sqlite-vec + fastembed; zero external services.",
   "type": "module",
   "main": "dist/index.js",
@@ -33,7 +33,7 @@
     "persistent"
   ],
   "author": "Art E Fish + Jonathan Barket",
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^12.9.0",

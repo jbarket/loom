@@ -8,6 +8,7 @@
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { CURRENT_STACK_VERSION, ensureStackVersion, readStackVersion, STACK_VERSION_FILE } from './config.js';
 import { loadIdentity } from './tools/identity.js';
 import { remember } from './tools/remember.js';
 import { recall } from './tools/recall.js';
@@ -34,9 +35,28 @@ export interface LoomServerInstance {
 export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
   const { contextDir } = config;
 
+  // Refuse to boot against a stack this loom build doesn't understand.
+  const onDisk = readStackVersion(contextDir);
+  if (onDisk !== null) {
+    if (Number.isNaN(onDisk)) {
+      throw new Error(
+        `LOOM_STACK_VERSION unparseable at ${contextDir}/${STACK_VERSION_FILE}. ` +
+        `Expected an integer; got raw content.`,
+      );
+    }
+    if (onDisk > CURRENT_STACK_VERSION) {
+      throw new Error(
+        `loom understands stack version ${CURRENT_STACK_VERSION} but found ` +
+        `stack version ${onDisk} at ${contextDir}/${STACK_VERSION_FILE}. ` +
+        `Upgrade loom or pin LOOM_CONTEXT_DIR to an older stack.`,
+      );
+    }
+  }
+  ensureStackVersion(contextDir);
+
   const server = new McpServer({
     name: 'loom',
-    version: '0.3.1', // Keep in sync with package.json
+    version: '0.4.0-alpha.1', // Keep in sync with package.json
   });
 
   // ─── Identity ───────────────────────────────────────────────────────────────
@@ -51,11 +71,15 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
       project: z.string().optional().describe('Project context to load (loads project-specific memories)'),
       client: z.string().optional().describe(
         'Runtime client name for tool-prefix context: "claude-code", "gemini-cli", "hermes", "openclaw", "nemoclaw". ' +
-        'Overrides the LOOM_CLIENT environment variable.'
+        'Overrides the LOOM_CLIENT environment variable.',
+      ),
+      model: z.string().optional().describe(
+        'Model identifier for model-manifest context (e.g. "claude-opus", "gemma4"). ' +
+        'Overrides the LOOM_MODEL environment variable.',
       ),
     },
-    async ({ project, client }) => {
-      const result = await loadIdentity(contextDir, project, client);
+    async ({ project, client, model }) => {
+      const result = await loadIdentity(contextDir, project, client, model);
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );

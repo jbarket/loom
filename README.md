@@ -3,7 +3,7 @@
 [![CI](https://github.com/jbarket/loom/actions/workflows/ci.yml/badge.svg)](https://github.com/jbarket/loom/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-0.3.1-blue.svg)](CHANGELOG.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-compatible-orange.svg)](https://modelcontextprotocol.io)
 
 **Persistent identity and memory for AI agents, as an MCP server.**
@@ -103,7 +103,8 @@ Add to `.mcp.json`:
       "args": ["/absolute/path/to/loom/dist/index.js"],
       "env": {
         "LOOM_CONTEXT_DIR": "/absolute/path/to/your/agent/context",
-        "LOOM_CLIENT": "claude-code"
+        "LOOM_CLIENT": "claude-code",
+        "LOOM_MODEL": "claude-opus"
       }
     }
   }
@@ -132,6 +133,7 @@ All configuration is through environment variables:
 | `LOOM_SQLITE_DB_PATH` | `<context>/memories.db` | Override the memory DB path |
 | `LOOM_FASTEMBED_MODEL` | `fast-bge-small-en-v1.5` | fastembed model ID |
 | `LOOM_FASTEMBED_CACHE_DIR` | `~/.cache/loom/fastembed/` | Where to cache ONNX models |
+| `LOOM_MODEL` | *(unset)* | Model identifier for model-manifest context: `claude-opus`, `gemma4`, etc. |
 | `LOOM_CLIENT` | *(unset)* | Client adapter hint: `claude-code`, `gemini-cli`, etc. |
 
 `--context-dir <path>` works as a CLI alternative to
@@ -144,13 +146,20 @@ point.
 
 ```
 $LOOM_CONTEXT_DIR/
-├── IDENTITY.md          # the terminal creed (immutable via tools)
-├── preferences.md       # user working style; agent-editable
-├── self-model.md        # agent's self-knowledge; agent-editable
-├── pursuits.md          # active cross-session goals
-├── memories.db          # sqlite-vec store of record
-└── projects/            # optional per-project briefs
-    └── <project>.md
+├── LOOM_STACK_VERSION      # schema-version stamp (auto-written)
+├── IDENTITY.md             # the terminal creed (immutable via tools)
+├── preferences.md          # user working style; agent-editable
+├── self-model.md           # agent's self-knowledge; agent-editable
+├── pursuits.md             # active cross-session goals
+├── memories.db             # sqlite-vec store of record
+├── projects/               # optional per-project briefs
+│   └── <project>.md
+├── harnesses/              # optional per-harness manifests
+│   └── <client>.md
+├── models/                 # optional per-model manifests
+│   └── <model>.md
+└── procedures/             # optional procedural-identity docs (cap ~10)
+    └── <procedure>.md
 ```
 
 Memory categories are an open vocabulary. Common ones: `user`,
@@ -209,6 +218,12 @@ relationship and why the project exists in its current shape.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+AGPL-3.0-or-later — see [LICENSE](LICENSE).
 
 Copyright © 2026 Art E Fish + Jonathan Barket.
+
+loom is free software: you can redistribute it and modify it under the
+terms of the GNU Affero General Public License (version 3 or any later
+version). If you run a modified loom and let others interact with it
+over a network, you must offer them the corresponding source. Bundle
+loom into a larger product freely; fork it and go proprietary, no.

@@ -6,19 +6,15 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
-      types:
+      npm:
         patterns:
-          - "@types/*"
-      dev-minor:
-        patterns:
-          - "typescript"
-          - "tsx"
-          - "vitest"
-        update-types:
-          - minor
-          - patch
+          - "*"
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    groups:
+      actions:
+        patterns:
+          - "*"
