@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import { loadClientAdapter } from '../clients.js';
 import * as harnessBlock from '../blocks/harness.js';
 import * as modelBlock from '../blocks/model.js';
+import * as proceduresBlock from '../blocks/procedures.js';
 
 async function readOptional(path: string): Promise<string | null> {
   try {
@@ -91,6 +92,14 @@ export async function loadIdentity(
         modelBlock.template(effectiveModel),
       );
     }
+  }
+
+  // Procedures — procedural-identity docs (stack spec §4.9).
+  const { blocks: procedures, capWarning } = await proceduresBlock.readAll(contextDir);
+  if (procedures.length > 0) {
+    const body = procedures.map((b) => b.body).join('\n\n---\n\n');
+    const withWarning = capWarning ? `> ${capWarning}\n\n${body}` : body;
+    parts.push(`# Procedures\n\n${withWarning}`);
   }
 
   // Optional recent-memory summary. The memory store of record is

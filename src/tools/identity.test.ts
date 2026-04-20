@@ -231,3 +231,46 @@ describe('loadIdentity — harness manifest', () => {
     expect(result).toContain('mcp__loom__*');
   });
 });
+
+describe('loadIdentity — procedures', () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'loom-proc-wake-'));
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('omits the "# Procedures" section when procedures/ is missing', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    const result = await loadIdentity(tempDir);
+    expect(result).not.toContain('# Procedures');
+  });
+
+  it('emits procedures joined with --- when present', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    await mkdir(join(tempDir, 'procedures'), { recursive: true });
+    await writeFile(join(tempDir, 'procedures', 'verify.md'), '# Verify\n\nAlways verify.');
+    await writeFile(join(tempDir, 'procedures', 'reflect.md'), '# Reflect\n\nAlways reflect.');
+    const result = await loadIdentity(tempDir);
+    expect(result).toContain('# Procedures');
+    expect(result).toContain('Always verify');
+    expect(result).toContain('Always reflect');
+  });
+
+  it('prepends a cap warning when >10 procedures are present', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    await mkdir(join(tempDir, 'procedures'), { recursive: true });
+    for (let i = 0; i < 11; i++) {
+      await writeFile(
+        join(tempDir, 'procedures', `proc-${i.toString().padStart(2, '0')}.md`),
+        `# ${i}\nbody`,
+      );
+    }
+    const result = await loadIdentity(tempDir);
+    expect(result).toContain('# Procedures');
+    expect(result.toLowerCase()).toContain('cap exceeded');
+  });
+});
