@@ -53,8 +53,8 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
   const limit = parsed.values.limit !== undefined
     ? Number.parseInt(parsed.values.limit, 10)
     : undefined;
-  if (limit !== undefined && Number.isNaN(limit)) {
-    io.stderr(`--limit must be an integer.\n`);
+  if (limit !== undefined && (!Number.isInteger(limit) || limit <= 0)) {
+    io.stderr(`--limit must be a positive integer.\n`);
     return 2;
   }
 

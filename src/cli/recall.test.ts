@@ -52,4 +52,12 @@ describe('loom recall', () => {
     const parsed = JSON.parse(stdout);
     expect(parsed.every((m: { category: string }) => m.category === 'reference')).toBe(true);
   });
+
+  it.each(['abc', '0', '-1'])('exits 2 when --limit is %s', async (bad) => {
+    const { stderr, code } = await runCliCaptured(
+      ['recall', 'q', '--context-dir', tempDir, `--limit=${bad}`],
+    );
+    expect(code).toBe(2);
+    expect(stderr).toMatch(/positive integer/);
+  });
 });
