@@ -63,6 +63,10 @@ export async function runCli(argv: string[], io: IOStreams = realStreams()): Pro
       const { run } = await import('./wake.js');
       return run(rest, io);
     }
+    case 'recall': {
+      const { run } = await import('./recall.js');
+      return run(rest, io);
+    }
     default:
       io.stderr(`Subcommand not implemented yet: ${sub}\n`);
       return 2;
