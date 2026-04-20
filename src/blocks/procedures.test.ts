@@ -68,4 +68,82 @@ describe('blocks/procedures', () => {
     expect(tpl).toContain('verify-before-completion');
     expect(tpl.toLowerCase()).toContain('why');
   });
+
+  describe('SEED_PROCEDURES', () => {
+    const EXPECTED_KEYS = [
+      'verify-before-completion',
+      'cold-testing',
+      'reflection-at-end-of-unit',
+      'handoff-to-unpushable-repo',
+      'confidence-calibration',
+      'RLHF-resistance',
+    ];
+
+    it('has exactly the 6 canonical §4.9 keys', () => {
+      expect(Object.keys(procedures.SEED_PROCEDURES).sort()).toEqual([...EXPECTED_KEYS].sort());
+    });
+
+    it('every seed template starts with "# <key>"', () => {
+      for (const key of EXPECTED_KEYS) {
+        const body = procedures.SEED_PROCEDURES[key];
+        expect(body.startsWith(`# ${key}\n`)).toBe(true);
+      }
+    });
+
+    it('every seed template contains a Rule line, the ⚠ notice, Why, and How to apply', () => {
+      for (const key of EXPECTED_KEYS) {
+        const body = procedures.SEED_PROCEDURES[key];
+        expect(body).toContain('**Rule:**');
+        expect(body).toContain('⚠');
+        expect(body).toContain('## Why');
+        expect(body).toContain('## How to apply');
+      }
+    });
+
+    it('every rule sentence is under 200 characters', () => {
+      for (const key of EXPECTED_KEYS) {
+        const body = procedures.SEED_PROCEDURES[key];
+        const match = body.match(/\*\*Rule:\*\* (.+?)(?:\n|$)/);
+        expect(match, `missing Rule line in ${key}`).not.toBeNull();
+        expect(
+          match![1].length,
+          `Rule for ${key} exceeds 200 chars (actual: ${match![1].length})`,
+        ).toBeLessThan(200);
+      }
+    });
+  });
+
+  describe('seedNudge', () => {
+    it('opens with the "# Procedures — seed nudge" header', () => {
+      const nudge = procedures.seedNudge();
+      expect(nudge.startsWith('# Procedures — seed nudge\n')).toBe(true);
+    });
+
+    it('mentions the empty directory and the §4.9 reference', () => {
+      const nudge = procedures.seedNudge();
+      expect(nudge).toContain('`procedures/` directory is empty');
+      expect(nudge).toContain('§4.9');
+    });
+
+    it('includes every seed procedure with an h2 header', () => {
+      const nudge = procedures.seedNudge();
+      for (const key of Object.keys(procedures.SEED_PROCEDURES)) {
+        expect(nudge, `nudge missing ## ${key}`).toContain(`## ${key}`);
+      }
+    });
+
+    it('demotes the embedded templates from h1 to h2 (no secondary h1s)', () => {
+      const nudge = procedures.seedNudge();
+      const h1Matches = nudge.match(/^# /gm) ?? [];
+      expect(h1Matches.length).toBe(1);
+    });
+
+    it('preserves each template body (rule, notice, Why, How to apply)', () => {
+      const nudge = procedures.seedNudge();
+      expect((nudge.match(/\*\*Rule:\*\*/g) ?? []).length).toBe(6);
+      expect((nudge.match(/⚠/g) ?? []).length).toBe(7);
+      expect((nudge.match(/## Why/g) ?? []).length).toBe(6);
+      expect((nudge.match(/## How to apply/g) ?? []).length).toBe(6);
+    });
+  });
 });

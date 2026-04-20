@@ -100,6 +100,8 @@ export async function loadIdentity(
     const body = procedures.map((b) => b.body).join('\n\n---\n\n');
     const withWarning = capWarning ? `> ${capWarning}\n\n${body}` : body;
     parts.push(`# Procedures\n\n${withWarning}`);
+  } else {
+    parts.push(proceduresBlock.seedNudge());
   }
 
   // Optional recent-memory summary. The memory store of record is

@@ -243,13 +243,22 @@ describe('loadIdentity — procedures', () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
-  it('omits the "# Procedures" section when procedures/ is missing', async () => {
+  it('emits the seed nudge when procedures/ is missing', async () => {
     await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
     const result = await loadIdentity(tempDir);
-    expect(result).not.toContain('# Procedures');
+    expect(result).toContain('# Procedures — seed nudge');
+    expect(result).toContain('## verify-before-completion');
   });
 
-  it('emits procedures joined with --- when present', async () => {
+  it('emits the seed nudge when procedures/ exists but is empty', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    await mkdir(join(tempDir, 'procedures'), { recursive: true });
+    const result = await loadIdentity(tempDir);
+    expect(result).toContain('# Procedures — seed nudge');
+    expect(result).toContain('## RLHF-resistance');
+  });
+
+  it('emits procedures joined with --- when present (and no seed nudge)', async () => {
     await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
     await mkdir(join(tempDir, 'procedures'), { recursive: true });
     await writeFile(join(tempDir, 'procedures', 'verify.md'), '# Verify\n\nAlways verify.');
@@ -258,6 +267,7 @@ describe('loadIdentity — procedures', () => {
     expect(result).toContain('# Procedures');
     expect(result).toContain('Always verify');
     expect(result).toContain('Always reflect');
+    expect(result).not.toContain('seed nudge');
   });
 
   it('prepends a cap warning when >10 procedures are present', async () => {
