@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0-alpha.2] - 2026-04-20
+
+### Added
+
+- Procedures seed content — 6 recommended seed templates (stack spec
+  v1 §4.9) exposed as `SEED_PROCEDURES` in `src/blocks/procedures.ts`:
+  `verify-before-completion`, `cold-testing`,
+  `reflection-at-end-of-unit`, `handoff-to-unpushable-repo`,
+  `confidence-calibration`, `RLHF-resistance`. Each template ships a
+  prescriptive Rule sentence plus agent-authored slots for Why and
+  How to apply, fenced by a ⚠ ownership-ritual notice the agent
+  deletes on adoption.
+- `seedNudge()` — renders an empty-directory onboarding message
+  containing all 6 templates. Emitted by `identity()` whenever
+  `procedures/` is missing or empty; suppressed as soon as any
+  procedure file exists.
+
 ### Changed
 
 - Documentation reshuffle: v0.4 arc docs moved out of the repo. The
@@ -79,6 +96,7 @@ Initial public release.
   stack and all added external-service dependencies or operational
   overhead.
 
-[Unreleased]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.1...HEAD
+[Unreleased]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.2...HEAD
+[0.4.0-alpha.2]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.1...v0.4.0-alpha.2
 [0.4.0-alpha.1]: https://github.com/jbarket/loom/compare/v0.3.1...v0.4.0-alpha.1
 [0.3.1]: https://github.com/jbarket/loom/releases/tag/v0.3.1
