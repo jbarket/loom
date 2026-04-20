@@ -105,7 +105,10 @@ describe('blocks/procedures', () => {
         const body = procedures.SEED_PROCEDURES[key];
         const match = body.match(/\*\*Rule:\*\* (.+?)(?:\n|$)/);
         expect(match, `missing Rule line in ${key}`).not.toBeNull();
-        expect(match![1].length).toBeLessThan(200);
+        expect(
+          match![1].length,
+          `Rule for ${key} exceeds 200 chars (actual: ${match![1].length})`,
+        ).toBeLessThan(200);
       }
     });
   });
