@@ -3,7 +3,7 @@
 [![CI](https://github.com/jbarket/loom/actions/workflows/ci.yml/badge.svg)](https://github.com/jbarket/loom/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-0.3.1-blue.svg)](CHANGELOG.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-compatible-orange.svg)](https://modelcontextprotocol.io)
 
 **Persistent identity and memory for AI agents, as an MCP server.**
@@ -218,6 +218,12 @@ relationship and why the project exists in its current shape.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+AGPL-3.0-or-later — see [LICENSE](LICENSE).
 
 Copyright © 2026 Art E Fish + Jonathan Barket.
+
+loom is free software: you can redistribute it and modify it under the
+terms of the GNU Affero General Public License (version 3 or any later
+version). If you run a modified loom and let others interact with it
+over a network, you must offer them the corresponding source. Bundle
+loom into a larger product freely; fork it and go proprietary, no.

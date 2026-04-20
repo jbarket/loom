@@ -34,6 +34,14 @@ for the full arc. This alpha is the first piece.
   but no corresponding manifest exists, `identity()` emits a
   template-filled section telling the agent exactly what to write.
 
+### Changed
+
+- License: MIT → **AGPL-3.0-or-later**. Forks that modify loom and
+  expose it over a network must offer source to their users. Bundling
+  loom into a larger product is still fine; closing the loom-derived
+  code and reselling it is not. Pre-alpha-1 releases remain available
+  under MIT.
+
 ## [0.3.1] - 2026-04-19
 
 Initial public release.

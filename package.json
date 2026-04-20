@@ -33,7 +33,7 @@
     "persistent"
   ],
   "author": "Art E Fish + Jonathan Barket",
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^12.9.0",
