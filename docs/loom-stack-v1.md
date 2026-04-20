@@ -426,3 +426,28 @@ model in their metadata so adapters can detect mismatch.
 - `src/backends/sqlite-vec.ts` — v1 reference backend
 - `src/backends/fastembed.ts` — v1 reference embedder
 - `src/tools/identity.ts` — reference wake-sequence implementation
+
+## §11 — Adapters: CLI
+
+Every tool defined in this spec (identity, recall, remember, forget,
+update, memory_list, memory_prune, pursuits, update_identity,
+bootstrap) has a first-party CLI surface in the reference
+implementation:
+
+| MCP tool          | CLI command                             |
+|-------------------|-----------------------------------------|
+| identity          | `loom wake`                             |
+| recall            | `loom recall <query>`                   |
+| remember          | `loom remember <title>` (body: stdin)   |
+| update            | `loom update <ref>` (body: stdin)       |
+| forget            | `loom forget <ref|scope>`               |
+| memory_list       | `loom memory list`                      |
+| memory_prune      | `loom memory prune`                     |
+| pursuits          | `loom pursuits <action>`                |
+| update_identity   | `loom update-identity <file> [<section>]` |
+| bootstrap         | `loom bootstrap`                        |
+
+A stdio-MCP startup is available as both the default (no subcommand)
+invocation and as the explicit `loom serve`. Alternate reference
+implementations (future ports) are expected to carry the same shell
+surface.

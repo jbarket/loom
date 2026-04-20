@@ -123,6 +123,33 @@ Claude Code uses double-underscore tool prefixes
 (`mcp_loom_identity`); set `LOOM_CLIENT` accordingly and loom will
 adapt the client-specific hints it emits.
 
+## CLI
+
+Every MCP tool has a shell equivalent. Useful for debugging, scripting,
+or running without a harness.
+
+```bash
+# Dump identity markdown (works even when MCP is dead)
+npx loom wake --context-dir ~/.config/loom/art
+
+# Save a memory (body from stdin)
+echo "Met Jonathan at a coffee shop" | npx loom remember "first meeting" \
+  --category user --context-dir ~/.config/loom/art
+
+# Search
+npx loom recall "coffee shop" --context-dir ~/.config/loom/art
+
+# List all memories in a category
+npx loom memory list --category feedback --context-dir ~/.config/loom/art
+
+# Initialize a fresh agent
+npx loom bootstrap --context-dir ~/.config/loom/new-agent
+```
+
+`npx loom --help` lists subcommands; `npx loom <cmd> --help` shows
+per-command usage. All global env vars (`LOOM_CONTEXT_DIR`,
+`LOOM_CLIENT`, `LOOM_MODEL`) are honored.
+
 ## Configuration
 
 All configuration is through environment variables:

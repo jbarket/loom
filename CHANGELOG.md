@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0-alpha.3] - 2026-04-20
+
+### Added
+
+- Full CLI surface — every MCP tool has a `loom <subcommand>` shell
+  equivalent: `wake`, `recall`, `remember`, `update`, `forget`,
+  `memory list`, `memory prune`, `pursuits`, `update-identity`,
+  `bootstrap`, plus an explicit `serve` alias. Write commands take
+  body text via stdin (when piped) or `$VISUAL`/`$EDITOR` (when
+  interactive). `--json` on any command emits the tool's structured
+  return value for scripting.
+- `assertStackVersionCompatible()` helper consolidates the
+  stack-version gate; both MCP startup and every CLI command call it.
+
+### Changed
+
+- `node dist/index.js` with no subcommand still launches MCP (backward
+  compatible with every existing `.mcp.json`). A known-subcommand
+  argv[2] routes to the CLI instead.
+
 ## [0.4.0-alpha.2] - 2026-04-20
 
 ### Added
@@ -96,7 +116,8 @@ Initial public release.
   stack and all added external-service dependencies or operational
   overhead.
 
-[Unreleased]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.2...HEAD
+[Unreleased]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.3...HEAD
+[0.4.0-alpha.3]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.2...v0.4.0-alpha.3
 [0.4.0-alpha.2]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.1...v0.4.0-alpha.2
 [0.4.0-alpha.1]: https://github.com/jbarket/loom/compare/v0.3.1...v0.4.0-alpha.1
 [0.3.1]: https://github.com/jbarket/loom/releases/tag/v0.3.1
