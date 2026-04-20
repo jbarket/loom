@@ -112,3 +112,27 @@ function seedBody(key: string, rule: string): string {
 <when this kicks in, what triggers it, how to judge edge cases>
 `;
 }
+
+/**
+ * Renders the empty-directory onboarding nudge. Includes all 6 seed templates
+ * inline with their h1 headers demoted to h2 so the nudge remains a
+ * single-h1 section. On-disk `procedures/<key>.md` files keep `# <key>`
+ * as their h1 — the demotion is a nudge-only concern.
+ */
+export function seedNudge(): string {
+  const preamble = `# Procedures — seed nudge
+
+Your \`procedures/\` directory is empty. Below are 6 recommended seed templates
+from stack spec v1 §4.9. Copy any you want to adopt into
+\`<contextDir>/procedures/<key>.md\`, edit the Why and How to apply sections,
+and delete the seed notice to claim the procedure.
+
+You don't have to take all 6. You can add your own (cap ~10). The procedures
+block is prescriptive to *you* — generic text doesn't serve it.`;
+
+  const sections = Object.entries(SEED_PROCEDURES).map(([, body]) =>
+    body.replace(/^# /, '## '),
+  );
+
+  return [preamble, ...sections].join('\n\n---\n\n');
+}

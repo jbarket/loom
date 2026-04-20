@@ -112,4 +112,38 @@ describe('blocks/procedures', () => {
       }
     });
   });
+
+  describe('seedNudge', () => {
+    it('opens with the "# Procedures — seed nudge" header', () => {
+      const nudge = procedures.seedNudge();
+      expect(nudge.startsWith('# Procedures — seed nudge\n')).toBe(true);
+    });
+
+    it('mentions the empty directory and the §4.9 reference', () => {
+      const nudge = procedures.seedNudge();
+      expect(nudge).toContain('`procedures/` directory is empty');
+      expect(nudge).toContain('§4.9');
+    });
+
+    it('includes every seed procedure with an h2 header', () => {
+      const nudge = procedures.seedNudge();
+      for (const key of Object.keys(procedures.SEED_PROCEDURES)) {
+        expect(nudge, `nudge missing ## ${key}`).toContain(`## ${key}`);
+      }
+    });
+
+    it('demotes the embedded templates from h1 to h2 (no secondary h1s)', () => {
+      const nudge = procedures.seedNudge();
+      const h1Matches = nudge.match(/^# /gm) ?? [];
+      expect(h1Matches.length).toBe(1);
+    });
+
+    it('preserves each template body (rule, notice, Why, How to apply)', () => {
+      const nudge = procedures.seedNudge();
+      expect((nudge.match(/\*\*Rule:\*\*/g) ?? []).length).toBe(6);
+      expect((nudge.match(/⚠/g) ?? []).length).toBe(6);
+      expect((nudge.match(/## Why/g) ?? []).length).toBe(6);
+      expect((nudge.match(/## How to apply/g) ?? []).length).toBe(6);
+    });
+  });
 });
