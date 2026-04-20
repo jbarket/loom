@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, access } from 'node:fs/promises';
+import { mkdtemp, rm, access, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCliCaptured } from './test-helpers.js';
+import { CURRENT_STACK_VERSION, STACK_VERSION_FILE } from '../config.js';
 
 describe('loom bootstrap', () => {
   let tempDir: string;
@@ -57,5 +58,17 @@ describe('loom bootstrap', () => {
     expect(parsed.wrote).toEqual(expect.arrayContaining([
       expect.stringMatching(/IDENTITY\.md$/),
     ]));
+    expect(parsed.wrote.some((p: string) => p.endsWith('pursuits.md'))).toBe(false);
+  });
+
+  it('exits 1 when the stack version stamp is ahead of this build', async () => {
+    await writeFile(join(tempDir, STACK_VERSION_FILE), `${CURRENT_STACK_VERSION + 1}\n`);
+    const { stderr, code } = await runCliCaptured([
+      'bootstrap',
+      '--name', 'Rook', '--purpose', 'p', '--voice', 'v',
+      '--context-dir', tempDir,
+    ]);
+    expect(code).toBe(1);
+    expect(stderr).toMatch(/Upgrade loom/);
   });
 });

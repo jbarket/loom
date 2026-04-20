@@ -10,6 +10,7 @@ import { parseArgs } from 'node:util';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { bootstrap } from '../tools/bootstrap.js';
+import { assertStackVersionCompatible } from '../config.js';
 import { extractGlobalFlags, resolveEnv } from './args.js';
 import { readStdin, renderJson } from './io.js';
 import type { IOStreams } from './io.js';
@@ -17,7 +18,7 @@ import type { BootstrapParams } from '../tools/bootstrap.js';
 
 const USAGE = `Usage: loom bootstrap [options]
 
-Initializes IDENTITY.md, preferences.md, self-model.md, and pursuits.md
+Initializes IDENTITY.md, preferences.md, and self-model.md
 in the context directory.
 
 Param sources (first match wins):
@@ -94,6 +95,8 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
   if (parsed.values.help) { io.stdout(USAGE); return 0; }
 
   const env = resolveEnv(global, io.env);
+  try { assertStackVersionCompatible(env.contextDir); }
+  catch (err) { io.stderr(`${(err as Error).message}\n`); return 1; }
 
   let params: BootstrapParams | null = null;
 
@@ -152,7 +155,6 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
           join(env.contextDir, 'IDENTITY.md'),
           join(env.contextDir, 'preferences.md'),
           join(env.contextDir, 'self-model.md'),
-          join(env.contextDir, 'pursuits.md'),
         ],
       });
     } else {
