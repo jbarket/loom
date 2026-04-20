@@ -40,4 +40,11 @@ describe('parseFrontmatter', () => {
     const { frontmatter } = parseFrontmatter(text);
     expect(frontmatter.note).toBe('time is 08:30 CT');
   });
+
+  it('normalizes CRLF line endings before parsing', () => {
+    const text = '---\r\nharness: claude-code\r\nversion: 0.4\r\n---\r\n\r\n## Section\r\nhello';
+    const { frontmatter, body } = parseFrontmatter(text);
+    expect(frontmatter).toEqual({ harness: 'claude-code', version: '0.4' });
+    expect(body).toContain('## Section');
+  });
 });

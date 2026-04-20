@@ -14,7 +14,7 @@ export interface Block {
   key: string;
   /** Parsed frontmatter as flat key→value. Empty object when absent or malformed. */
   frontmatter: Record<string, string>;
-  /** Markdown body after the frontmatter fences, trimmed. */
+  /** Markdown body after the frontmatter fences. Not trimmed — callers trim as needed. */
   body: string;
   /** Absolute path this block was read from. */
   path: string;
@@ -34,12 +34,16 @@ export interface BlockReader {
  * Split `---` frontmatter from the markdown body. Missing or malformed
  * fences yield `{}` frontmatter + the original text as body. Individual
  * lines that aren't `key: value` are ignored.
+ *
+ * Normalizes CRLF → LF before parsing so files authored on Windows parse correctly.
  */
 export function parseFrontmatter(text: string): {
   frontmatter: Record<string, string>;
   body: string;
 } {
-  const match = text.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  // Normalize CRLF → LF so the regex works cross-platform.
+  const normalized = text.replace(/\r\n/g, '\n');
+  const match = normalized.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
   if (!match) return { frontmatter: {}, body: text };
 
   const frontmatter: Record<string, string> = {};
