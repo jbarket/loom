@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    setupFiles: ['./src/test-setup.ts'],
     env: {
       // Force filesystem backend in tests so tool-level tests don't route
       // through Qdrant (which requires a live server and separate data store).

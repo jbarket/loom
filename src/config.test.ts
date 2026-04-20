@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -11,6 +12,7 @@ import {
   STACK_VERSION_FILE,
   readStackVersion,
   ensureStackVersion,
+  assertStackVersionCompatible,
 } from './config.js';
 
 describe('resolveContextDir', () => {
@@ -121,5 +123,28 @@ describe('stack version', () => {
     writeFileSync(join(dir, 'LOOM_STACK_VERSION'), '1\n');
     ensureStackVersion(dir);
     expect(readFileSync(join(dir, 'LOOM_STACK_VERSION'), 'utf-8')).toBe('1\n');
+  });
+});
+
+describe('assertStackVersionCompatible', () => {
+  let tempDir: string;
+  beforeEach(async () => { tempDir = await mkdtemp(join(tmpdir(), 'loom-stack-gate-')); });
+  afterEach(async () => { await rm(tempDir, { recursive: true, force: true }); });
+
+  it('stamps current version when missing', async () => {
+    assertStackVersionCompatible(tempDir);
+    const { readFile } = await import('node:fs/promises');
+    const stamp = await readFile(join(tempDir, STACK_VERSION_FILE), 'utf-8');
+    expect(stamp.trim()).toBe(String(CURRENT_STACK_VERSION));
+  });
+
+  it('accepts a stamp equal to CURRENT_STACK_VERSION', async () => {
+    await writeFile(join(tempDir, STACK_VERSION_FILE), `${CURRENT_STACK_VERSION}\n`);
+    expect(() => assertStackVersionCompatible(tempDir)).not.toThrow();
+  });
+
+  it('refuses a stamp ahead of CURRENT_STACK_VERSION', async () => {
+    await writeFile(join(tempDir, STACK_VERSION_FILE), `${CURRENT_STACK_VERSION + 1}\n`);
+    expect(() => assertStackVersionCompatible(tempDir)).toThrow(/Upgrade loom/);
   });
 });

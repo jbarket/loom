@@ -82,3 +82,26 @@ export function ensureStackVersion(contextDir: string): void {
   if (existsSync(path)) return;
   writeFileSync(path, `${CURRENT_STACK_VERSION}\n`, 'utf-8');
 }
+
+/**
+ * Refuse to operate against a stack at a higher version than this build
+ * understands; stamp the current version if the file is missing.
+ */
+export function assertStackVersionCompatible(contextDir: string): void {
+  const onDisk = readStackVersion(contextDir);
+  if (onDisk !== null) {
+    if (Number.isNaN(onDisk)) {
+      throw new Error(
+        `LOOM_STACK_VERSION unparseable at ${contextDir}/${STACK_VERSION_FILE}. ` +
+        `Expected an integer; got raw content.`,
+      );
+    }
+    if (onDisk > CURRENT_STACK_VERSION) {
+      throw new Error(
+        `Stack at ${contextDir} is version ${onDisk}; ` +
+        `this loom build understands up to v${CURRENT_STACK_VERSION}. Upgrade loom.`,
+      );
+    }
+  }
+  ensureStackVersion(contextDir);
+}

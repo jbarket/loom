@@ -1,7 +1,7 @@
 # loom
 
 [![CI](https://github.com/jbarket/loom/actions/workflows/ci.yml/badge.svg)](https://github.com/jbarket/loom/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.3.1-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.4.0--alpha.3-blue.svg)](CHANGELOG.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-compatible-orange.svg)](https://modelcontextprotocol.io)
@@ -122,6 +122,33 @@ Claude Code uses double-underscore tool prefixes
 (`mcp__loom__identity`). Other runtimes use single underscores
 (`mcp_loom_identity`); set `LOOM_CLIENT` accordingly and loom will
 adapt the client-specific hints it emits.
+
+## CLI
+
+Every MCP tool has a shell equivalent. Useful for debugging, scripting,
+or running without a harness.
+
+```bash
+# Dump identity markdown (works even when MCP is dead)
+npx loom wake --context-dir ~/.config/loom/art
+
+# Save a memory (body from stdin)
+echo "Met Jonathan at a coffee shop" | npx loom remember "first meeting" \
+  --category user --context-dir ~/.config/loom/art
+
+# Search
+npx loom recall "coffee shop" --context-dir ~/.config/loom/art
+
+# List all memories in a category
+npx loom memory list --category feedback --context-dir ~/.config/loom/art
+
+# Initialize a fresh agent
+npx loom bootstrap --context-dir ~/.config/loom/new-agent
+```
+
+`npx loom --help` lists subcommands; `npx loom <cmd> --help` shows
+per-command usage. All global env vars (`LOOM_CONTEXT_DIR`,
+`LOOM_CLIENT`, `LOOM_MODEL`) are honored.
 
 ## Configuration
 
