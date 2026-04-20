@@ -56,7 +56,15 @@ export async function runCli(argv: string[], io: IOStreams = realStreams()): Pro
     return 2;
   }
 
-  // Subcommands land in Tasks 2–10.
-  io.stderr(`Subcommand not implemented yet: ${first}\n`);
-  return 2;
+  const sub = first;
+  const rest = argv.slice(1);
+  switch (sub) {
+    case 'wake': {
+      const { run } = await import('./wake.js');
+      return run(rest, io);
+    }
+    default:
+      io.stderr(`Subcommand not implemented yet: ${sub}\n`);
+      return 2;
+  }
 }
