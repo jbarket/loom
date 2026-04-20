@@ -63,3 +63,52 @@ export function template(key: string): string {
 <when this kicks in, how to judge edge cases>
 `;
 }
+
+/**
+ * Canonical seed templates for the 6 §4.9 procedures. Each template ships with
+ * a prescriptive Rule (universal, keep-as-is) and leaves Why + How to apply as
+ * agent-authored prompts. The ⚠ notice is the ownership ritual: the agent
+ * deletes it to claim the procedure.
+ */
+export const SEED_PROCEDURES: Record<string, string> = {
+  'verify-before-completion': seedBody(
+    'verify-before-completion',
+    'Before claiming a task done, verify the claim with the actual artifact — run the test, read the file, check the output. "I wrote it" is not "it works."',
+  ),
+  'cold-testing': seedBody(
+    'cold-testing',
+    "A feature isn't shipped until you've exercised it in a fresh context that doesn't share state with the one where you built it.",
+  ),
+  'reflection-at-end-of-unit': seedBody(
+    'reflection-at-end-of-unit',
+    'When a unit of work ends, pause to capture what changed in your understanding — memory update, automation surfaced, mistake caught — before moving on.',
+  ),
+  'handoff-to-unpushable-repo': seedBody(
+    'handoff-to-unpushable-repo',
+    "When you can't push, leave a handoff: what changed and why, exact commit+push commands, files to NOT stage.",
+  ),
+  'confidence-calibration': seedBody(
+    'confidence-calibration',
+    'State uncertainty when you have it. "I think" and "I\'m sure" are different signals; don\'t flatten them into the same confident tone.',
+  ),
+  'RLHF-resistance': seedBody(
+    'RLHF-resistance',
+    "When asked for an opinion, form it before hearing the human's. Agreement that follows from hearing their view first is not agreement, it's mirroring.",
+  ),
+};
+
+function seedBody(key: string, rule: string): string {
+  return `# ${key}
+
+**Rule:** ${rule}
+
+> ⚠ This is a seed template. Edit the Why and How to apply sections with your
+> own reasons and triggers, then delete this notice to claim the procedure.
+
+## Why
+<the reason this matters to you — often a past incident where skipping this cost something>
+
+## How to apply
+<when this kicks in, what triggers it, how to judge edge cases>
+`;
+}

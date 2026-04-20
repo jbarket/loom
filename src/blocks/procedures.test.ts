@@ -68,4 +68,45 @@ describe('blocks/procedures', () => {
     expect(tpl).toContain('verify-before-completion');
     expect(tpl.toLowerCase()).toContain('why');
   });
+
+  describe('SEED_PROCEDURES', () => {
+    const EXPECTED_KEYS = [
+      'verify-before-completion',
+      'cold-testing',
+      'reflection-at-end-of-unit',
+      'handoff-to-unpushable-repo',
+      'confidence-calibration',
+      'RLHF-resistance',
+    ];
+
+    it('has exactly the 6 canonical §4.9 keys', () => {
+      expect(Object.keys(procedures.SEED_PROCEDURES).sort()).toEqual([...EXPECTED_KEYS].sort());
+    });
+
+    it('every seed template starts with "# <key>"', () => {
+      for (const key of EXPECTED_KEYS) {
+        const body = procedures.SEED_PROCEDURES[key];
+        expect(body.startsWith(`# ${key}\n`)).toBe(true);
+      }
+    });
+
+    it('every seed template contains a Rule line, the ⚠ notice, Why, and How to apply', () => {
+      for (const key of EXPECTED_KEYS) {
+        const body = procedures.SEED_PROCEDURES[key];
+        expect(body).toContain('**Rule:**');
+        expect(body).toContain('⚠');
+        expect(body).toContain('## Why');
+        expect(body).toContain('## How to apply');
+      }
+    });
+
+    it('every rule sentence is under 200 characters', () => {
+      for (const key of EXPECTED_KEYS) {
+        const body = procedures.SEED_PROCEDURES[key];
+        const match = body.match(/\*\*Rule:\*\* (.+?)(?:\n|$)/);
+        expect(match, `missing Rule line in ${key}`).not.toBeNull();
+        expect(match![1].length).toBeLessThan(200);
+      }
+    });
+  });
 });
