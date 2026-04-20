@@ -52,4 +52,14 @@ describe('loom update', () => {
     );
     expect(code).toBe(2);
   });
+
+  it('updates via --category + --title identifier', async () => {
+    const { stdout, code } = await runCliCaptured(
+      ['update', '--category', 'reference', '--title', 't', '--context-dir', tempDir, '--json'],
+      { stdin: 'new body' },
+    );
+    expect(code).toBe(0);
+    const parsed = JSON.parse(stdout);
+    expect(parsed.updated).toBe(true);
+  });
 });

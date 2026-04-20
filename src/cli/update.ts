@@ -10,7 +10,7 @@ import { readBody, renderJson } from './io.js';
 import type { IOStreams } from './io.js';
 import type { UpdateInput } from '../backends/types.js';
 
-export const USAGE = `Usage: loom update <ref> [options]
+const USAGE = `Usage: loom update <ref> [options]
        loom update --category <cat> --title <exact> [options]
 
 Updates content (from stdin or \$EDITOR) and/or metadata on an existing
