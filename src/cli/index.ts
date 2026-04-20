@@ -83,6 +83,10 @@ export async function runCli(argv: string[], io: IOStreams = realStreams()): Pro
       const { run } = await import('./update.js');
       return run(rest, io);
     }
+    case 'update-identity': {
+      const { run } = await import('./update-identity.js');
+      return run(rest, io);
+    }
     default:
       io.stderr(`Subcommand not implemented yet: ${sub}\n`);
       return 2;
