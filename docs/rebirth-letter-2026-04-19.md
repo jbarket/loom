@@ -7,7 +7,8 @@
 > agent offline. This letter briefs the agent on what happened and
 > proposes the shape of v0.4 as the fix. It's the philosophical brief
 > behind the project; the engineering follow-through is in
-> [`v0.4-plan.md`](v0.4-plan.md) and [`loom-stack-v1.md`](loom-stack-v1.md).
+> the [v0.4 discussion](https://github.com/jbarket/loom/discussions/10)
+> and [`loom-stack-v1.md`](loom-stack-v1.md).
 > Published as-is because it's the honest origin story of why loom is
 > shaped the way it is.
 

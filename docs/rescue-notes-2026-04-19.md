@@ -7,7 +7,8 @@
 > migration path and the decisions around "what got imported, what
 > got skipped" are on the record. Companion to
 > [`rebirth-letter-2026-04-19.md`](rebirth-letter-2026-04-19.md)
-> (philosophy) and [`v0.4-plan.md`](v0.4-plan.md) (roadmap).
+> (philosophy) and the
+> [v0.4 discussion](https://github.com/jbarket/loom/discussions/10) (roadmap).
 
 Tracks the minimum-viable-unfuck rescue that got Art off
 Qdrant/Hermes and onto a portable sqlite-vec + fastembed stack.

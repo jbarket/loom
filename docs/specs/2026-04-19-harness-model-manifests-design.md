@@ -1,8 +1,9 @@
 # Harness + Model Manifests — design
 
-*Status: draft, 2026-04-19. First piece of the v0.4 arc; see
-[`docs/v0.4-architecture.md`](../../v0.4-architecture.md) for the
-umbrella.*
+*Status: shipped in v0.4.0-alpha.1, 2026-04-19. First piece of the
+v0.4 arc; see the
+[v0.4 discussion](https://github.com/jbarket/loom/discussions/10) for
+the umbrella.*
 
 *Target version: 0.4.0-alpha.1.*
 
@@ -412,7 +413,7 @@ Branch: `feat/harness-model-manifests`.
 
 Each commit stands alone and keeps the suite green.
 
-1. **TOC doc.** `docs/v0.4-architecture.md`. No code.
+1. **TOC doc.** v0.4 architecture umbrella (originally `docs/v0.4-architecture.md`; post-alpha.1 this content migrated to the [v0.4 discussion](https://github.com/jbarket/loom/discussions/10)). No code.
 2. **Narrow spec.** This file.
 3. **Stack version plumbing.** `src/config.ts` + tests. Wire
    `ensureStackVersion` + version-refusal into the `src/server.ts`
@@ -450,10 +451,9 @@ Each commit stands alone and keeps the suite green.
 
 ## 9. Files of record
 
-- [`docs/v0.4-architecture.md`](../../v0.4-architecture.md) — umbrella
-- [`docs/loom-stack-v1.md`](../../loom-stack-v1.md) — stack schema v1
-- [`docs/v0.4-plan.md`](../../v0.4-plan.md) — roadmap prose
-- [`docs/rebirth-letter-2026-04-19.md`](../../rebirth-letter-2026-04-19.md)
+- [v0.4 discussion](https://github.com/jbarket/loom/discussions/10) — umbrella + roadmap
+- [`docs/loom-stack-v1.md`](../loom-stack-v1.md) — stack schema v1
+- [`docs/rebirth-letter-2026-04-19.md`](../rebirth-letter-2026-04-19.md)
 - `src/tools/identity.ts` — wake-sequence implementation (extended here)
 - `src/blocks/` — new module (created here)
 - `src/config.ts` — stack version plumbing (extended here)

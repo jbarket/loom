@@ -6,8 +6,8 @@ persistent identity + memory + procedural state, independent of any
 particular runtime, storage, or transport.*
 
 *Reference reading first: `docs/rebirth-letter-2026-04-19.md` (the
-philosophy) and `docs/v0.4-plan.md` (the roadmap). This doc is the
-engineering contract those two rely on.*
+philosophy) and the [v0.4 discussion](https://github.com/jbarket/loom/discussions/10)
+(the roadmap). This doc is the engineering contract they rely on.*
 
 ---
 
@@ -420,7 +420,7 @@ model in their metadata so adapters can detect mismatch.
 ## Files of record
 
 - `docs/rebirth-letter-2026-04-19.md` — philosophical brief
-- `docs/v0.4-plan.md` — roadmap
+- [v0.4 roadmap discussion](https://github.com/jbarket/loom/discussions/10)
 - `docs/loom-stack-v1.md` — this spec
 - `src/backends/types.ts` — `MemoryBackend` interface
 - `src/backends/sqlite-vec.ts` — v1 reference backend
