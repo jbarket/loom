@@ -58,4 +58,18 @@ describe('loom wake', () => {
     expect(code).toBe(0);
     expect(stdout + stderr).toMatch(/loom wake/);
   });
+
+  it('exits 2 on unknown flag with usage on stderr', async () => {
+    const { code, stderr } = await runCliCaptured(['wake', '--bogus', '--context-dir', tempDir]);
+    expect(code).toBe(2);
+    expect(stderr).toMatch(/loom wake/);
+  });
+
+  it('exits 1 when stack is ahead of this build', async () => {
+    const { CURRENT_STACK_VERSION, STACK_VERSION_FILE } = await import('../config.js');
+    await writeFile(join(tempDir, STACK_VERSION_FILE), `${CURRENT_STACK_VERSION + 1}\n`);
+    const { code, stderr } = await runCliCaptured(['wake', '--context-dir', tempDir]);
+    expect(code).toBe(1);
+    expect(stderr).toMatch(/Upgrade loom/);
+  });
 });

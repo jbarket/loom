@@ -7,7 +7,7 @@ import { assertStackVersionCompatible } from '../config.js';
 import { extractGlobalFlags, resolveEnv } from './args.js';
 import type { IOStreams } from './io.js';
 
-export const USAGE = `Usage: loom wake [options]
+const USAGE = `Usage: loom wake [options]
 
 Prints the agent's wake output (identity, preferences, self-model,
 harness manifest, model manifest, procedures) to stdout.
