@@ -141,7 +141,7 @@ describe('blocks/procedures', () => {
     it('preserves each template body (rule, notice, Why, How to apply)', () => {
       const nudge = procedures.seedNudge();
       expect((nudge.match(/\*\*Rule:\*\*/g) ?? []).length).toBe(6);
-      expect((nudge.match(/⚠/g) ?? []).length).toBe(6);
+      expect((nudge.match(/⚠/g) ?? []).length).toBe(7);
       expect((nudge.match(/## Why/g) ?? []).length).toBe(6);
       expect((nudge.match(/## How to apply/g) ?? []).length).toBe(6);
     });

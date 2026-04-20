@@ -125,7 +125,7 @@ export function seedNudge(): string {
 Your \`procedures/\` directory is empty. Below are 6 recommended seed templates
 from stack spec v1 §4.9. Copy any you want to adopt into
 \`<contextDir>/procedures/<key>.md\`, edit the Why and How to apply sections,
-and delete the seed notice to claim the procedure.
+and delete the ⚠ notice to claim the procedure.
 
 You don't have to take all 6. You can add your own (cap ~10). The procedures
 block is prescriptive to *you* — generic text doesn't serve it.`;
