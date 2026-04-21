@@ -14,7 +14,7 @@ describe('loom bootstrap', () => {
   it('runs flag-driven when all required flags are provided', async () => {
     const { stdout, code } = await runCliCaptured([
       'bootstrap',
-      '--name', 'Sage',
+      '--name', 'sage',
       '--purpose', 'Help me code',
       '--voice', 'Direct, terse',
       '--context-dir', tempDir,
@@ -28,7 +28,7 @@ describe('loom bootstrap', () => {
 
   it('reads params from piped JSON on stdin', async () => {
     const payload = JSON.stringify({
-      name: 'Oak', purpose: 'p', voice: 'v', clients: ['claude-code'],
+      name: 'oak', purpose: 'p', voice: 'v', clients: ['claude-code'],
     });
     const { code } = await runCliCaptured(
       ['bootstrap', '--context-dir', tempDir],
@@ -48,7 +48,7 @@ describe('loom bootstrap', () => {
   it('emits structured result on --json', async () => {
     const { stdout, code } = await runCliCaptured([
       'bootstrap',
-      '--name', 'Wren', '--purpose', 'p', '--voice', 'v',
+      '--name', 'wren', '--purpose', 'p', '--voice', 'v',
       '--context-dir', tempDir, '--json',
     ]);
     expect(code).toBe(0);
@@ -65,10 +65,34 @@ describe('loom bootstrap', () => {
     await writeFile(join(tempDir, STACK_VERSION_FILE), `${CURRENT_STACK_VERSION + 1}\n`);
     const { stderr, code } = await runCliCaptured([
       'bootstrap',
-      '--name', 'Rook', '--purpose', 'p', '--voice', 'v',
+      '--name', 'rook', '--purpose', 'p', '--voice', 'v',
       '--context-dir', tempDir,
     ]);
     expect(code).toBe(1);
     expect(stderr).toMatch(/Upgrade loom/);
+  });
+
+  it('rejects a reserved name with a clear error', async () => {
+    const { stderr, code } = await runCliCaptured([
+      'bootstrap',
+      '--name', 'current',
+      '--purpose', 'p',
+      '--voice', 'v',
+      '--context-dir', tempDir,
+    ]);
+    expect(code).toBe(2);
+    expect(stderr).toMatch(/reserved/);
+  });
+
+  it('rejects an uppercase name', async () => {
+    const { stderr, code } = await runCliCaptured([
+      'bootstrap',
+      '--name', 'Art',
+      '--purpose', 'p',
+      '--voice', 'v',
+      '--context-dir', tempDir,
+    ]);
+    expect(code).toBe(2);
+    expect(stderr).toMatch(/lowercase/);
   });
 });
