@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0-alpha.4] - 2026-04-20
+
+### Added
+
+- `loom inject` — CLI command that writes a marker-bounded managed
+  section into harness dotfiles (`~/.claude/CLAUDE.md`,
+  `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`). The managed section
+  tells the agent how to load identity via loom — prefer MCP
+  (`mcp__loom__identity`), fall back to the CLI (`loom wake`).
+  Content outside the `<!-- loom:start / loom:end -->` markers is
+  preserved; re-running is idempotent.
+- `--all`, `--harness <keys>`, `--to <path>`, `--dry-run`, `--json`
+  flags for non-interactive use. Interactive keyboard-nav wizard
+  when stdin is a TTY and no harness flags are given.
+- Reusable `src/cli/tui/multi-select.ts` — stdlib keyboard-nav
+  checkbox primitive with a pure reducer. Future consumers: bootstrap
+  procedure adoption, harness-manifest selection.
+- Stack spec §11 lists Injection as a new adapter.
+
+### Changed
+
+- No existing MCP tool surfaces or CLI commands altered. `loom inject`
+  is purely additive.
+
 ## [0.4.0-alpha.3] - 2026-04-20
 
 ### Added
@@ -116,7 +140,8 @@ Initial public release.
   stack and all added external-service dependencies or operational
   overhead.
 
-[Unreleased]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.3...HEAD
+[Unreleased]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.4...HEAD
+[0.4.0-alpha.4]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.3...v0.4.0-alpha.4
 [0.4.0-alpha.3]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.2...v0.4.0-alpha.3
 [0.4.0-alpha.2]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.1...v0.4.0-alpha.2
 [0.4.0-alpha.1]: https://github.com/jbarket/loom/compare/v0.3.1...v0.4.0-alpha.1

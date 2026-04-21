@@ -451,3 +451,22 @@ A stdio-MCP startup is available as both the default (no subcommand)
 invocation and as the explicit `loom serve`. Alternate reference
 implementations (future ports) are expected to carry the same shell
 surface.
+
+## §11 — Adapters: Injection (filesystem)
+
+Added in alpha.4. `loom inject` writes a marker-bounded managed section
+into harness dotfiles (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`,
+`~/.gemini/GEMINI.md`) telling the agent to load identity via loom at
+session start. Content outside the `<!-- loom:start / loom:end -->`
+markers is preserved; re-running is idempotent.
+
+| Harness        | Default path            |
+|----------------|-------------------------|
+| claude-code    | `~/.claude/CLAUDE.md`   |
+| codex          | `~/.codex/AGENTS.md`    |
+| gemini-cli     | `~/.gemini/GEMINI.md`   |
+
+Selection is interactive when stdin is a TTY and no harness flags are
+given; non-interactive via `--harness <keys>` or `--all`. `--to <path>`
+overrides the default when exactly one harness is selected. `--dry-run`
+previews via unified diff; `--json` emits structured write results.
