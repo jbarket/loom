@@ -164,8 +164,32 @@ async function runAdopt(
       io.stderr('loom procedures adopt: <keys> or --all required when stdin is not a TTY\n');
       return 2;
     }
-    io.stderr(`loom procedures adopt: interactive picker not implemented yet\n${USAGE}`);
-    return 2;
+    // TTY path — multi-select picker, un-adopted keys only
+    const { available } = await listProcedures(env.contextDir);
+    const unadopted = available.filter((a) => !a.adopted);
+    if (unadopted.length === 0) {
+      io.stdout('All seed procedures are already adopted. Nothing to do.\n');
+      return 0;
+    }
+    const { multiSelect } = await import('./tui/multi-select.js');
+    const chosen = await multiSelect<string>({
+      title: 'Select procedures to adopt:',
+      items: unadopted.map((a) => ({
+        value: a.key,
+        label: a.key,
+        detail: a.path,
+      })),
+      initialSelected: new Set<string>(),
+    });
+    if (chosen === null) {
+      io.stderr('loom procedures adopt: cancelled\n');
+      return 130;
+    }
+    if (chosen.size === 0) {
+      io.stderr('loom procedures adopt: no procedures selected\n');
+      return 2;
+    }
+    keys = [...chosen];
   }
 
   try {

@@ -205,3 +205,89 @@ describe('loom procedures adopt (flag-driven)', () => {
     expect(stderr).toMatch(/TTY|keys/);
   });
 });
+
+describe('loom procedures adopt (TUI picker)', () => {
+  let ctx: string;
+  beforeEach(async () => { ctx = await mkdtemp(join(tmpdir(), 'loom-proc-cli-tui-')); });
+  afterEach(async () => { await rm(ctx, { recursive: true, force: true }); });
+
+  it('picker with user selections writes only the selected keys', async () => {
+    const { vi } = await import('vitest');
+    vi.resetModules();
+    vi.doMock('./tui/multi-select.js', async () => {
+      const actual = await vi.importActual<typeof import('./tui/multi-select.js')>('./tui/multi-select.js');
+      return {
+        ...actual,
+        multiSelect: async () => new Set(['cold-testing', 'confidence-calibration']),
+      };
+    });
+    const { runCliCaptured: run } = await import('./test-helpers.js');
+    const { code } = await run(['procedures', 'adopt', '--context-dir', ctx]);
+    vi.resetModules();
+    vi.doUnmock('./tui/multi-select.js');
+    expect(code).toBe(0);
+    const { readFile } = await import('node:fs/promises');
+    await readFile(resolve(ctx, 'procedures', 'cold-testing.md'), 'utf-8');
+    await readFile(resolve(ctx, 'procedures', 'confidence-calibration.md'), 'utf-8');
+    const { access } = await import('node:fs/promises');
+    await expect(access(resolve(ctx, 'procedures', 'cold-testing.md'))).resolves.toBeUndefined();
+    await expect(access(resolve(ctx, 'procedures', 'RLHF-resistance.md')))
+      .rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('picker cancel (null) exits 130', async () => {
+    const { vi } = await import('vitest');
+    vi.resetModules();
+    vi.doMock('./tui/multi-select.js', async () => {
+      const actual = await vi.importActual<typeof import('./tui/multi-select.js')>('./tui/multi-select.js');
+      return { ...actual, multiSelect: async () => null };
+    });
+    const { runCliCaptured: run } = await import('./test-helpers.js');
+    const { code } = await run(['procedures', 'adopt', '--context-dir', ctx]);
+    vi.resetModules();
+    vi.doUnmock('./tui/multi-select.js');
+    expect(code).toBe(130);
+  });
+
+  it('picker empty-selection exits 2 with message', async () => {
+    const { vi } = await import('vitest');
+    vi.resetModules();
+    vi.doMock('./tui/multi-select.js', async () => {
+      const actual = await vi.importActual<typeof import('./tui/multi-select.js')>('./tui/multi-select.js');
+      return { ...actual, multiSelect: async () => new Set<string>() };
+    });
+    const { runCliCaptured: run } = await import('./test-helpers.js');
+    const { code, stderr } = await run(['procedures', 'adopt', '--context-dir', ctx]);
+    vi.resetModules();
+    vi.doUnmock('./tui/multi-select.js');
+    expect(code).toBe(2);
+    expect(stderr).toMatch(/no procedures selected/);
+  });
+
+  it('picker only offers un-adopted keys', async () => {
+    const { vi } = await import('vitest');
+    const { mkdir, writeFile } = await import('node:fs/promises');
+    await mkdir(resolve(ctx, 'procedures'), { recursive: true });
+    await writeFile(resolve(ctx, 'procedures', 'cold-testing.md'), '# done', 'utf-8');
+
+    vi.resetModules();
+    let capturedKeys: string[] = [];
+    vi.doMock('./tui/multi-select.js', async () => {
+      const actual = await vi.importActual<typeof import('./tui/multi-select.js')>('./tui/multi-select.js');
+      return {
+        ...actual,
+        multiSelect: async (opts: { items: { value: string }[] }) => {
+          capturedKeys = opts.items.map((i) => i.value);
+          return new Set<string>();
+        },
+      };
+    });
+    const { runCliCaptured: run } = await import('./test-helpers.js');
+    await run(['procedures', 'adopt', '--context-dir', ctx]);
+    vi.resetModules();
+    vi.doUnmock('./tui/multi-select.js');
+
+    expect(capturedKeys).not.toContain('cold-testing');
+    expect(capturedKeys).toContain('verify-before-completion');
+  });
+});
