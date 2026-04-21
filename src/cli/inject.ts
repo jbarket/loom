@@ -6,10 +6,12 @@
  * interactive wizard is added in Task 7.
  */
 import { parseArgs } from 'node:util';
+import { createInterface } from 'node:readline/promises';
 import { assertStackVersionCompatible } from '../config.js';
 import { extractGlobalFlags, resolveEnv } from './args.js';
 import type { IOStreams } from './io.js';
 import { renderJson } from './io.js';
+import { multiSelect } from './tui/multi-select.js';
 import {
   HARNESSES,
   HARNESS_KEYS,
@@ -63,6 +65,8 @@ interface ReportRow {
 }
 
 
+const wizardOverrides = new Map<HarnessKey, string>();
+
 /** Minimal line-level diff (Myers-lite via LCS table). Good enough for
  *  a managed-block preview; avoids pulling in a dependency. */
 function lineDiff(oldText: string, newText: string): string[] {
@@ -105,10 +109,15 @@ async function planTargets(
       code: 2,
     };
   }
-  return harnesses.map((key) => ({
-    harness: HARNESSES[key],
-    path: toOverride ?? resolveHarnessPath(HARNESSES[key], envHome),
-  }));
+  const targets = harnesses.map((key) => {
+    const override = toOverride ?? wizardOverrides.get(key);
+    return {
+      harness: HARNESSES[key],
+      path: override ?? resolveHarnessPath(HARNESSES[key], envHome),
+    };
+  });
+  wizardOverrides.clear();
+  return targets;
 }
 
 async function executeTargets(
@@ -228,8 +237,42 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
       io.stderr('loom inject: --harness or --all required when stdin is not a TTY\n');
       return 2;
     }
-    io.stderr('loom inject: interactive wizard not yet wired; pass --harness or --all\n');
-    return 2;
+    const chosen = await multiSelect<HarnessKey>({
+      title: 'Select harnesses to inject loom into:',
+      items: HARNESS_KEYS.map((k) => {
+        const home = io.env.HOME ?? '';
+        const defaultPath = resolveHarnessPath(HARNESSES[k], io.env.HOME);
+        const display = home ? defaultPath.replace(new RegExp(`^${home}`), '~') : defaultPath;
+        return {
+          value: k,
+          label: HARNESSES[k].display,
+          detail: display,
+        };
+      }),
+      initialSelected: new Set(HARNESS_KEYS),
+    });
+    if (chosen === null) {
+      io.stderr('loom inject: cancelled\n');
+      return 130;
+    }
+    harnesses = [...chosen];
+    if (harnesses.length === 0) {
+      io.stderr('loom inject: no harnesses selected\n');
+      return 2;
+    }
+    const rl = createInterface({ input: process.stdin, output: process.stderr });
+    try {
+      io.stderr('\nPress enter to accept defaults, or type a path:\n');
+      for (const k of harnesses) {
+        const defaultPath = resolveHarnessPath(HARNESSES[k], io.env.HOME);
+        const ans = (await rl.question(
+          `  ${HARNESSES[k].display} [${defaultPath}]: `,
+        )).trim();
+        if (ans.length > 0) wizardOverrides.set(k, ans);
+      }
+    } finally {
+      rl.close();
+    }
   }
 
   const envR = resolveEnv(global, io.env);

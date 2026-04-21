@@ -201,4 +201,53 @@ describe('loom inject (flag-driven)', () => {
     expect(stdout).not.toMatch(/^-# Header$/m);
     expect(stdout).not.toMatch(/^\+# Header$/m);
   });
+
+  it('wizard confirms default selection on TTY and writes files', async () => {
+    const { vi } = await import('vitest');
+    vi.resetModules();
+    vi.doMock('./tui/multi-select.js', async () => {
+      const actual = await vi.importActual<typeof import('./tui/multi-select.js')>('./tui/multi-select.js');
+      return {
+        ...actual,
+        multiSelect: async () => new Set(['claude-code', 'codex', 'gemini-cli']),
+      };
+    });
+    vi.doMock('node:readline/promises', () => ({
+      createInterface: () => ({
+        question: async (_: string) => '',
+        close: () => {},
+      }),
+    }));
+    const { runCliCaptured: run } = await import('./test-helpers.js');
+    const { code } = await run(
+      ['inject', '--context-dir', ctx],
+      { env: { HOME: home } },
+    );
+    vi.resetModules();
+    vi.doUnmock('./tui/multi-select.js');
+    vi.doUnmock('node:readline/promises');
+    expect(code).toBe(0);
+    await readFile(join(home, '.claude', 'CLAUDE.md'), 'utf-8');
+    await readFile(join(home, '.codex', 'AGENTS.md'), 'utf-8');
+    await readFile(join(home, '.gemini', 'GEMINI.md'), 'utf-8');
+  });
+
+  it('wizard cancel (null from multiSelect) exits 130 with no writes', async () => {
+    const { vi } = await import('vitest');
+    vi.resetModules();
+    vi.doMock('./tui/multi-select.js', async () => {
+      const actual = await vi.importActual<typeof import('./tui/multi-select.js')>('./tui/multi-select.js');
+      return { ...actual, multiSelect: async () => null };
+    });
+    const { runCliCaptured: run } = await import('./test-helpers.js');
+    const { code } = await run(
+      ['inject', '--context-dir', ctx],
+      { env: { HOME: home } },
+    );
+    vi.resetModules();
+    vi.doUnmock('./tui/multi-select.js');
+    expect(code).toBe(130);
+    await expect(readFile(join(home, '.claude', 'CLAUDE.md'), 'utf-8'))
+      .rejects.toMatchObject({ code: 'ENOENT' });
+  });
 });
