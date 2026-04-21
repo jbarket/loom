@@ -48,3 +48,22 @@ export const HARNESSES: Readonly<Record<HarnessKey, HarnessPreset>> = {
 export function isHarnessKey(s: string): s is HarnessKey {
   return (HARNESS_KEYS as readonly string[]).includes(s);
 }
+
+/**
+ * Resolve the injection path for a harness given an optional HOME override.
+ * Default path is cached from homedir() at module load; this resolver
+ * lets callers (CLI args, tests passing { HOME }) redirect the base
+ * without mutating the frozen preset.
+ */
+export function resolveHarnessPath(
+  harness: HarnessPreset,
+  home?: string,
+): string {
+  const base = home ?? homedir();
+  if (base === homedir()) return harness.defaultPath;
+  switch (harness.key) {
+    case 'claude-code': return join(base, '.claude', 'CLAUDE.md');
+    case 'codex':       return join(base, '.codex', 'AGENTS.md');
+    case 'gemini-cli':  return join(base, '.gemini', 'GEMINI.md');
+  }
+}

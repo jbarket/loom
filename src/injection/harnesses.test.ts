@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { HARNESSES, HARNESS_KEYS, type HarnessKey } from './harnesses.js';
+import { HARNESSES, HARNESS_KEYS, resolveHarnessPath, type HarnessKey } from './harnesses.js';
 
 describe('HARNESSES preset table', () => {
   it('exposes exactly three keys: claude-code, codex, gemini-cli', () => {
@@ -30,5 +30,22 @@ describe('HARNESSES preset table', () => {
   it('HarnessKey type narrows to the three string literals', () => {
     const k: HarnessKey = 'claude-code';
     expect(HARNESSES[k]).toBeDefined();
+  });
+});
+
+describe('resolveHarnessPath', () => {
+  it('returns the frozen defaultPath when home is undefined', () => {
+    expect(resolveHarnessPath(HARNESSES['claude-code'])).toBe(HARNESSES['claude-code'].defaultPath);
+  });
+
+  it('returns a HOME-relative path when an override is provided', () => {
+    const p = resolveHarnessPath(HARNESSES['codex'], '/tmp/fake-home');
+    expect(p).toBe('/tmp/fake-home/.codex/AGENTS.md');
+  });
+
+  it('covers all three harnesses with override', () => {
+    expect(resolveHarnessPath(HARNESSES['claude-code'], '/h')).toBe('/h/.claude/CLAUDE.md');
+    expect(resolveHarnessPath(HARNESSES['codex'], '/h')).toBe('/h/.codex/AGENTS.md');
+    expect(resolveHarnessPath(HARNESSES['gemini-cli'], '/h')).toBe('/h/.gemini/GEMINI.md');
   });
 });

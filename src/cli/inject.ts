@@ -6,8 +6,6 @@
  * interactive wizard is added in Task 7.
  */
 import { parseArgs } from 'node:util';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import { assertStackVersionCompatible } from '../config.js';
 import { extractGlobalFlags, resolveEnv } from './args.js';
 import type { IOStreams } from './io.js';
@@ -16,6 +14,7 @@ import {
   HARNESSES,
   HARNESS_KEYS,
   isHarnessKey,
+  resolveHarnessPath,
   type HarnessKey,
   type HarnessPreset,
 } from '../injection/harnesses.js';
@@ -61,24 +60,6 @@ interface ReportRow {
   diff?: string;
 }
 
-/**
- * Resolve the default path for a harness, honoring the HOME env var from
- * io.env if set, rather than relying on the module-load-time frozen homedir().
- */
-function resolveDefaultPath(harness: HarnessPreset, envHome: string | undefined): string {
-  if (envHome === undefined) {
-    return harness.defaultPath;
-  }
-  // Re-compute relative to the provided HOME
-  const base = (() => {
-    switch (harness.key) {
-      case 'claude-code': return join(envHome, '.claude', 'CLAUDE.md');
-      case 'codex':       return join(envHome, '.codex', 'AGENTS.md');
-      case 'gemini-cli':  return join(envHome, '.gemini', 'GEMINI.md');
-    }
-  })();
-  return base;
-}
 
 function makeDiff(existing: string, next: string, path: string): string {
   const oldLines = existing.split('\n');
@@ -106,7 +87,7 @@ async function planTargets(
   }
   return harnesses.map((key) => ({
     harness: HARNESSES[key],
-    path: toOverride ?? resolveDefaultPath(HARNESSES[key], envHome),
+    path: toOverride ?? resolveHarnessPath(HARNESSES[key], envHome),
   }));
 }
 
