@@ -11,6 +11,7 @@ import { extractGlobalFlags, resolveEnv } from './args.js';
 import { renderJson } from './io.js';
 import type { IOStreams } from './io.js';
 import {
+  adoptProcedures,
   listProcedures,
   showProcedure,
   UnknownProcedureError,
@@ -120,11 +121,66 @@ async function runShow(
 }
 
 async function runAdopt(
-  _env: ReturnType<typeof resolveEnv>,
-  _subRest: string[],
+  env: ReturnType<typeof resolveEnv>,
+  subRest: string[],
   io: IOStreams,
 ): Promise<number> {
-  // Implemented in Task 4/5.
-  io.stderr('loom procedures adopt: not implemented yet\n');
-  return 2;
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args: subRest,
+      options: {
+        all:   { type: 'boolean' },
+        force: { type: 'boolean' },
+        help:  { type: 'boolean', short: 'h' },
+      },
+      strict: true,
+      allowPositionals: true,
+    });
+  } catch (err) {
+    io.stderr(`${(err as Error).message}\n${USAGE}`);
+    return 2;
+  }
+
+  if (parsed.values.help) { io.stdout(USAGE); return 0; }
+
+  const positionals = parsed.positionals;
+  const wantAll = parsed.values.all === true;
+  const overwrite = parsed.values.force === true;
+
+  if (wantAll && positionals.length > 0) {
+    io.stderr('loom procedures adopt: --all and positional keys are mutually exclusive\n');
+    return 2;
+  }
+
+  let keys: string[];
+  if (wantAll) {
+    const { available } = await listProcedures(env.contextDir);
+    keys = available.map((a) => a.key);
+  } else if (positionals.length > 0) {
+    keys = positionals;
+  } else {
+    if (!io.stdinIsTTY) {
+      io.stderr('loom procedures adopt: <keys> or --all required when stdin is not a TTY\n');
+      return 2;
+    }
+    io.stderr(`loom procedures adopt: interactive picker not implemented yet\n${USAGE}`);
+    return 2;
+  }
+
+  try {
+    const results = await adoptProcedures(env.contextDir, keys, { overwrite });
+    if (env.json) { renderJson(io, results); return 0; }
+    for (const r of results) {
+      io.stdout(`${r.key}: ${r.path} (${r.action})\n`);
+    }
+    return 0;
+  } catch (err) {
+    if (err instanceof UnknownProcedureError) {
+      io.stderr(`${err.message}\n`);
+      return 2;
+    }
+    io.stderr(`loom procedures adopt: ${(err as Error).message}\n`);
+    return 1;
+  }
 }

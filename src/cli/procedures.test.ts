@@ -107,3 +107,101 @@ describe('loom procedures show', () => {
     expect(stderr).toMatch(/show/);
   });
 });
+
+describe('loom procedures adopt (flag-driven)', () => {
+  let ctx: string;
+  beforeEach(async () => { ctx = await mkdtemp(join(tmpdir(), 'loom-proc-cli-adopt-')); });
+  afterEach(async () => { await rm(ctx, { recursive: true, force: true }); });
+
+  it('adopts a single key by positional arg', async () => {
+    const { stdout, code } = await runCliCaptured(
+      ['procedures', 'adopt', 'cold-testing', '--context-dir', ctx],
+    );
+    expect(code).toBe(0);
+    expect(stdout).toMatch(/cold-testing.*created/);
+    const { readFile } = await import('node:fs/promises');
+    const body = await readFile(resolve(ctx, 'procedures', 'cold-testing.md'), 'utf-8');
+    expect(body).toContain('⚠ This is a seed template');
+  });
+
+  it('adopts multiple keys', async () => {
+    const { stdout, code } = await runCliCaptured(
+      ['procedures', 'adopt', 'cold-testing', 'confidence-calibration', '--context-dir', ctx],
+    );
+    expect(code).toBe(0);
+    expect(stdout).toMatch(/cold-testing.*created/);
+    expect(stdout).toMatch(/confidence-calibration.*created/);
+  });
+
+  it('--all adopts every seed procedure', async () => {
+    const { stdout, code } = await runCliCaptured(
+      ['procedures', 'adopt', '--all', '--context-dir', ctx],
+    );
+    expect(code).toBe(0);
+    expect(stdout).toMatch(/verify-before-completion.*created/);
+    expect(stdout).toMatch(/RLHF-resistance.*created/);
+    expect(stdout.trim().split('\n')).toHaveLength(6);
+  });
+
+  it('skips-exists on re-run without --force', async () => {
+    await runCliCaptured(['procedures', 'adopt', 'cold-testing', '--context-dir', ctx]);
+    const { stdout, code } = await runCliCaptured(
+      ['procedures', 'adopt', 'cold-testing', '--context-dir', ctx],
+    );
+    expect(code).toBe(0);
+    expect(stdout).toMatch(/cold-testing.*skipped-exists/);
+  });
+
+  it('--force overwrites existing adopted files', async () => {
+    await runCliCaptured(['procedures', 'adopt', 'cold-testing', '--context-dir', ctx]);
+    const { readFile, writeFile } = await import('node:fs/promises');
+    const path = resolve(ctx, 'procedures', 'cold-testing.md');
+    await writeFile(path, '# my edits\n', 'utf-8');
+    const { stdout, code } = await runCliCaptured(
+      ['procedures', 'adopt', 'cold-testing', '--force', '--context-dir', ctx],
+    );
+    expect(code).toBe(0);
+    expect(stdout).toMatch(/cold-testing.*overwritten/);
+    const body = await readFile(path, 'utf-8');
+    expect(body).toContain('⚠ This is a seed template');
+  });
+
+  it('exits 2 on an unknown key', async () => {
+    const { code, stderr } = await runCliCaptured(
+      ['procedures', 'adopt', 'not-a-real-key', '--context-dir', ctx],
+    );
+    expect(code).toBe(2);
+    expect(stderr).toMatch(/not-a-real-key/);
+  });
+
+  it('exits 2 when --all and positional keys are both given', async () => {
+    const { code, stderr } = await runCliCaptured(
+      ['procedures', 'adopt', '--all', 'cold-testing', '--context-dir', ctx],
+    );
+    expect(code).toBe(2);
+    expect(stderr).toMatch(/mutually exclusive|--all/);
+  });
+
+  it('--json emits an AdoptResult[] array', async () => {
+    const { stdout, code } = await runCliCaptured(
+      ['procedures', 'adopt', 'cold-testing', '--json', '--context-dir', ctx],
+    );
+    expect(code).toBe(0);
+    const parsed = JSON.parse(stdout);
+    expect(Array.isArray(parsed)).toBe(true);
+    expect(parsed[0]).toMatchObject({
+      key: 'cold-testing',
+      action: 'created',
+      path: expect.any(String),
+    });
+  });
+
+  it('exits 2 with usage when no keys and non-TTY stdin', async () => {
+    const { code, stderr } = await runCliCaptured(
+      ['procedures', 'adopt', '--context-dir', ctx],
+      { stdin: '' },
+    );
+    expect(code).toBe(2);
+    expect(stderr).toMatch(/TTY|keys/);
+  });
+});
