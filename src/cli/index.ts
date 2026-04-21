@@ -24,6 +24,7 @@ Commands:
   serve              Explicit MCP stdio startup (same as no args)
   inject             Write loom identity pointer into harness dotfiles
   procedures        Browse/adopt procedural-identity seed templates
+  harness init      Scaffold a harness manifest from template
 
 Global flags:
   --context-dir <path>   Agent context dir (default: $LOOM_CONTEXT_DIR or ~/.config/loom/default)
@@ -107,6 +108,10 @@ export async function runCli(argv: string[], io: IOStreams = realStreams()): Pro
     }
     case 'procedures': {
       const { run } = await import('./procedures.js');
+      return run(rest, io);
+    }
+    case 'harness': {
+      const { run } = await import('./harness.js');
       return run(rest, io);
     }
     default:
