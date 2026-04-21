@@ -129,13 +129,13 @@ async function executeTargets(
         });
         const norm = existing === null ? null : normalizeLF(existing);
         const markers = norm === null ? null : findMarkers(norm, t.path);
-        const { next, action } = buildContent(existing, block, markers);
+        const { next, action } = buildContent(norm, block, markers);
         rows.push({
           harness: t.harness.key,
           path: t.path,
           action,
           bytesWritten: 0,
-          diff: makeDiff(existing ?? '', next, t.path),
+          diff: makeDiff(norm ?? '', next, t.path),
         });
       } else {
         const res: WriteResult = await writeManagedBlock(t.path, block);

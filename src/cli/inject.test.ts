@@ -185,4 +185,20 @@ describe('loom inject (flag-driven)', () => {
     expect(stdout).not.toMatch(/^-# Header$/m);
     expect(stdout).not.toMatch(/^\+# Header$/m);
   });
+
+  it('--dry-run normalizes CRLF input so the diff does not treat every line as changed', async () => {
+    const target = join(home, 'CLAUDE.md');
+    const { HARNESSES } = await import('../injection/harnesses.js');
+    const { renderBlock } = await import('../injection/render.js');
+    const stale = renderBlock(HARNESSES['claude-code'], '/old/ctx').replace(/\n/g, '\r\n');
+    await writeFile(target, `# Header\r\n\r\n${stale}\r\n# Footer\r\n`, 'utf-8');
+
+    const { stdout, code } = await runCliCaptured(
+      ['inject', '--harness', 'claude-code', '--to', target, '--dry-run', '--context-dir', ctx],
+    );
+    expect(code).toBe(0);
+    // Header/footer must appear as unchanged context, not as -+ pairs
+    expect(stdout).not.toMatch(/^-# Header$/m);
+    expect(stdout).not.toMatch(/^\+# Header$/m);
+  });
 });
