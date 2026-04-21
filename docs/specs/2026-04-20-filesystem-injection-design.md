@@ -94,18 +94,18 @@ export const HARNESSES: Record<HarnessKey, HarnessPreset> = {
     key: 'codex',
     display: 'Codex',
     defaultPath: path.join(os.homedir(), '.codex', 'AGENTS.md'),
-    toolPrefix: 'mcp_loom_',
+    toolPrefix: 'mcp__loom__',
   },
   'gemini-cli': {
     key: 'gemini-cli',
     display: 'Gemini CLI',
     defaultPath: path.join(os.homedir(), '.gemini', 'GEMINI.md'),
-    toolPrefix: 'mcp_loom_',
+    toolPrefix: 'mcp__loom__',
   },
 };
 ```
 
-Tool-prefix values come from existing client-adapter conventions (`src/clients.ts`). No new config surface; this is a constant per harness.
+All three harnesses use the `mcp__loom__` double-underscore prefix — matches the MCP-native convention already used by `src/clients.ts` for claude-code and gemini-cli. Single-underscore prefixes (e.g. `mcp_loom_`) are a Hermes/OpenClaw/NemoClaw quirk and aren't in scope for this alpha. If a future harness target uses a different prefix, add it here.
 
 ### Rendered block (`src/injection/render.ts`)
 
@@ -137,7 +137,7 @@ where they conflict.
 <!-- loom:end -->
 ````
 
-Codex and Gemini CLI get the same shape with `mcp_loom_identity` single-underscore tool names and their harness key in the start marker. The block is a string constant template + tool-prefix substitution + `contextDir` interpolation. No conditional logic on current stack contents.
+Codex and Gemini CLI get the same block with their own harness key in the start marker; tool prefix is `mcp__loom__` for all three (see preset table above). The block is a string constant template + tool-prefix substitution + `contextDir` interpolation. No conditional logic on current stack contents.
 
 **Marker shape:** `<!-- loom:start v1 harness=<key> -->` and `<!-- loom:end -->`. The writer matches on the literal `loom:start` and `loom:end` strings; the `v1 harness=<key>` metadata is informational for humans and for future-self if the schema evolves. No `</loom>` or XML closing — the comment pair is one-shot and cannot nest.
 
@@ -338,7 +338,7 @@ Not wired into any install script — this is guidance, not a default.
 
 | File | Coverage |
 |---|---|
-| `src/injection/harnesses.test.ts` | Preset has three expected keys; each has `display`, `defaultPath` (absolute, under `os.homedir()`), `toolPrefix` matching `mcp__loom__` (Claude Code) or `mcp_loom_` (Codex, Gemini CLI). |
+| `src/injection/harnesses.test.ts` | Preset has three expected keys; each has `display`, `defaultPath` (absolute, under `os.homedir()`), `toolPrefix` = `mcp__loom__`. |
 | `src/injection/render.test.ts` | Block contains start + end markers; start marker carries `harness=<key>`; tool prefix matches harness; `contextDir` is interpolated exactly; block is valid markdown (no unbalanced fences). |
 | `src/injection/writer.test.ts` | Five deterministic cases: new file, no markers (appended), valid markers (updated), idempotent second run (no-change), malformed (throws). Plus: atomic rename semantics (no partial writes under simulated crash), preserved file mode on update, preserved content outside markers byte-identical. |
 | `src/cli/tui/multi-select.test.ts` | `reduce` state machine: up/down wraparound, toggle flips membership, confirm returns selected set, cancel returns null. Non-TTY `multiSelect` short-circuits. |
