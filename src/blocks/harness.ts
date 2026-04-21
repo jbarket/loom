@@ -8,7 +8,7 @@
  *
  * Contract: stack spec v1 §4.7.
  */
-import { readFile, readdir } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseFrontmatter, type Block } from './types.js';
@@ -55,4 +55,33 @@ version: 0.4
 ## Gotchas
 <known quirks>
 `;
+}
+
+// ─── Initialization ─────────────────────────────────────────────────────────
+
+export interface InitResult {
+  name: string;
+  path: string;
+  action: 'created' | 'skipped-exists' | 'overwritten';
+}
+
+export async function initHarness(
+  contextDir: string,
+  name: string,
+  opts: { overwrite?: boolean } = {},
+): Promise<InitResult> {
+  if (!name || name.includes('/') || name.includes('\\')) {
+    throw new Error(
+      `Invalid harness name '${name}': must be non-empty and contain no path separators.`,
+    );
+  }
+  const dir = resolve(contextDir, DIR);
+  await mkdir(dir, { recursive: true });
+  const path = resolve(dir, `${name}.md`);
+  const exists = existsSync(path);
+  if (exists && !opts.overwrite) {
+    return { name, path, action: 'skipped-exists' };
+  }
+  await writeFile(path, template(name), 'utf-8');
+  return { name, path, action: exists ? 'overwritten' : 'created' };
 }

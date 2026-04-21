@@ -470,3 +470,17 @@ Selection is interactive when stdin is a TTY and no harness flags are
 given; non-interactive via `--harness <keys>` or `--all`. `--to <path>`
 overrides the default when exactly one harness is selected. `--dry-run`
 previews via unified diff; `--json` emits structured write results.
+
+## §11 — Adapters: Procedures + Manifests
+
+Added in alpha.5. CLI + MCP surface for materializing procedural-identity
+docs (§4.9) and harness manifests (§4.7) from seed templates.
+
+- CLI: `loom procedures list|show|adopt`, `loom harness init`.
+- MCP: `procedure_list`, `procedure_show`, `procedure_adopt`,
+  `harness_init`.
+- Both surfaces share core functions in `src/blocks/procedures.ts` and
+  `src/blocks/harness.ts`; MCP tools are thin wrappers.
+- Idempotent by default; `--force` / `overwrite: true` replaces existing
+  content. Ownership ritual on seed bodies is preserved until the agent
+  removes it.

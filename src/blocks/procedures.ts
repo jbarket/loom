@@ -7,7 +7,7 @@
  * emits a warning when the cap is exceeded so the wake sequence can
  * surface it in the identity payload.
  */
-import { readFile, readdir } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseFrontmatter, type Block } from './types.js';
@@ -135,4 +135,89 @@ block is prescriptive to *you* — generic text doesn't serve it.`;
   );
 
   return [preamble, ...sections].join('\n\n---\n\n');
+}
+
+// ─── Adoption / listing / show ──────────────────────────────────────────────
+
+export class UnknownProcedureError extends Error {
+  constructor(public readonly key: string, public readonly valid: string[]) {
+    super(
+      `Unknown procedure key '${key}'. ` +
+      `Valid keys: ${valid.join(', ')}`,
+    );
+    this.name = 'UnknownProcedureError';
+  }
+}
+
+export interface AdoptResult {
+  key: string;
+  path: string;
+  action: 'created' | 'skipped-exists' | 'overwritten';
+}
+
+export async function adoptProcedures(
+  contextDir: string,
+  keys: string[],
+  opts: { overwrite?: boolean } = {},
+): Promise<AdoptResult[]> {
+  const validKeys = Object.keys(SEED_PROCEDURES);
+  for (const key of keys) {
+    if (!(key in SEED_PROCEDURES)) {
+      throw new UnknownProcedureError(key, validKeys);
+    }
+  }
+  const dir = resolve(contextDir, DIR);
+  await mkdir(dir, { recursive: true });
+  const results: AdoptResult[] = [];
+  for (const key of keys) {
+    const path = resolve(dir, `${key}.md`);
+    const exists = existsSync(path);
+    if (exists && !opts.overwrite) {
+      results.push({ key, path, action: 'skipped-exists' });
+      continue;
+    }
+    await writeFile(path, SEED_PROCEDURES[key], 'utf-8');
+    results.push({ key, path, action: exists ? 'overwritten' : 'created' });
+  }
+  return results;
+}
+
+export interface ProcedureSummary {
+  key: string;
+  adopted: boolean;
+  path: string;
+}
+
+export async function listProcedures(contextDir: string): Promise<{
+  available: ProcedureSummary[];
+}> {
+  const available: ProcedureSummary[] = Object.keys(SEED_PROCEDURES).map((key) => {
+    const path = resolve(contextDir, DIR, `${key}.md`);
+    return { key, adopted: existsSync(path), path };
+  });
+  return { available };
+}
+
+export interface ProcedureDetail {
+  key: string;
+  template: string;
+  adopted: boolean;
+  path: string;
+  body?: string;
+}
+
+export async function showProcedure(
+  contextDir: string,
+  key: string,
+): Promise<ProcedureDetail> {
+  if (!(key in SEED_PROCEDURES)) {
+    throw new UnknownProcedureError(key, Object.keys(SEED_PROCEDURES));
+  }
+  const path = resolve(contextDir, DIR, `${key}.md`);
+  const template = SEED_PROCEDURES[key];
+  if (!existsSync(path)) {
+    return { key, template, adopted: false, path };
+  }
+  const body = await readFile(path, 'utf-8');
+  return { key, template, adopted: true, path, body };
 }
