@@ -1,7 +1,7 @@
 # loom
 
 [![CI](https://github.com/jbarket/loom/actions/workflows/ci.yml/badge.svg)](https://github.com/jbarket/loom/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.4.0--alpha.4-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.4.0--alpha.5-blue.svg)](CHANGELOG.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-compatible-orange.svg)](https://modelcontextprotocol.io)
@@ -147,6 +147,13 @@ npx loom bootstrap --context-dir ~/.config/loom/new-agent
 
 # Inject loom identity pointer into harness dotfiles
 npx loom inject --all --context-dir ~/.config/loom/art
+
+# Adopt procedural-identity seed templates
+npx loom procedures list
+npx loom procedures adopt --all --context-dir ~/.config/loom/art
+
+# Scaffold a harness manifest
+npx loom harness init claude-code --context-dir ~/.config/loom/art
 ```
 
 `npx loom --help` lists subcommands; `npx loom <cmd> --help` shows
@@ -176,6 +183,38 @@ loom inject --all >/dev/null 2>&1 || true
 ```
 
 Idempotent; cheap (no-op when already up to date); silent on success.
+
+### `loom procedures` — adopt procedural-identity seed templates
+
+`loom procedures` manages the prescriptive "how this agent acts" docs in
+`<context>/procedures/*.md` (stack spec v1 §4.9). Six seed templates ship
+with loom: `verify-before-completion`, `cold-testing`,
+`reflection-at-end-of-unit`, `handoff-to-unpushable-repo`,
+`confidence-calibration`, `RLHF-resistance`.
+
+- `loom procedures list` — table of seeds with adoption state.
+- `loom procedures show <key>` — print template or adopted body.
+- `loom procedures adopt <keys...>` — write seeds to disk.
+- `loom procedures adopt --all` — adopt every un-adopted seed.
+- `loom procedures adopt` on a TTY — multi-select picker (un-adopted
+  only).
+- `--force` overwrites; idempotent by default (re-runs report
+  `skipped-exists`). `--json` for scripting.
+
+Adopted procedures ship with a ⚠ ownership ritual the agent deletes when
+it customizes the Why and How-to-apply sections. Unedited seeds are
+self-announcing in the identity payload.
+
+### `loom harness init` — scaffold a harness manifest
+
+`loom harness init <name>` writes `<context>/harnesses/<name>.md` from
+the stack-spec §4.7 template. Name falls back to `--client` then
+`$LOOM_CLIENT`. `--force` overwrites; `--json` for scripting.
+
+Typical use: `identity()` reports "manifest missing" for the current
+harness — run `loom harness init` (or call `harness_init` via MCP) to
+drop a template you can then fill in with the harness's tool prefixes,
+delegation primitive, etc.
 
 ## Configuration
 
