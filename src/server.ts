@@ -19,6 +19,8 @@ import { memoryList } from './tools/memory-list.js';
 import { updateIdentity } from './tools/update-identity.js';
 import { pursuits } from './tools/pursuits.js';
 import { bootstrap } from './tools/bootstrap.js';
+import { procedureList, procedureShow, procedureAdopt } from './tools/procedures.js';
+import { harnessInit } from './tools/harness.js';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -240,6 +242,67 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     async ({ action, name, goal, progress, reason }) => {
       const result = await pursuits(contextDir, { action, name, goal, progress, reason });
       return { content: [{ type: 'text' as const, text: result }] };
+    },
+  );
+
+  // ─── Procedures ─────────────────────────────────────────────────────────────
+
+  server.tool(
+    'procedure_list',
+    'List available procedural-identity seed templates and their adoption state in this stack. ' +
+    'Procedures are prescriptive docs for how this agent acts (verify, cold-test, reflect, handoff). ' +
+    'Use this when you want to see which seeds are available or which have already been adopted.',
+    {},
+    async () => {
+      const text = await procedureList(contextDir);
+      return { content: [{ type: 'text' as const, text }] };
+    },
+  );
+
+  server.tool(
+    'procedure_show',
+    'Preview the body of a procedure — the seed template if not adopted, or the current ' +
+    'on-disk body if adopted. Useful before calling procedure_adopt or as a primitive for ' +
+    'future customization wizards.',
+    {
+      key: z.string().describe('Seed procedure key (e.g. "verify-before-completion")'),
+    },
+    async ({ key }) => {
+      const text = await procedureShow(contextDir, key);
+      return { content: [{ type: 'text' as const, text }] };
+    },
+  );
+
+  server.tool(
+    'procedure_adopt',
+    'Materialize one or more procedural-identity seed templates into ' +
+    '<contextDir>/procedures/<key>.md. Idempotent: skip-exists by default. ' +
+    'Pass overwrite: true to replace already-adopted files. Call this in response ' +
+    'to the procedures seed nudge in the identity payload.',
+    {
+      keys: z.array(z.string()).describe('Seed procedure keys to adopt'),
+      overwrite: z.boolean().optional().describe('Replace already-adopted files (default: false)'),
+    },
+    async ({ keys, overwrite }) => {
+      const text = await procedureAdopt(contextDir, { keys, overwrite });
+      return { content: [{ type: 'text' as const, text }] };
+    },
+  );
+
+  // ─── Harness manifests ──────────────────────────────────────────────────────
+
+  server.tool(
+    'harness_init',
+    'Scaffold a harness manifest at <contextDir>/harnesses/<name>.md from the template ' +
+    '(see stack spec v1 §4.7). Call this when identity() reports a missing manifest for the ' +
+    'current harness. Idempotent: skip-exists by default; overwrite: true replaces.',
+    {
+      name: z.string().describe('Harness name (e.g. "claude-code", "codex", "gemini-cli")'),
+      overwrite: z.boolean().optional().describe('Replace existing manifest (default: false)'),
+    },
+    async ({ name, overwrite }) => {
+      const text = await harnessInit(contextDir, { name, overwrite });
+      return { content: [{ type: 'text' as const, text }] };
     },
   );
 
