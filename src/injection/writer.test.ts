@@ -133,6 +133,30 @@ Context dir: /old
     expect(written.endsWith('\n')).toBe(true);
     expect(written.endsWith('\n\n')).toBe(false);
   });
+
+  it('does not match unrelated loom:start* comments (word boundary)', async () => {
+    const path = join(dir, 'CLAUDE.md');
+    await writeFile(path, '<!-- loom:started -->\n<!-- loom:starting-gun -->\n', 'utf-8');
+    // No real start/end markers => should treat as no-markers and append.
+    const result = await writeManagedBlock(path, BLOCK);
+    expect(result.action).toBe('appended');
+  });
+
+  it('normalizes exactly one blank line between end marker and following content on update', async () => {
+    const path = join(dir, 'CLAUDE.md');
+    // BLOCK ends with \n; add one more \n to produce one blank line before "# Next section"
+    const existing = `${BLOCK}\n# Next section\n`;
+    await writeFile(path, existing, 'utf-8');
+    const result = await writeManagedBlock(path, OTHER_BLOCK);
+    expect(result.action).toBe('updated');
+    const written = await readFile(path, 'utf-8');
+    // The single \n after end marker is stripped and the block contributes its own trailing \n,
+    // so exactly one blank line (two \n) separates end marker from "# Next section"
+    expect(written).toMatch(/<!-- loom:end -->\n\n# Next section\n$/);
+    // Running again should now be a no-change
+    const result2 = await writeManagedBlock(path, OTHER_BLOCK);
+    expect(result2.action).toBe('no-change');
+  });
 });
 
 describe('previewWrite', () => {

@@ -32,7 +32,7 @@ export class MalformedMarkersError extends Error {
   }
 }
 
-const START_RE = /<!--\s*loom:start[^>]*-->/g;
+const START_RE = /<!--\s*loom:start(\s[^>]*)?-->/g;
 const END_RE = /<!--\s*loom:end\s*-->/g;
 
 interface MarkerBounds {
@@ -124,7 +124,7 @@ function buildContent(
   const after = norm.slice(markers.endTerminusIdx);
   const afterTrimmed = after.startsWith('\n') ? after.slice(1) : after;
   const combined = ensureTrailingNewline(`${before}${blockLF.replace(/\n$/, '')}\n${afterTrimmed}`);
-  if (combined === norm || combined === existing) {
+  if (combined === norm) {
     return { next: combined, action: 'no-change' };
   }
   return { next: combined, action: 'updated' };
