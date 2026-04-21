@@ -1,12 +1,19 @@
 {
   "name": "loom",
-  "version": "0.4.0-alpha.5",
+  "version": "0.4.0-alpha.6",
   "description": "System 3 MCP server — persistent identity, memory, and self-model for AI agents. Single-file sqlite-vec + fastembed; zero external services.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
     "loom": "dist/index.js"
   },
+  "files": [
+    "dist",
+    "assets",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "engines": {
     "node": ">=20"
   },
