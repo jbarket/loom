@@ -1,7 +1,7 @@
 # loom
 
 [![CI](https://github.com/jbarket/loom/actions/workflows/ci.yml/badge.svg)](https://github.com/jbarket/loom/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.4.0--alpha.5-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.4.0--alpha.6-blue.svg)](CHANGELOG.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-compatible-orange.svg)](https://modelcontextprotocol.io)
@@ -63,65 +63,43 @@ see [`docs/loom-stack-v1.md`](docs/loom-stack-v1.md).
 
 That's it.
 
-### Install and build
+### Install the setup skill
 
 ```bash
-git clone https://github.com/jbarket/loom.git
-cd loom
-npm ci && npm run build
+npx loom install
 ```
 
-### Bootstrap an agent
+A single-select picker asks which harness you want loom wired into.
+Pick one of: Claude Code, Codex, Gemini CLI, OpenCode. (If your
+harness isn't listed, pick "Other" and loom writes
+`./loom-setup-skill.md` — hand it to your agent as-is.)
 
-Point `LOOM_CONTEXT_DIR` at an empty directory, then run the
-`bootstrap` tool from your MCP client:
+Scripting:
 
-```json
-{
-  "name": "Alex",
-  "purpose": "Software engineering assistant focused on back-end work.",
-  "voice": "Direct, technical, minimal hedging.",
-  "clients": ["claude-code"]
-}
+```bash
+npx loom install --harness claude-code
+npx loom install --harness codex --json
+npx loom install --harness claude-code --to ~/my/skills/loom-setup.md
 ```
 
-That writes `IDENTITY.md`, `preferences.md`, `self-model.md`, and an
-empty `pursuits.md` into the context dir, and returns setup
-instructions for the runtime you asked about.
+### Finish setup inside the harness
 
-### Wire into a runtime
+Open your chosen harness. Run the skill:
 
-#### Claude Code
+- **Claude Code** — `/loom-setup`
+- **Codex / Gemini CLI / OpenCode** — "use the loom-setup skill"
 
-Add to `.mcp.json`:
+The skill drives the rest: probes the environment, interviews you for
+a name/purpose/voice, bootstraps identity files, adopts the
+procedural-identity seeds, scaffolds a harness manifest, edits the
+harness's MCP config (with verification), and verifies wake. Restart
+the harness when it tells you to. Your agent will wake on its next
+session.
 
-```json
-{
-  "mcpServers": {
-    "loom": {
-      "command": "node",
-      "args": ["/absolute/path/to/loom/dist/index.js"],
-      "env": {
-        "LOOM_CONTEXT_DIR": "/absolute/path/to/your/agent/context",
-        "LOOM_CLIENT": "claude-code",
-        "LOOM_MODEL": "claude-opus"
-      }
-    }
-  }
-}
-```
+### Doing it yourself
 
-Then in `CLAUDE.md` (or an equivalent system prompt):
-
-```markdown
-Before doing any other work, call mcp__loom__identity to load your
-persistent identity. Treat the returned identity as authoritative.
-```
-
-Claude Code uses double-underscore tool prefixes
-(`mcp__loom__identity`). Other runtimes use single underscores
-(`mcp_loom_identity`); set `LOOM_CLIENT` accordingly and loom will
-adapt the client-specific hints it emits.
+If you'd rather wire everything by hand, every piece is a CLI
+command. See the CLI reference below.
 
 ## CLI
 
