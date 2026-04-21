@@ -22,6 +22,7 @@ Commands:
   update-identity    Edit preferences.md / self-model.md sections
   bootstrap          Initialize a fresh agent
   serve              Explicit MCP stdio startup (same as no args)
+  inject             Write loom identity pointer into harness dotfiles
 
 Global flags:
   --context-dir <path>   Agent context dir (default: $LOOM_CONTEXT_DIR or ~/.config/loom/default)
@@ -97,6 +98,10 @@ export async function runCli(argv: string[], io: IOStreams = realStreams()): Pro
     }
     case 'update-identity': {
       const { run } = await import('./update-identity.js');
+      return run(rest, io);
+    }
+    case 'inject': {
+      const { run } = await import('./inject.js');
       return run(rest, io);
     }
     default:

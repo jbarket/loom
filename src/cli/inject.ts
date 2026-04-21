@@ -1,0 +1,283 @@
+/**
+ * loom inject — write a marker-bounded managed section into each
+ * selected harness's dotfile. Composes with user content; idempotent.
+ *
+ * This file only wires the flag-driven (non-interactive) path; the
+ * interactive wizard is added in Task 7.
+ */
+import { parseArgs } from 'node:util';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { assertStackVersionCompatible } from '../config.js';
+import { extractGlobalFlags, resolveEnv } from './args.js';
+import type { IOStreams } from './io.js';
+import { renderJson } from './io.js';
+import {
+  HARNESSES,
+  HARNESS_KEYS,
+  isHarnessKey,
+  type HarnessKey,
+  type HarnessPreset,
+} from '../injection/harnesses.js';
+import { renderBlock } from '../injection/render.js';
+import {
+  writeManagedBlock,
+  previewWrite,
+  MalformedMarkersError,
+  type WriteAction,
+  type WriteResult,
+} from '../injection/writer.js';
+import { readFile } from 'node:fs/promises';
+
+const USAGE = `Usage: loom inject [options]
+
+Writes a managed section into each selected harness's dotfile telling
+the agent how to load identity via loom. Re-running is idempotent;
+content outside the <!-- loom:start / loom:end --> markers is preserved.
+
+Options:
+  --harness <keys>       Comma-separated subset of: ${HARNESS_KEYS.join(', ')}
+  --all                  Inject into all default harnesses (exclusive with --harness)
+  --to <path>            Override target path (valid only when exactly one harness is selected)
+  --dry-run              Print unified diff; write nothing
+  --json                 Machine-readable output
+  --context-dir <path>   Agent context dir (default: $LOOM_CONTEXT_DIR)
+  --help, -h             Show this help
+
+With no harness flags, runs the interactive wizard on a TTY; exits 2
+on non-TTY stdin.
+`;
+
+interface InjectTarget {
+  harness: HarnessPreset;
+  path: string;
+}
+
+interface ReportRow {
+  harness: HarnessKey;
+  path: string;
+  action: WriteAction;
+  bytesWritten: number;
+  diff?: string;
+}
+
+/**
+ * Resolve the default path for a harness, honoring the HOME env var from
+ * io.env if set, rather than relying on the module-load-time frozen homedir().
+ */
+function resolveDefaultPath(harness: HarnessPreset, envHome: string | undefined): string {
+  if (envHome === undefined) {
+    return harness.defaultPath;
+  }
+  // Re-compute relative to the provided HOME
+  const base = (() => {
+    switch (harness.key) {
+      case 'claude-code': return join(envHome, '.claude', 'CLAUDE.md');
+      case 'codex':       return join(envHome, '.codex', 'AGENTS.md');
+      case 'gemini-cli':  return join(envHome, '.gemini', 'GEMINI.md');
+    }
+  })();
+  return base;
+}
+
+function makeDiff(existing: string, next: string, path: string): string {
+  const oldLines = existing.split('\n');
+  const newLines = next.split('\n');
+  const header =
+    `--- ${path}\n+++ ${path}\n@@ -1,${oldLines.length} +1,${newLines.length} @@\n`;
+  const body =
+    oldLines.map((l) => `-${l}`).join('\n') +
+    (oldLines.length ? '\n' : '') +
+    newLines.map((l) => `+${l}`).join('\n') +
+    (newLines.length ? '\n' : '');
+  return header + body;
+}
+
+async function planTargets(
+  harnesses: HarnessKey[],
+  toOverride: string | undefined,
+  envHome: string | undefined,
+): Promise<InjectTarget[] | { error: string; code: 2 }> {
+  if (toOverride !== undefined && harnesses.length !== 1) {
+    return {
+      error: 'loom inject: --to requires exactly a single --harness value',
+      code: 2,
+    };
+  }
+  return harnesses.map((key) => ({
+    harness: HARNESSES[key],
+    path: toOverride ?? resolveDefaultPath(HARNESSES[key], envHome),
+  }));
+}
+
+async function executeTargets(
+  targets: InjectTarget[],
+  contextDir: string,
+  opts: { dryRun: boolean },
+): Promise<{ rows: ReportRow[]; hadError: boolean; lastError?: Error }> {
+  const rows: ReportRow[] = [];
+  let hadError = false;
+  let lastError: Error | undefined;
+  for (const t of targets) {
+    const block = renderBlock(t.harness, contextDir);
+    try {
+      if (opts.dryRun) {
+        const existing = await readFile(t.path, 'utf-8').catch((e) => {
+          if ((e as NodeJS.ErrnoException).code === 'ENOENT') return '';
+          throw e;
+        });
+        const action = await previewWrite(t.path, block);
+        const next = (() => {
+          if (action === 'created') return block;
+          if (action === 'no-change') return existing;
+          return existing + (existing.endsWith('\n') ? '' : '\n') + '\n' + block;
+        })();
+        rows.push({
+          harness: t.harness.key,
+          path: t.path,
+          action,
+          bytesWritten: 0,
+          diff: makeDiff(existing, next, t.path),
+        });
+      } else {
+        const res: WriteResult = await writeManagedBlock(t.path, block);
+        rows.push({
+          harness: t.harness.key,
+          path: res.path,
+          action: res.action,
+          bytesWritten: res.bytesWritten,
+        });
+      }
+    } catch (err) {
+      hadError = true;
+      lastError = err as Error;
+      rows.push({
+        harness: t.harness.key,
+        path: t.path,
+        action: 'no-change',
+        bytesWritten: 0,
+      });
+    }
+  }
+  return { rows, hadError, lastError };
+}
+
+function humanActionLabel(action: WriteAction): string {
+  switch (action) {
+    case 'created': return 'created';
+    case 'appended': return 'appended';
+    case 'updated': return 'updated';
+    case 'no-change': return 'no change';
+  }
+}
+
+function writeHumanReport(rows: ReportRow[], io: IOStreams): void {
+  for (const r of rows) {
+    io.stdout(`${r.harness}: ${r.path} (${humanActionLabel(r.action)})\n`);
+  }
+}
+
+function writeDiffReport(rows: ReportRow[], io: IOStreams): void {
+  for (const r of rows) {
+    if (r.diff) io.stdout(r.diff);
+  }
+}
+
+export async function run(argv: string[], io: IOStreams): Promise<number> {
+  const { flags: global, rest } = extractGlobalFlags(argv);
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args: rest,
+      options: {
+        harness: { type: 'string' },
+        all:     { type: 'boolean' },
+        to:      { type: 'string' },
+        'dry-run': { type: 'boolean' },
+        help:    { type: 'boolean', short: 'h' },
+      },
+      strict: true,
+      allowPositionals: false,
+    });
+  } catch (err) {
+    io.stderr(`${(err as Error).message}\n${USAGE}`);
+    return 2;
+  }
+
+  if (parsed.values.help) { io.stdout(USAGE); return 0; }
+
+  if (parsed.values.harness !== undefined && parsed.values.all === true) {
+    io.stderr('loom inject: --harness and --all are mutually exclusive\n');
+    return 2;
+  }
+
+  let harnesses: HarnessKey[] | null = null;
+  if (parsed.values.all === true) {
+    harnesses = [...HARNESS_KEYS];
+  } else if (parsed.values.harness !== undefined) {
+    const parts = parsed.values.harness.split(',').map((s) => s.trim()).filter(Boolean);
+    for (const p of parts) {
+      if (!isHarnessKey(p)) {
+        io.stderr(`loom inject: unknown harness '${p}' (valid: ${HARNESS_KEYS.join(', ')})\n`);
+        return 2;
+      }
+    }
+    harnesses = parts as HarnessKey[];
+  }
+
+  if (harnesses === null) {
+    if (!io.stdinIsTTY) {
+      io.stderr('loom inject: --harness or --all required when stdin is not a TTY\n');
+      return 2;
+    }
+    io.stderr('loom inject: interactive wizard not yet wired; pass --harness or --all\n');
+    return 2;
+  }
+
+  const envR = resolveEnv(global, io.env);
+  try {
+    assertStackVersionCompatible(envR.contextDir);
+  } catch (err) {
+    io.stderr(`${(err as Error).message}\n`);
+    return 1;
+  }
+
+  const plan = await planTargets(harnesses, parsed.values.to, io.env.HOME);
+  if ('error' in plan) {
+    io.stderr(`${plan.error}\n`);
+    return plan.code;
+  }
+
+  const dryRun = parsed.values['dry-run'] === true;
+  const json = global.json === true;
+
+  let report;
+  try {
+    report = await executeTargets(plan, envR.contextDir, { dryRun });
+  } catch (err) {
+    if (err instanceof MalformedMarkersError) {
+      io.stderr(`${err.message}\n`);
+      return 1;
+    }
+    io.stderr(`loom inject: ${(err as Error).message}\n`);
+    return 1;
+  }
+
+  if (json) {
+    renderJson(io, report.rows);
+  } else if (dryRun) {
+    writeDiffReport(report.rows, io);
+  } else {
+    writeHumanReport(report.rows, io);
+  }
+
+  if (report.hadError) {
+    if (report.lastError instanceof MalformedMarkersError) {
+      io.stderr(`${report.lastError.message}\n`);
+    } else if (report.lastError) {
+      io.stderr(`loom inject: ${report.lastError.message}\n`);
+    }
+    return 1;
+  }
+  return 0;
+}
