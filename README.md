@@ -37,7 +37,7 @@ No daemon, no external service, no GPU.
 
 ## The stack
 
-v0.3.1 ships one opinionated stack:
+loom ships one opinionated stack:
 
 - **Storage** — `better-sqlite3` + the `sqlite-vec` vec0 virtual
   table. One `memories.db` per agent, real cosine similarity.

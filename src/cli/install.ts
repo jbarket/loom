@@ -134,6 +134,7 @@ function actionVerb(a: WriteAction): string {
   switch (a) {
     case 'created':         return 'Wrote';
     case 'skipped-exists':  return 'Already up to date at';
+    case 'skipped-stale':   return 'Skill file is outdated (re-run with --force to overwrite):';
     case 'overwritten':     return 'Overwrote';
   }
 }

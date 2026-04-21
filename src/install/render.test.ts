@@ -27,11 +27,11 @@ describe('writeSkill', () => {
     expect(second.action).toBe('skipped-exists');
   });
 
-  it('skips when destination exists with different content unless force=true', async () => {
+  it('reports skipped-stale when destination exists with different content and force is unset', async () => {
     const dest = join(work, 'loom-setup.md');
     await writeFile(dest, 'pre-existing content\n', 'utf-8');
     const res = await writeSkill(dest);
-    expect(res.action).toBe('skipped-exists');
+    expect(res.action).toBe('skipped-stale');
     const body = await readFile(dest, 'utf-8');
     expect(body).toBe('pre-existing content\n');
   });

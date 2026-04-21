@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { resolveSkillSourcePath } from './skill-source.js';
 
-export type WriteAction = 'created' | 'skipped-exists' | 'overwritten';
+export type WriteAction = 'created' | 'skipped-exists' | 'skipped-stale' | 'overwritten';
 
 export interface WriteSkillResult {
   path: string;
@@ -24,11 +24,12 @@ async function pathExists(p: string): Promise<boolean> {
 }
 
 /**
- * Write the bundled SKILL.md to `dest`. Idempotent: when the
- * destination already has matching content, returns `skipped-exists`.
- * When content differs, returns `skipped-exists` unless `force: true`
- * (then `overwritten`). `dryRun: true` short-circuits all writes but
- * still reports the action that would have been taken.
+ * Write the bundled SKILL.md to `dest`. Idempotent: returns
+ * `skipped-exists` when destination already matches source,
+ * `skipped-stale` when content differs and `force` is unset (signals
+ * the on-disk copy is out of date), `overwritten` with `force: true`.
+ * `dryRun: true` short-circuits all writes but still reports the
+ * action that would have been taken.
  */
 export async function writeSkill(
   dest: string,
@@ -50,7 +51,7 @@ export async function writeSkill(
     return { path: dest, action: 'skipped-exists' };
   }
   if (!opts.force) {
-    return { path: dest, action: 'skipped-exists' };
+    return { path: dest, action: 'skipped-stale' };
   }
   if (!opts.dryRun) {
     await writeFile(dest, source, 'utf-8');

@@ -78,7 +78,7 @@ export const INSTALL_TARGETS: Readonly<Record<InstallTargetKey, InstallTarget>> 
     label: 'Other (dump skill file to cwd)',
     skillDir: null,
     mcpConfigHint: null,
-    invoke: 'tell your agent to read loom-setup.md and follow it',
+    invoke: 'tell your agent to read loom-setup-skill.md and follow it',
     restart: 'restart your harness after it finishes setup',
     toolPrefix: 'mcp_loom_',
   },
