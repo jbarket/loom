@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdtemp, mkdir, readdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import * as harness from './harness.js';
+import { initHarness } from './harness.js';
 
 describe('blocks/harness', () => {
   let dir: string;
@@ -78,5 +79,51 @@ describe('blocks/harness', () => {
       expect(tpl).toContain('## Session search');
       expect(tpl).toContain('## Gotchas');
     });
+  });
+});
+
+describe('initHarness', () => {
+  let ctx: string;
+  beforeEach(async () => { ctx = await mkdtemp(join(tmpdir(), 'loom-harness-init-')); });
+  afterEach(async () => { await rm(ctx, { recursive: true, force: true }); });
+
+  it('creates harnesses/<name>.md from the template on a fresh stack', async () => {
+    const result = await initHarness(ctx, 'claude-code');
+    expect(result.action).toBe('created');
+    expect(result.name).toBe('claude-code');
+    expect(result.path).toBe(resolve(ctx, 'harnesses', 'claude-code.md'));
+    const body = await readFile(result.path, 'utf-8');
+    expect(body).toContain('harness: claude-code');
+    expect(body).toContain('Tool prefixes');
+  });
+
+  it('creates the harnesses directory if missing', async () => {
+    await initHarness(ctx, 'codex');
+    const entries = await readdir(resolve(ctx, 'harnesses'));
+    expect(entries).toContain('codex.md');
+  });
+
+  it('reports skipped-exists for an already-initialized harness', async () => {
+    await initHarness(ctx, 'codex');
+    const result = await initHarness(ctx, 'codex');
+    expect(result.action).toBe('skipped-exists');
+  });
+
+  it('overwrites when opts.overwrite is true', async () => {
+    const path = resolve(ctx, 'harnesses', 'codex.md');
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, '# customized manifest body', 'utf-8');
+    const result = await initHarness(ctx, 'codex', { overwrite: true });
+    expect(result.action).toBe('overwritten');
+    const body = await readFile(path, 'utf-8');
+    expect(body).toContain('harness: codex');
+  });
+
+  it('rejects names containing path separators', async () => {
+    await expect(initHarness(ctx, 'foo/bar')).rejects.toThrow(/name/);
+  });
+
+  it('rejects an empty name', async () => {
+    await expect(initHarness(ctx, '')).rejects.toThrow(/name/);
   });
 });
