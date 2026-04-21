@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0-alpha.5] - 2026-04-21
+
+### Added
+
+- `loom procedures list|show|adopt` — CLI for procedural-identity seed
+  templates (stack spec v1 §4.9). `adopt` supports positional keys,
+  `--all`, `--force` overwrite, and an interactive multi-select picker
+  (reuses the `src/cli/tui/multi-select.ts` primitive from alpha.4) on
+  TTY. Idempotent by default.
+- `loom harness init <name>` — CLI that scaffolds a harness manifest
+  (stack spec v1 §4.7) from the template. Falls back to `--client` /
+  `$LOOM_CLIENT` when no name is given. `--force` overwrites.
+- `mcp__loom__procedure_list`, `procedure_show`, `procedure_adopt`,
+  `harness_init` — MCP tools mirroring the CLI. Thin wrappers over the
+  same shared core; first-class way for an agent to respond to the
+  procedures seed nudge or a missing-manifest warning in the identity
+  payload without needing harness-native filesystem tools.
+- Stack spec §11 lists Procedures + Manifests as a new adapter.
+
+### Changed
+
+- `src/blocks/procedures.ts` gains `adoptProcedures`, `listProcedures`,
+  `showProcedure`, and `UnknownProcedureError` (additive — existing
+  exports untouched).
+- `src/blocks/harness.ts` gains `initHarness` (additive).
+
 ## [0.4.0-alpha.4] - 2026-04-20
 
 ### Added
@@ -140,7 +166,8 @@ Initial public release.
   stack and all added external-service dependencies or operational
   overhead.
 
-[Unreleased]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.4...HEAD
+[Unreleased]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.5...HEAD
+[0.4.0-alpha.5]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.4...v0.4.0-alpha.5
 [0.4.0-alpha.4]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.3...v0.4.0-alpha.4
 [0.4.0-alpha.3]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.2...v0.4.0-alpha.3
 [0.4.0-alpha.2]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.1...v0.4.0-alpha.2
