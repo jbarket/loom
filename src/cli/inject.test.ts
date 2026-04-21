@@ -167,4 +167,22 @@ describe('loom inject (flag-driven)', () => {
     expect(code).toBe(1);
     expect(stderr).toMatch(/Upgrade loom/);
   });
+
+  it('--dry-run diff on an existing-with-block target shows only the changed region', async () => {
+    const target = join(home, 'CLAUDE.md');
+    // Seed with the claude-code block rendered against a DIFFERENT context dir
+    const { HARNESSES } = await import('../injection/harnesses.js');
+    const { renderBlock } = await import('../injection/render.js');
+    const stale = renderBlock(HARNESSES['claude-code'], '/old/ctx/path');
+    await writeFile(target, `# Header\n\n${stale}\n# Footer\n`, 'utf-8');
+
+    const { stdout, code } = await runCliCaptured(
+      ['inject', '--harness', 'claude-code', '--to', target, '--dry-run', '--context-dir', ctx],
+    );
+    expect(code).toBe(0);
+    expect(stdout).toContain('-Context dir: /old/ctx/path');
+    expect(stdout).toContain(`+Context dir: ${ctx}`);
+    expect(stdout).not.toMatch(/^-# Header$/m);
+    expect(stdout).not.toMatch(/^\+# Header$/m);
+  });
 });

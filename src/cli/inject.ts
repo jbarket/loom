@@ -21,8 +21,10 @@ import {
 import { renderBlock } from '../injection/render.js';
 import {
   writeManagedBlock,
-  previewWrite,
   MalformedMarkersError,
+  findMarkers,
+  buildContent,
+  normalizeLF,
   type WriteAction,
   type WriteResult,
 } from '../injection/writer.js';
@@ -61,17 +63,35 @@ interface ReportRow {
 }
 
 
+/** Minimal line-level diff (Myers-lite via LCS table). Good enough for
+ *  a managed-block preview; avoids pulling in a dependency. */
+function lineDiff(oldText: string, newText: string): string[] {
+  const A = oldText.split('\n');
+  const B = newText.split('\n');
+  const n = A.length, m = B.length;
+  const lcs: number[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      if (A[i] === B[j]) lcs[i][j] = lcs[i + 1][j + 1] + 1;
+      else lcs[i][j] = Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+    }
+  }
+  const out: string[] = [];
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (A[i] === B[j]) { out.push(` ${A[i]}`); i++; j++; }
+    else if (lcs[i + 1][j] >= lcs[i][j + 1]) { out.push(`-${A[i]}`); i++; }
+    else { out.push(`+${B[j]}`); j++; }
+  }
+  while (i < n) { out.push(`-${A[i]}`); i++; }
+  while (j < m) { out.push(`+${B[j]}`); j++; }
+  return out;
+}
+
 function makeDiff(existing: string, next: string, path: string): string {
-  const oldLines = existing.split('\n');
-  const newLines = next.split('\n');
-  const header =
-    `--- ${path}\n+++ ${path}\n@@ -1,${oldLines.length} +1,${newLines.length} @@\n`;
-  const body =
-    oldLines.map((l) => `-${l}`).join('\n') +
-    (oldLines.length ? '\n' : '') +
-    newLines.map((l) => `+${l}`).join('\n') +
-    (newLines.length ? '\n' : '');
-  return header + body;
+  const header = `--- ${path}\n+++ ${path}\n`;
+  const hunk = lineDiff(existing, next);
+  return header + hunk.join('\n') + (hunk.length ? '\n' : '');
 }
 
 async function planTargets(
@@ -104,21 +124,18 @@ async function executeTargets(
     try {
       if (opts.dryRun) {
         const existing = await readFile(t.path, 'utf-8').catch((e) => {
-          if ((e as NodeJS.ErrnoException).code === 'ENOENT') return '';
+          if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null;
           throw e;
         });
-        const action = await previewWrite(t.path, block);
-        const next = (() => {
-          if (action === 'created') return block;
-          if (action === 'no-change') return existing;
-          return existing + (existing.endsWith('\n') ? '' : '\n') + '\n' + block;
-        })();
+        const norm = existing === null ? null : normalizeLF(existing);
+        const markers = norm === null ? null : findMarkers(norm, t.path);
+        const { next, action } = buildContent(existing, block, markers);
         rows.push({
           harness: t.harness.key,
           path: t.path,
           action,
           bytesWritten: 0,
-          diff: makeDiff(existing, next, t.path),
+          diff: makeDiff(existing ?? '', next, t.path),
         });
       } else {
         const res: WriteResult = await writeManagedBlock(t.path, block);

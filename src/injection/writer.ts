@@ -35,12 +35,12 @@ export class MalformedMarkersError extends Error {
 const START_RE = /<!--\s*loom:start(\s[^>]*)?-->/g;
 const END_RE = /<!--\s*loom:end\s*-->/g;
 
-interface MarkerBounds {
+export interface MarkerBounds {
   startIdx: number;
   endTerminusIdx: number;
 }
 
-function findMarkers(text: string, path: string): MarkerBounds | null {
+export function findMarkers(text: string, path: string): MarkerBounds | null {
   const starts = [...text.matchAll(START_RE)];
   const ends = [...text.matchAll(END_RE)];
   if (starts.length === 0 && ends.length === 0) return null;
@@ -67,7 +67,7 @@ function findMarkers(text: string, path: string): MarkerBounds | null {
   return { startIdx, endTerminusIdx };
 }
 
-function normalizeLF(s: string): string {
+export function normalizeLF(s: string): string {
   return s.replace(/\r\n/g, '\n');
 }
 
@@ -105,7 +105,7 @@ async function atomicWrite(
   return buf.byteLength;
 }
 
-function buildContent(
+export function buildContent(
   existing: string | null,
   block: string,
   markers: MarkerBounds | null,
