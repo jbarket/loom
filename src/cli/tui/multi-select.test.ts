@@ -82,3 +82,45 @@ describe('reduce', () => {
     expect(r.status).toBe('running');
   });
 });
+
+describe('reduce (single-select mode)', () => {
+  const items = [
+    { value: 'a', label: 'A' },
+    { value: 'b', label: 'B' },
+    { value: 'c', label: 'C' },
+  ] as const;
+
+  it('replaces prior selection on toggle when single=true', () => {
+    const s0 = initialState(items);
+    const s1 = reduce(s0, { kind: 'toggle' }, items, { single: true });
+    expect(s1.status).toBe('running');
+    if (s1.status !== 'running') throw new Error('unreachable');
+    expect([...s1.state.selected]).toEqual(['a']);
+
+    const s2 = reduce(s1.state, { kind: 'down' }, items, { single: true });
+    if (s2.status !== 'running') throw new Error('unreachable');
+    const s3 = reduce(s2.state, { kind: 'toggle' }, items, { single: true });
+    if (s3.status !== 'running') throw new Error('unreachable');
+    expect([...s3.state.selected]).toEqual(['b']);
+  });
+
+  it('deselects on toggle of already-selected item in single mode', () => {
+    const s0 = initialState(items);
+    const s1 = reduce(s0, { kind: 'toggle' }, items, { single: true });
+    if (s1.status !== 'running') throw new Error('unreachable');
+    const s2 = reduce(s1.state, { kind: 'toggle' }, items, { single: true });
+    if (s2.status !== 'running') throw new Error('unreachable');
+    expect([...s2.state.selected]).toEqual([]);
+  });
+
+  it('multi-select default unchanged when opts omitted', () => {
+    const s0 = initialState(items);
+    const s1 = reduce(s0, { kind: 'toggle' }, items);
+    if (s1.status !== 'running') throw new Error('unreachable');
+    const s2 = reduce(s1.state, { kind: 'down' }, items);
+    if (s2.status !== 'running') throw new Error('unreachable');
+    const s3 = reduce(s2.state, { kind: 'toggle' }, items);
+    if (s3.status !== 'running') throw new Error('unreachable');
+    expect([...s3.state.selected].sort()).toEqual(['a', 'b']);
+  });
+});

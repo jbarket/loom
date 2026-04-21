@@ -33,10 +33,15 @@ export type MultiSelectResult<T> =
   | { status: 'confirmed'; selected: Set<T> }
   | { status: 'cancelled' };
 
+export interface ReduceOpts {
+  single?: boolean;
+}
+
 export interface MultiSelectOpts<T> {
   title: string;
   items: ReadonlyArray<MultiSelectItem<T>>;
   initialSelected?: ReadonlySet<T>;
+  single?: boolean;
 }
 
 export function initialState<T>(
@@ -53,6 +58,7 @@ export function reduce<T>(
   state: MultiSelectState<T>,
   event: MultiSelectEvent,
   items: ReadonlyArray<MultiSelectItem<T>>,
+  opts: ReduceOpts = {},
 ): MultiSelectResult<T> {
   switch (event.kind) {
     case 'up': {
@@ -68,9 +74,15 @@ export function reduce<T>(
     case 'toggle': {
       if (items.length === 0) return { status: 'running', state };
       const v = items[state.cursor].value;
-      const next = new Set(state.selected);
-      if (next.has(v)) next.delete(v);
-      else next.add(v);
+      const has = state.selected.has(v);
+      let next: Set<T>;
+      if (opts.single) {
+        next = has ? new Set() : new Set([v]);
+      } else {
+        next = new Set(state.selected);
+        if (has) next.delete(v);
+        else next.add(v);
+      }
       return { status: 'running', state: { cursor: state.cursor, selected: next } };
     }
     case 'confirm':
@@ -96,7 +108,10 @@ function renderFrame<T>(
     const detail = item.detail ? `  ${item.detail}` : '';
     write(`  ${pointer} ${marker} ${item.label}${detail}\n`);
   });
-  write('\n  ↑/↓ move    space toggle    enter confirm    esc/q cancel\n');
+  const hint = opts.single
+    ? '\n  ↑/↓ move    space select    enter confirm    esc/q cancel\n'
+    : '\n  ↑/↓ move    space toggle    enter confirm    esc/q cancel\n';
+  write(hint);
 }
 
 interface KeypressAdapterDeps {
@@ -136,7 +151,7 @@ export async function multiSelect<T>(
       else if (key.name === 'return') event = { kind: 'confirm' };
       if (!event) return;
 
-      const result = reduce(state, event, opts.items);
+      const result = reduce(state, event, opts.items, { single: opts.single });
       if (result.status === 'running') {
         state = result.state;
         renderFrame(opts, state, write);
