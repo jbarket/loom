@@ -1,7 +1,7 @@
 # loom
 
 [![CI](https://github.com/jbarket/loom/actions/workflows/ci.yml/badge.svg)](https://github.com/jbarket/loom/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.4.0--alpha.3-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.4.0--alpha.4-blue.svg)](CHANGELOG.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-compatible-orange.svg)](https://modelcontextprotocol.io)
@@ -144,11 +144,38 @@ npx loom memory list --category feedback --context-dir ~/.config/loom/art
 
 # Initialize a fresh agent
 npx loom bootstrap --context-dir ~/.config/loom/new-agent
+
+# Inject loom identity pointer into harness dotfiles
+npx loom inject --all --context-dir ~/.config/loom/art
 ```
 
 `npx loom --help` lists subcommands; `npx loom <cmd> --help` shows
 per-command usage. All global env vars (`LOOM_CONTEXT_DIR`,
 `LOOM_CLIENT`, `LOOM_MODEL`) are honored.
+
+### `loom inject` — write identity pointer to harness dotfiles
+
+`loom inject` writes a small marker-bounded managed section into each
+harness's canonical config file (e.g. `~/.claude/CLAUDE.md`,
+`~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`) telling the agent to load
+identity via loom at session start — MCP tool preferred, shell
+fallback to `loom wake`. Content outside the `<!-- loom:start / end -->`
+markers is preserved; re-running is idempotent.
+
+Run with no flags on a TTY for an interactive picker, or with
+`--harness <keys>` / `--all` for scripting. Target paths can be
+overridden with `--to <path>` (valid only when exactly one harness is
+selected). `--dry-run` prints a unified diff; `--json` emits the
+structured write results for scripts.
+
+To keep your injections fresh automatically, add this to your shell rc
+(`~/.bashrc` / `~/.zshrc` / `~/.config/fish/config.fish`):
+
+```bash
+loom inject --all >/dev/null 2>&1 || true
+```
+
+Idempotent; cheap (no-op when already up to date); silent on success.
 
 ## Configuration
 
