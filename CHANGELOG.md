@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0-alpha.6] - 2026-04-21
+
+### Added
+
+- `loom install` — CLI that writes the bundled `loom-setup` skill
+  into a target harness's skills directory. Flag-driven
+  (`--harness <key>`) or single-select TUI on a TTY. Targets:
+  `claude-code`, `codex`, `gemini-cli`, `opencode`, `other`. `--to`
+  overrides destination; `--force` overwrites; `--dry-run` /
+  `--json` for scripting. The "other" target writes
+  `./loom-setup-skill.md` in the current directory.
+- `loom doctor` — read-only CLI probe reporting node version, stack
+  version compatibility, context dir resolution, and enumerating
+  existing agents under `~/.config/loom/*` with forward-looking
+  `git: { initialized, hasRemote, dirty, gitignorePresent }` fields
+  per agent. `--json` for scripting.
+- `assets/skill/SKILL.md` — bundled skill that drives first-run
+  setup inside the target harness: probe → interview → bootstrap →
+  procedures adopt → harness init → MCP config edit
+  (verify-before-write) → inject → wake verify. Never clobbers
+  existing agent dirs; never proposes `--force`.
+- `src/install/names.ts` — canonical agent-name validation plus
+  reserved-names list (`current`, `default`, `config`, `backups`,
+  `cache`, `tmp`, `shared`).
+- Stack spec §13 (Multi-agent layout) and §14 (Git-backed agent
+  dirs).
+
+### Changed
+
+- `loom bootstrap --name` now validates against the canonical name
+  rules. Invalid or reserved names exit with code 2 and a specific
+  error.
+- `src/cli/tui/multi-select.ts` gains a `single: boolean` option
+  (reducer + TTY adapter). Existing multi-select consumers are
+  unchanged — the option defaults to `false`.
+- `package.json` adds a `files` array so `assets/` ships in the
+  published tarball alongside `dist/`.
+- README Quick Start rewritten around `npx loom install` +
+  `/loom-setup`. Per-command reference sections unchanged.
+
 ## [0.4.0-alpha.5] - 2026-04-21
 
 ### Added
@@ -166,7 +206,8 @@ Initial public release.
   stack and all added external-service dependencies or operational
   overhead.
 
-[Unreleased]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.5...HEAD
+[Unreleased]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.6...HEAD
+[0.4.0-alpha.6]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.5...v0.4.0-alpha.6
 [0.4.0-alpha.5]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.4...v0.4.0-alpha.5
 [0.4.0-alpha.4]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.3...v0.4.0-alpha.4
 [0.4.0-alpha.3]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.2...v0.4.0-alpha.3
