@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import { join } from 'node:path';
 import {
   INSTALL_TARGETS,
   INSTALL_TARGET_KEYS,
