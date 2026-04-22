@@ -257,6 +257,9 @@ implementation history — one file per feature, frozen after merge.
 
 ## Docs
 
+- [`docs/faq.md`](docs/faq.md) — common failure modes and fixes:
+  MCP tools missing, `loom wake` errors, fastembed download issues,
+  stale identity, empty memory queries, and more.
 - [`docs/loom-stack-v1.md`](docs/loom-stack-v1.md) — engineering
   contract: directory layout, block types, memory schema, wake
   sequence, adapter contract.
