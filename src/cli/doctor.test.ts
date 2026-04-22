@@ -82,4 +82,46 @@ describe('loom doctor', () => {
     expect(joined).toMatch(/art/);
     expect(joined).toMatch(/node/i);
   });
+
+  it('includes embed report in json output', async () => {
+    const { io, out } = mkIo({ HOME: work });
+    const code = await run(['--json'], io);
+    expect(code).toBe(0);
+    const parsed = JSON.parse(out.join(''));
+    expect(parsed.embed).toBeDefined();
+    expect(typeof parsed.embed.model).toBe('string');
+    expect(typeof parsed.embed.cacheDir).toBe('string');
+    expect(typeof parsed.embed.cached).toBe('boolean');
+    expect(typeof parsed.embed.cacheEnvSet).toBe('boolean');
+  });
+
+  it('includes embed lines in human-readable output', async () => {
+    const { io, out } = mkIo({ HOME: work });
+    const code = await run([], io);
+    expect(code).toBe(0);
+    const joined = out.join('');
+    expect(joined).toMatch(/embed model:/);
+    expect(joined).toMatch(/embed cache:/);
+  });
+
+  it('--warm is accepted and exits 0', async () => {
+    // Point cache at a temp dir with no model so we exercise the warm path,
+    // then verify the flag is accepted and the run exits cleanly.
+    const savedCacheDir = process.env.LOOM_FASTEMBED_CACHE_DIR;
+    process.env.LOOM_FASTEMBED_CACHE_DIR = work;
+    try {
+      const { io, err } = mkIo({ HOME: work });
+      const code = await run(['--warm'], io);
+      expect(code).toBe(0);
+      // warmUp() should trigger some stderr output about warming or the model
+      const errStr = err.join('');
+      expect(errStr).toMatch(/warm|cache|model/i);
+    } finally {
+      if (savedCacheDir === undefined) {
+        delete process.env.LOOM_FASTEMBED_CACHE_DIR;
+      } else {
+        process.env.LOOM_FASTEMBED_CACHE_DIR = savedCacheDir;
+      }
+    }
+  });
 });

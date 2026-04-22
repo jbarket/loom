@@ -10,10 +10,13 @@
  */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { loadClientAdapter } from '../clients.js';
 import * as harnessBlock from '../blocks/harness.js';
 import * as modelBlock from '../blocks/model.js';
 import * as proceduresBlock from '../blocks/procedures.js';
+import { isModelCached } from '../backends/fastembed.js';
+import { resolveFastEmbedModel, resolveFastEmbedCacheDir } from '../config.js';
 
 async function readOptional(path: string): Promise<string | null> {
   try {
@@ -119,6 +122,24 @@ export async function loadIdentity(
     if (adapter) {
       parts.push(adapter);
     }
+  }
+
+  // Warn when the embedding model isn't cached yet. The first remember() or
+  // recall() call will block on a ~33MB download from GCS — which can eat
+  // an MCP tool budget on slow networks. Running `loom doctor --warm` pre-seeds
+  // the cache so this notice disappears on the next identity() call.
+  const embedModel = resolveFastEmbedModel();
+  const embedCacheDir = resolveFastEmbedCacheDir() ?? join(homedir(), '.cache', 'loom', 'fastembed');
+  if (!isModelCached(embedCacheDir, embedModel)) {
+    parts.push(
+      '# Notice: embedding model not yet cached\n\n' +
+      `The embedding model (\`${embedModel}\`) has not been downloaded yet. ` +
+      'The first call to `remember()` or `recall()` will trigger a ~33MB download from GCS, ' +
+      'which may take 30–60 seconds on a typical connection and could exceed MCP tool timeouts ' +
+      'on slow or metered networks.\n\n' +
+      'To pre-seed the cache before a memory call, run `loom doctor --warm` in the terminal. ' +
+      'For offline installs, set `LOOM_FASTEMBED_CACHE_DIR` to point to a pre-seeded directory.',
+    );
   }
 
   return parts.join('\n\n---\n\n');

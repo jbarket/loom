@@ -232,6 +232,35 @@ describe('loadIdentity — harness manifest', () => {
   });
 });
 
+describe('loadIdentity — embedding cache notice', () => {
+  let tempDir: string;
+  let savedCacheDir: string | undefined;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'loom-embed-notice-'));
+    // Point the cache at a temp dir that has no model — guarantees the notice appears.
+    savedCacheDir = process.env.LOOM_FASTEMBED_CACHE_DIR;
+    process.env.LOOM_FASTEMBED_CACHE_DIR = tempDir;
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+    if (savedCacheDir === undefined) {
+      delete process.env.LOOM_FASTEMBED_CACHE_DIR;
+    } else {
+      process.env.LOOM_FASTEMBED_CACHE_DIR = savedCacheDir;
+    }
+  });
+
+  it('includes a notice when the embedding model is not cached', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    const result = await loadIdentity(tempDir);
+    expect(result).toContain('# Notice: embedding model not yet cached');
+    expect(result).toContain('remember()');
+    expect(result).toContain('loom doctor --warm');
+  });
+});
+
 describe('loadIdentity — procedures', () => {
   let tempDir: string;
 

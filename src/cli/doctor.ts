@@ -8,15 +8,19 @@
 import { parseArgs } from 'node:util';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { extractGlobalFlags } from './args.js';
 import type { IOStreams } from './io.js';
 import { renderJson } from './io.js';
+import { resolveFastEmbedModel, resolveFastEmbedCacheDir } from '../config.js';
+import { isModelCached, FastEmbedProvider } from '../backends/fastembed.js';
 
 const USAGE = `Usage: loom doctor [options]
 
-Probes the loom environment. Read-only; exits 0 regardless of findings.
+Probes the loom environment. Read-only by default; exits 0 regardless of findings.
 
 Options:
+  --warm    Download the embedding model if not already cached (writes to cache)
   --json    Machine-readable output
   --help    Show this help
 `;
@@ -37,6 +41,13 @@ interface AgentReport {
   git: GitState;
 }
 
+interface EmbedReport {
+  model: string;
+  cacheDir: string;
+  cached: boolean;
+  cacheEnvSet: boolean;
+}
+
 interface DoctorReport {
   nodeOk: boolean;
   nodeVersion: string;
@@ -44,6 +55,7 @@ interface DoctorReport {
   contextDirResolved: string;
   agentsRoot: string;
   existingAgents: AgentReport[];
+  embed: EmbedReport;
 }
 
 async function fileExists(p: string): Promise<boolean> {
@@ -97,6 +109,18 @@ async function probeAgents(home: string): Promise<{ root: string; agents: AgentR
   return { root, agents };
 }
 
+function probeEmbed(): EmbedReport {
+  const model = resolveFastEmbedModel();
+  const envCacheDir = resolveFastEmbedCacheDir();
+  const cacheDir = envCacheDir ?? join(homedir(), '.cache', 'loom', 'fastembed');
+  return {
+    model,
+    cacheDir,
+    cached: isModelCached(cacheDir, model),
+    cacheEnvSet: Boolean(envCacheDir),
+  };
+}
+
 function nodeOk(version: string): boolean {
   const m = version.match(/^v(\d+)\./);
   return m !== null && Number(m[1]) >= 20;
@@ -120,6 +144,7 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
     parsed = parseArgs({
       args: rest,
       options: {
+        warm: { type: 'boolean' },
         json: { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
       },
@@ -135,6 +160,23 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
   const home = io.env.HOME ?? process.env.HOME ?? '';
   const contextDir = global.contextDir ?? io.env.LOOM_CONTEXT_DIR ?? join(home, '.config', 'loom', 'default');
   const { root, agents } = await probeAgents(home);
+  const embed = probeEmbed();
+
+  // --warm: download the embedding model now if not yet cached.
+  if (parsed.values.warm && !embed.cached) {
+    io.stderr(`Warming embedding model cache (${embed.model})...\n`);
+    const provider = new FastEmbedProvider({ model: embed.model, cacheDir: embed.cacheDir });
+    try {
+      await provider.warmUp();
+      // Refresh cached status after warm-up.
+      embed.cached = isModelCached(embed.cacheDir, embed.model);
+      io.stderr('Embedding model cached.\n');
+    } catch (err) {
+      io.stderr(`Warm-up failed: ${(err as Error).message}\n`);
+    }
+  } else if (parsed.values.warm && embed.cached) {
+    io.stderr(`Embedding model already cached (${embed.model}).\n`);
+  }
 
   const report: DoctorReport = {
     nodeOk: nodeOk(process.version),
@@ -143,6 +185,7 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
     contextDirResolved: contextDir,
     agentsRoot: root,
     existingAgents: agents,
+    embed,
   };
 
   const json = Boolean(parsed.values.json) || Boolean(global.json);
@@ -169,6 +212,10 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
       lines.push(`  - ${a.name} (${flags.join(', ') || 'empty'})`);
     }
   }
+  const embedCacheNote = report.embed.cacheEnvSet ? ` (LOOM_FASTEMBED_CACHE_DIR)` : '';
+  const embedStatus = report.embed.cached ? 'cached' : 'not cached  (run with --warm to download)';
+  lines.push(`embed model: ${report.embed.model}  [${embedStatus}]`);
+  lines.push(`embed cache: ${report.embed.cacheDir}${embedCacheNote}`);
   io.stdout(lines.join('\n') + '\n');
   return 0;
 }
