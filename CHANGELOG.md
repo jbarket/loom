@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0-alpha.7] - 2026-04-22
+
+### Changed
+
+- **npm package renamed `loom` → `loomai`.** The unscoped `loom`
+  name is taken by an unrelated package. Brand (`loom`), CLI binary
+  (`loom`), MCP server key (`loom`), and tool prefix
+  (`mcp__loom__*`) are unchanged — only the `npx` install surface
+  moves: `npx loom install` → `npx loomai install`. alpha.6 was
+  never published to npm; alpha.7 is the first release tag.
+- `package.json` adds `publishConfig: { access: public, provenance:
+  true }` so tagged releases publish with Sigstore provenance.
+- README Quick Start + CLI examples updated to `npx loomai`.
+
+### Added
+
+- `.github/workflows/release.yml` — tag-triggered publish pipeline.
+  Push a `v*` tag → runs `npm ci`, `npm test`, `npm run build`,
+  `npm publish --provenance`, then creates a GitHub release with
+  auto-generated notes. Pre-release tags (`-alpha`, `-beta`, `-rc`)
+  are flagged as prereleases on GitHub. Requires `NPM_TOKEN`
+  repository secret.
+
 ## [0.4.0-alpha.6] - 2026-04-21
 
 ### Added
@@ -206,7 +229,8 @@ Initial public release.
   stack and all added external-service dependencies or operational
   overhead.
 
-[Unreleased]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.6...HEAD
+[Unreleased]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.7...HEAD
+[0.4.0-alpha.7]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.6...v0.4.0-alpha.7
 [0.4.0-alpha.6]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.5...v0.4.0-alpha.6
 [0.4.0-alpha.5]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.4...v0.4.0-alpha.5
 [0.4.0-alpha.4]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.3...v0.4.0-alpha.4
