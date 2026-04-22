@@ -27,6 +27,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "prepare": "tsc",
     "dev": "tsx src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest"
