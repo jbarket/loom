@@ -15,6 +15,7 @@ import { extractGlobalFlags, resolveEnv } from './args.js';
 import { readStdin, renderJson } from './io.js';
 import type { IOStreams } from './io.js';
 import type { BootstrapParams } from '../tools/bootstrap.js';
+import { validateAgentName } from '../install/names.js';
 
 const USAGE = `Usage: loom bootstrap [options]
 
@@ -37,6 +38,13 @@ Options:
   --context-dir <path>   Agent context dir
   --help, -h             Show this help
 `;
+
+function checkName(name: string, io: IOStreams): number | null {
+  const r = validateAgentName(name);
+  if (r.ok) return null;
+  io.stderr(`Invalid --name: ${r.reason}\n`);
+  return 2;
+}
 
 async function promptInteractive(io: IOStreams): Promise<BootstrapParams | null> {
   const rl = createInterface({ input: io.stdin, output: process.stderr });
@@ -144,6 +152,9 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
     }
     params = { ...prompted, force: Boolean(parsed.values.force) };
   }
+
+  const nameCode = checkName(params!.name, io);
+  if (nameCode !== null) return nameCode;
 
   try {
     // params is always set by this point — all null paths return early above.

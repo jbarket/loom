@@ -20,6 +20,18 @@ describe('runCli top-level dispatch', () => {
     expect(code).toBe(2);
     expect(stderr).toMatch(/Unknown subcommand/);
   });
+
+  it('routes `install` to install.run', async () => {
+    const { stdout, code } = await runCliCaptured(['install', '--help']);
+    expect(code).toBe(0);
+    expect(stdout).toMatch(/loom install/);
+  });
+
+  it('routes `doctor` to doctor.run', async () => {
+    const { stdout, code } = await runCliCaptured(['doctor', '--help']);
+    expect(code).toBe(0);
+    expect(stdout).toMatch(/loom doctor/);
+  });
 });
 
 import { isCliInvocation } from '../index.js';

@@ -25,6 +25,8 @@ Commands:
   inject             Write loom identity pointer into harness dotfiles
   procedures        Browse/adopt procedural-identity seed templates
   harness init      Scaffold a harness manifest from template
+  install           Write loom-setup skill into a harness's skills dir
+  doctor            Probe the loom environment (read-only)
 
 Global flags:
   --context-dir <path>   Agent context dir (default: $LOOM_CONTEXT_DIR or ~/.config/loom/default)
@@ -112,6 +114,14 @@ export async function runCli(argv: string[], io: IOStreams = realStreams()): Pro
     }
     case 'harness': {
       const { run } = await import('./harness.js');
+      return run(rest, io);
+    }
+    case 'install': {
+      const { run } = await import('./install.js');
+      return run(rest, io);
+    }
+    case 'doctor': {
+      const { run } = await import('./doctor.js');
       return run(rest, io);
     }
     default:

@@ -484,3 +484,97 @@ docs (§4.9) and harness manifests (§4.7) from seed templates.
 - Idempotent by default; `--force` / `overwrite: true` replaces existing
   content. Ownership ritual on seed bodies is preserved until the agent
   removes it.
+
+## 13. Multi-agent layout
+
+Each agent lives in its own directory under a shared root.
+
+### 13.1 Canonical path
+
+`~/.config/loom/<name>/`. `LOOM_CONTEXT_DIR` overrides for advanced
+users; the install skill and the `bootstrap` CLI default to the
+canonical path.
+
+### 13.2 Name validation
+
+Agent names must match `/^[a-z0-9][a-z0-9-]*$/`, be 1–64 characters,
+and not appear in the reserved list (§13.3). Enforced by
+`src/install/names.ts::validateAgentName`; wired into `loom bootstrap`
+and the install skill's interview.
+
+### 13.3 Reserved names
+
+| name      | reserved for                                     |
+|-----------|--------------------------------------------------|
+| `current` | pointer to the active agent (alpha.7+)           |
+| `default` | fallback when LOOM_CONTEXT_DIR is unset          |
+| `config`  | loom-wide (not agent-scoped) configuration       |
+| `backups` | snapshot storage adjacent to agents (alpha.7+)   |
+| `cache`   | shared re-downloadable artifacts                 |
+| `tmp`     | scratch area used by `memory export` flows       |
+| `shared`  | prompts/templates shared across agents           |
+
+### 13.4 Self-containment invariant
+
+Everything required to resurrect an agent lives under its canonical
+directory. The fastembed model cache (`~/.cache/loom/fastembed/`) is
+explicitly excluded: shared, re-downloadable, not agent data.
+
+### 13.5 Pointer-slot contract (forward-declared)
+
+Alpha.7+ introduces `loom agents current|switch`, backed by a pointer
+at `~/.config/loom/current`. This document forward-declares that slot
+so tools written in alpha.6 do not reuse `current` as an agent name.
+
+## 14. Git-backed agent dirs
+
+Agent directories are suitable for `git init`. Two use cases:
+
+1. **Portability** — `git clone <agent-dir>` onto another machine
+   restores the agent.
+2. **Unfuck** — `git reset --hard` rolls off a bad upgrade or an
+   accidental edit.
+
+### 14.1 What to commit
+
+Commit: `IDENTITY.md`, `preferences.md`, `self-model.md`,
+`pursuits.md`, `procedures/*.md`, `harnesses/*.md`, `models/*.md`,
+`projects/*.md`, `LOOM_STACK_VERSION`, `.gitignore`.
+
+### 14.2 What *not* to commit
+
+Do not commit `memories.db`, `memories.db-wal`, `memories.db-shm`, or
+`*.log`. The canonical `.gitignore` lists these.
+
+### 14.3 `memories.db` is a derivable cache
+
+The authoritative form of a memory is its JSONL export
+(`loom memory list --json`). Embeddings are deterministic for a given
+model + backend. `memories.db` is a materialized index — losing it is
+recoverable via replay. This invariant is load-bearing for `loom
+memory export/import --jsonl` (alpha.7+) and for the decision to keep
+`memories.db` out of git.
+
+### 14.4 Doctor reporting
+
+`loom doctor --json` emits per-agent git state:
+
+```json
+{
+  "initialized": false,
+  "hasRemote": false,
+  "dirty": false,
+  "gitignorePresent": false
+}
+```
+
+In alpha.6 `hasRemote` and `dirty` are always `false` (best-effort
+without shelling out to `git`). The shape is stable so alpha.7+
+snapshot tooling can light up those fields without a schema change.
+
+### 14.5 Snapshot contract (forward-declared)
+
+Alpha.7+ introduces `loom snapshot [--message <m>]` — commits the
+current agent dir state with a conventional message. Not present in
+alpha.6; the architecture ensures nothing in alpha.6 contradicts its
+semantics.
