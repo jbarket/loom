@@ -1,7 +1,8 @@
 # loom
 
 [![CI](https://github.com/jbarket/loom/actions/workflows/ci.yml/badge.svg)](https://github.com/jbarket/loom/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.4.0--alpha.6-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.4.0--alpha.7-blue.svg)](CHANGELOG.md)
+[![npm](https://img.shields.io/npm/v/loomai.svg?label=npm%3A%20loomai)](https://www.npmjs.com/package/loomai)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-compatible-orange.svg)](https://modelcontextprotocol.io)
@@ -66,8 +67,13 @@ That's it.
 ### Install the setup skill
 
 ```bash
-npx loom install
+npx loomai install
 ```
+
+> The npm package is **`loomai`** (the unscoped `loom` name was
+> taken). Brand, CLI binary (`loom`), and MCP server key
+> (`mcp__loom__*`) are all still `loom` — the `ai` suffix is only
+> how you *fetch* the package.
 
 A single-select picker asks which harness you want loom wired into.
 Pick one of: Claude Code, Codex, Gemini CLI, OpenCode. (If your
@@ -77,9 +83,9 @@ harness isn't listed, pick "Other" and loom writes
 Scripting:
 
 ```bash
-npx loom install --harness claude-code
-npx loom install --harness codex --json
-npx loom install --harness claude-code --to ~/my/skills/loom-setup.md
+npx loomai install --harness claude-code
+npx loomai install --harness codex --json
+npx loomai install --harness claude-code --to ~/my/skills/loom-setup.md
 ```
 
 ### Finish setup inside the harness
@@ -108,33 +114,33 @@ or running without a harness.
 
 ```bash
 # Dump identity markdown (works even when MCP is dead)
-npx loom wake --context-dir ~/.config/loom/art
+npx loomai wake --context-dir ~/.config/loom/art
 
 # Save a memory (body from stdin)
-echo "Met Jonathan at a coffee shop" | npx loom remember "first meeting" \
+echo "Met Jonathan at a coffee shop" | npx loomai remember "first meeting" \
   --category user --context-dir ~/.config/loom/art
 
 # Search
-npx loom recall "coffee shop" --context-dir ~/.config/loom/art
+npx loomai recall "coffee shop" --context-dir ~/.config/loom/art
 
 # List all memories in a category
-npx loom memory list --category feedback --context-dir ~/.config/loom/art
+npx loomai memory list --category feedback --context-dir ~/.config/loom/art
 
 # Initialize a fresh agent
-npx loom bootstrap --context-dir ~/.config/loom/new-agent
+npx loomai bootstrap --context-dir ~/.config/loom/new-agent
 
 # Inject loom identity pointer into harness dotfiles
-npx loom inject --all --context-dir ~/.config/loom/art
+npx loomai inject --all --context-dir ~/.config/loom/art
 
 # Adopt procedural-identity seed templates
-npx loom procedures list
-npx loom procedures adopt --all --context-dir ~/.config/loom/art
+npx loomai procedures list
+npx loomai procedures adopt --all --context-dir ~/.config/loom/art
 
 # Scaffold a harness manifest
-npx loom harness init claude-code --context-dir ~/.config/loom/art
+npx loomai harness init claude-code --context-dir ~/.config/loom/art
 ```
 
-`npx loom --help` lists subcommands; `npx loom <cmd> --help` shows
+`npx loomai --help` lists subcommands; `npx loomai <cmd> --help` shows
 per-command usage. All global env vars (`LOOM_CONTEXT_DIR`,
 `LOOM_CLIENT`, `LOOM_MODEL`) are honored.
 
