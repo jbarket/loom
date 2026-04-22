@@ -9,7 +9,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-export type HarnessKey = 'claude-code' | 'codex' | 'gemini-cli';
+export type HarnessKey = 'claude-code' | 'codex' | 'gemini-cli' | 'opencode';
 
 export interface HarnessPreset {
   readonly key: HarnessKey;
@@ -22,6 +22,7 @@ export const HARNESS_KEYS: readonly HarnessKey[] = [
   'claude-code',
   'codex',
   'gemini-cli',
+  'opencode',
 ];
 
 export const HARNESSES: Readonly<Record<HarnessKey, HarnessPreset>> = {
@@ -42,6 +43,12 @@ export const HARNESSES: Readonly<Record<HarnessKey, HarnessPreset>> = {
     display: 'Gemini CLI',
     defaultPath: join(homedir(), '.gemini', 'GEMINI.md'),
     toolPrefix: 'mcp__loom__',
+  },
+  'opencode': {
+    key: 'opencode',
+    display: 'OpenCode',
+    defaultPath: join(homedir(), '.opencode', 'AGENTS.md'),
+    toolPrefix: 'loom_',
   },
 };
 
@@ -65,5 +72,6 @@ export function resolveHarnessPath(
     case 'claude-code': return join(base, '.claude', 'CLAUDE.md');
     case 'codex':       return join(base, '.codex', 'AGENTS.md');
     case 'gemini-cli':  return join(base, '.gemini', 'GEMINI.md');
+    case 'opencode':    return join(base, '.opencode', 'AGENTS.md');
   }
 }

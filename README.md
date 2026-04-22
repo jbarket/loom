@@ -148,10 +148,10 @@ per-command usage. All global env vars (`LOOM_CONTEXT_DIR`,
 
 `loom inject` writes a small marker-bounded managed section into each
 harness's canonical config file (e.g. `~/.claude/CLAUDE.md`,
-`~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`) telling the agent to load
-identity via loom at session start — MCP tool preferred, shell
-fallback to `loom wake`. Content outside the `<!-- loom:start / end -->`
-markers is preserved; re-running is idempotent.
+`~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`, `~/.opencode/AGENTS.md`)
+telling the agent to load identity via loom at session start — MCP tool
+preferred, shell fallback to `loom wake`. Content outside the
+`<!-- loom:start / end -->` markers is preserved; re-running is idempotent.
 
 Run with no flags on a TTY for an interactive picker, or with
 `--harness <keys>` / `--all` for scripting. Target paths can be

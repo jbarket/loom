@@ -52,7 +52,7 @@ describe('loom inject (flag-driven)', () => {
     expect(geminiText).toContain('harness=gemini-cli');
   });
 
-  it('--all writes all three defaults', async () => {
+  it('--all writes all four defaults', async () => {
     const { code } = await runCliCaptured(
       ['inject', '--all', '--context-dir', ctx],
       { env: { HOME: home } },
@@ -61,6 +61,7 @@ describe('loom inject (flag-driven)', () => {
     expect((await readFile(join(home, '.claude', 'CLAUDE.md'), 'utf-8'))).toContain('harness=claude-code');
     expect((await readFile(join(home, '.codex', 'AGENTS.md'), 'utf-8'))).toContain('harness=codex');
     expect((await readFile(join(home, '.gemini', 'GEMINI.md'), 'utf-8'))).toContain('harness=gemini-cli');
+    expect((await readFile(join(home, '.opencode', 'AGENTS.md'), 'utf-8'))).toContain('harness=opencode');
   });
 
   it('--dry-run writes nothing and prints a diff', async () => {
@@ -111,7 +112,7 @@ describe('loom inject (flag-driven)', () => {
       { env: { HOME: home } },
     );
     expect(code).toBe(0);
-    expect((stdout.match(/no change/g) ?? []).length).toBe(3);
+    expect((stdout.match(/no change/g) ?? []).length).toBe(4);
   });
 
   it('exits 2 on unknown --harness', async () => {
