@@ -78,6 +78,7 @@ export function readStackVersion(contextDir: string): number | null {
  * (and refusing) versions ahead of CURRENT_STACK_VERSION.
  */
 export function ensureStackVersion(contextDir: string): void {
+  if (!existsSync(contextDir)) return; // dir doesn't exist yet; bootstrap will create it
   const path = resolve(contextDir, STACK_VERSION_FILE);
   if (existsSync(path)) return;
   writeFileSync(path, `${CURRENT_STACK_VERSION}\n`, 'utf-8');
