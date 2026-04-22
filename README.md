@@ -16,6 +16,10 @@ directory. When the runtime changes, the stack survives.
 
 > *Identity is operational. Voice is substrate.*
 
+> **New here?** Start with [`docs/concepts.md`](docs/concepts.md) —
+> it's the plain-language on-ramp to stack/sleeve/seam and why loom
+> looks the way it does.
+
 ## What it is
 
 A Model Context Protocol server exposing ten tools that read and write
@@ -257,6 +261,9 @@ implementation history — one file per feature, frozen after merge.
 
 ## Docs
 
+- [`docs/concepts.md`](docs/concepts.md) — newcomer-friendly tour of
+  stack, sleeve, the seam, and why identity and memory are separate.
+  Start here.
 - [`docs/loom-stack-v1.md`](docs/loom-stack-v1.md) — engineering
   contract: directory layout, block types, memory schema, wake
   sequence, adapter contract.
