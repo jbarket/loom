@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * Loom — CLI + stdio MCP entry point.
  *
