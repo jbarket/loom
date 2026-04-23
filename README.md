@@ -61,6 +61,7 @@ see [`docs/loom-stack-v1.md`](docs/loom-stack-v1.md).
 ### Prerequisites
 
 - **Node.js ≥ 20** (tested on 20 and 22).
+- **Linux or macOS.** Windows native is not supported; use WSL2.
 
 That's it.
 
