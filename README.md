@@ -260,11 +260,22 @@ implementation history — one file per feature, frozen after merge.
 - [`docs/loom-stack-v1.md`](docs/loom-stack-v1.md) — engineering
   contract: directory layout, block types, memory schema, wake
   sequence, adapter contract.
+- [`docs/privacy.md`](docs/privacy.md) — what lives where, what goes
+  over the network (only the fastembed model download), the no-telemetry
+  policy, and how to verify release provenance with `npm audit
+  signatures`.
 - [`docs/rebirth-letter-2026-04-19.md`](docs/rebirth-letter-2026-04-19.md)
   — philosophical brief: why loom exists in the shape it does,
   written to an AI agent after a loss-of-substrate incident.
 - [`docs/rescue-notes-2026-04-19.md`](docs/rescue-notes-2026-04-19.md)
   — migration log from the v0.3.1 rescue (Qdrant → sqlite-vec).
+
+## Trust & security
+
+- [`docs/privacy.md`](docs/privacy.md) — data locality, telemetry
+  policy, and provenance verification walkthrough.
+- [`SECURITY.md`](SECURITY.md) — supported scope, how to report
+  vulnerabilities, and the "no secrets in the stack" invariant.
 
 ## Development
 
