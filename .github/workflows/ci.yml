@@ -33,3 +33,6 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Validate skill
+        run: npx --yes skills-ref validate skills/loom-setup

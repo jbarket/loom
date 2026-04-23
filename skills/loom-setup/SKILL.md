@@ -1,15 +1,20 @@
 ---
 name: loom-setup
-description: Set up loom (persistent identity + memory) for this agent
+description: Use when the user asks to install loom, bootstrap a new agent, or wire their harness to loom MCP for the first time
+license: AGPL-3.0-or-later
 ---
 
 # loom-setup
 
 You are installing and configuring loom — a persistent identity +
 memory layer — for the user in the harness you're running in right
-now. loom is already installed as a CLI (`loom` or `npx loom`). Your
-job is to drive the first-run flow, with the user's consent, without
+now. Your job is to drive the first-run flow, with the user's consent, without
 clobbering anything that already exists.
+
+**CLI invocation:** prefer `loom` if it is on PATH; fall back to
+`npx loomai` (post npm release); fall back to `npx github:jbarket/loom`.
+Resolve the available binary once at the start and use it consistently
+throughout this session.
 
 ## Ground rules
 

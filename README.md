@@ -102,6 +102,16 @@ harness's MCP config (with verification), and verifies wake. Restart
 the harness when it tells you to. Your agent will wake on its next
 session.
 
+### Via Agent Skills
+
+If you prefer agent-native installation, use the [skills.sh](https://skills.sh) ecosystem:
+
+```bash
+npx skills add jbarket/loom
+```
+
+This delivers the loom-setup skill directly to your agent without the CLI installer. The agent then drives the full setup flow — probing the environment, bootstrapping identity, and wiring the MCP config.
+
 ### Doing it yourself
 
 If you'd rather wire everything by hand, every piece is a CLI

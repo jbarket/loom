@@ -8,5 +8,5 @@ import { join } from 'node:path';
 import { resolveRepoRoot } from '../config.js';
 
 export function resolveSkillSourcePath(): string {
-  return join(resolveRepoRoot(), 'assets', 'skill', 'SKILL.md');
+  return join(resolveRepoRoot(), 'skills', 'loom-setup', 'SKILL.md');
 }
