@@ -33,6 +33,7 @@ Global flags:
   --client <name>        Harness adapter hint (default: $LOOM_CLIENT)
   --model <name>         Model manifest hint (default: $LOOM_MODEL)
   --json                 Machine-readable output
+  --verbose              Print per-section stats and warnings to stderr (LOOM_LOG=debug for full tracing)
   --help, -h             Show help
   --version, -V          Print loom version
 

@@ -13,6 +13,8 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import BetterSqlite3, { type Database } from 'better-sqlite3';
 import * as sqliteVec from 'sqlite-vec';
+import { debugLog } from '../logging.js';
+import { LoomError, LOOM_E_MEMORIES_CORRUPT } from '../errors.js';
 import type {
   MemoryBackend,
   MemoryInput,
@@ -73,15 +75,25 @@ export class SqliteVecBackend implements MemoryBackend {
     private readonly embedder: EmbeddingProvider,
   ) {
     mkdirSync(dirname(config.dbPath), { recursive: true });
-    this.db = new BetterSqlite3(config.dbPath);
-    this.db.pragma('journal_mode = WAL');
-    sqliteVec.load(this.db);
-    this.initSchema();
+    debugLog('sqlite-vec', 'opening database', { dbPath: config.dbPath });
+    try {
+      this.db = new BetterSqlite3(config.dbPath);
+      this.db.pragma('journal_mode = WAL');
+      sqliteVec.load(this.db);
+      this.initSchema();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new LoomError(
+        LOOM_E_MEMORIES_CORRUPT,
+        `Failed to open memories database at "${config.dbPath}": ${msg}`,
+      );
+    }
   }
 
   // ── MemoryBackend interface ──
 
   async remember(input: MemoryInput): Promise<MemoryRef> {
+    debugLog('sqlite-vec', 'remember', { category: input.category, title: input.title });
     const uuid = randomUUID();
     const timestamp = new Date().toISOString();
     const slug = slugify(input.title);
@@ -126,6 +138,8 @@ export class SqliteVecBackend implements MemoryBackend {
   }
 
   async recall(input: RecallInput): Promise<MemoryMatch[]> {
+    debugLog('sqlite-vec', 'recall', { query: input.query, limit: input.limit });
+    const t0 = Date.now();
     const limit = input.limit ?? 10;
     const fetchK = limit * 4;
 
@@ -176,6 +190,7 @@ export class SqliteVecBackend implements MemoryBackend {
       tx(hitIds);
     }
 
+    debugLog('sqlite-vec', 'recall done', { results: results.length, ms: Date.now() - t0 });
     return results;
   }
 

@@ -16,6 +16,8 @@ import {
   EmbeddingModel,
 } from 'fastembed';
 import type { EmbeddingProvider } from './types.js';
+import { debugLog } from '../logging.js';
+import { LoomError, LOOM_E_EMBED_DOWNLOAD, LOOM_E_EMBED_INIT } from '../errors.js';
 
 export interface FastEmbedConfig {
   /** Model identifier, e.g. 'fast-bge-small-en-v1.5' */
@@ -51,20 +53,28 @@ export class FastEmbedProvider implements EmbeddingProvider {
   }
 
   async embed(text: string): Promise<number[]> {
+    const t0 = Date.now();
     const embedder = await this.ensureEmbedder();
     const vectors = await collectBatches(embedder.embed([text], 1));
+    debugLog('fastembed', 'embed (passage)', { ms: Date.now() - t0, chars: text.length });
     return vectors[0];
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
     if (texts.length === 0) return [];
+    const t0 = Date.now();
     const embedder = await this.ensureEmbedder();
-    return collectBatches(embedder.embed(texts, 32));
+    const result = await collectBatches(embedder.embed(texts, 32));
+    debugLog('fastembed', 'embedBatch', { ms: Date.now() - t0, count: texts.length });
+    return result;
   }
 
   async embedQuery(text: string): Promise<number[]> {
+    const t0 = Date.now();
     const embedder = await this.ensureEmbedder();
-    return embedder.queryEmbed(text);
+    const result = await embedder.queryEmbed(text);
+    debugLog('fastembed', 'embedQuery', { ms: Date.now() - t0, chars: text.length });
+    return result;
   }
 
   private ensureEmbedder(): Promise<FlagEmbedding> {
@@ -73,13 +83,23 @@ export class FastEmbedProvider implements EmbeddingProvider {
       const cacheDir =
         this.config.cacheDir ?? join(homedir(), '.cache', 'loom', 'fastembed');
       mkdirSync(cacheDir, { recursive: true });
+      debugLog('fastembed', 'initializing model', { model: this.config.model, cacheDir });
+      const t0 = Date.now();
       this.initPromise = FlagEmbedding.init({
         model: this.config.model as Exclude<EmbeddingModel, EmbeddingModel.CUSTOM>,
         cacheDir,
         showDownloadProgress: false,
       }).then((e) => {
         this.embedder = e;
+        debugLog('fastembed', 'model ready', { model: this.config.model, ms: Date.now() - t0 });
         return e;
+      }).catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        const isDownload = /download|network|fetch|ENOTFOUND|ETIMEDOUT/i.test(msg);
+        throw new LoomError(
+          isDownload ? LOOM_E_EMBED_DOWNLOAD : LOOM_E_EMBED_INIT,
+          `Failed to initialize fastembed model "${this.config.model}": ${msg}`,
+        );
       });
     }
     return this.initPromise;

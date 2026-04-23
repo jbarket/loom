@@ -19,6 +19,7 @@ import { resolve, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { LoomError, LOOM_E_STACK_VERSION } from './errors.js';
 
 export function resolveContextDir(): string {
   if (process.env.LOOM_CONTEXT_DIR) {
@@ -91,13 +92,15 @@ export function assertStackVersionCompatible(contextDir: string): void {
   const onDisk = readStackVersion(contextDir);
   if (onDisk !== null) {
     if (Number.isNaN(onDisk)) {
-      throw new Error(
+      throw new LoomError(
+        LOOM_E_STACK_VERSION,
         `LOOM_STACK_VERSION unparseable at ${contextDir}/${STACK_VERSION_FILE}. ` +
         `Expected an integer; got raw content.`,
       );
     }
     if (onDisk > CURRENT_STACK_VERSION) {
-      throw new Error(
+      throw new LoomError(
+        LOOM_E_STACK_VERSION,
         `Stack at ${contextDir} is version ${onDisk}; ` +
         `this loom build understands up to v${CURRENT_STACK_VERSION}. Upgrade loom.`,
       );

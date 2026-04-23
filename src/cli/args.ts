@@ -11,6 +11,7 @@ export interface ResolvedEnv {
   client?: string;
   model?: string;
   json: boolean;
+  verbose: boolean;
 }
 
 export interface RawGlobalFlags {
@@ -18,6 +19,7 @@ export interface RawGlobalFlags {
   client?: string;
   model?: string;
   json?: boolean;
+  verbose?: boolean;
 }
 
 export function resolveEnv(
@@ -33,6 +35,7 @@ export function resolveEnv(
     client: flags.client ?? processEnv.LOOM_CLIENT,
     model: flags.model ?? processEnv.LOOM_MODEL,
     json: Boolean(flags.json),
+    verbose: Boolean(flags.verbose),
   };
 }
 
@@ -51,7 +54,8 @@ export function extractGlobalFlags(argv: string[]): {
     if (a === '--context-dir') { flags.contextDir = argv[++i]; continue; }
     if (a === '--client')      { flags.client     = argv[++i]; continue; }
     if (a === '--model')       { flags.model      = argv[++i]; continue; }
-    if (a === '--json')        { flags.json = true;            continue; }
+    if (a === '--json')        { flags.json    = true;         continue; }
+    if (a === '--verbose')     { flags.verbose = true;         continue; }
     rest.push(a);
   }
   return { flags, rest };
