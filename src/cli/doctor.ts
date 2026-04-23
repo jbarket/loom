@@ -5,12 +5,15 @@
  * writes. Exit 0 regardless of findings; health is the output, not
  * the exit code.
  */
-import { parseArgs } from 'node:util';
+import { execFile } from 'node:child_process';
+import { promisify, parseArgs } from 'node:util';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { extractGlobalFlags } from './args.js';
 import type { IOStreams } from './io.js';
 import { renderJson } from './io.js';
+
+const execFileAsync = promisify(execFile);
 
 const USAGE = `Usage: loom doctor [options]
 
@@ -59,14 +62,30 @@ async function dirNonEmpty(p: string): Promise<boolean> {
   }
 }
 
+async function gitOutput(args: string[], cwd: string): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync('git', args, { cwd });
+    return stdout;
+  } catch {
+    return '';
+  }
+}
+
 async function probeGit(agentDir: string): Promise<GitState> {
   const dotGit = join(agentDir, '.git');
   const initialized = await fileExists(dotGit);
   const gitignorePresent = await fileExists(join(agentDir, '.gitignore'));
+  if (!initialized) {
+    return { initialized, hasRemote: false, dirty: false, gitignorePresent };
+  }
+  const [remotes, status] = await Promise.all([
+    gitOutput(['remote'], agentDir),
+    gitOutput(['status', '--porcelain'], agentDir),
+  ]);
   return {
     initialized,
-    hasRemote: false,
-    dirty: false,
+    hasRemote: remotes.trim().length > 0,
+    dirty: status.trim().length > 0,
     gitignorePresent,
   };
 }
