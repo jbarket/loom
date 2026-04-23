@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `docs/privacy.md` — trust doc covering data locality (everything
+  local, only outbound call is the first-run fastembed model
+  download), the no-opt-out-telemetry policy, and a walkthrough for
+  verifying release provenance via `npm audit signatures` and
+  `gh attestation verify`. Linked from README (new "Trust &
+  security" section) and CONTRIBUTING.
+
 ## [0.4.0-alpha.7] - 2026-04-22
 
 ### Changed
