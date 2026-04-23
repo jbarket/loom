@@ -107,6 +107,29 @@ export interface MemoryEntry {
   created: string;
 }
 
+export interface MemoryExportEntry {
+  ref: string;
+  category: string;
+  title: string;
+  content: string;
+  project?: string;
+  metadata: Record<string, unknown>;
+  ttl?: string;
+  created: string;
+  updated?: string;
+}
+
+export interface ExportInput {
+  category?: string;
+  project?: string;
+}
+
+export interface ImportResult {
+  imported: number;
+  updated: number;
+  skipped: number;
+}
+
 // ─── Backend Interface ───────────────────────────────────────────────────────
 
 export interface MemoryBackend {
@@ -117,6 +140,8 @@ export interface MemoryBackend {
   /** Remove expired memories and report stale ones. */
   prune(options?: { dryRun?: boolean; staleDays?: number }): Promise<PruneResult>;
   list(input: ListInput): Promise<MemoryEntry[]>;
+  export(input: ExportInput): Promise<MemoryExportEntry[]>;
+  import(entries: MemoryExportEntry[]): Promise<ImportResult>;
 }
 
 // ─── Embedding Interface (used by vector backends) ───────────────────────────

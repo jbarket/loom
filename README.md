@@ -126,6 +126,12 @@ npx github:jbarket/loom recall "coffee shop" --context-dir ~/.config/loom/art
 # List all memories in a category
 npx github:jbarket/loom memory list --category feedback --context-dir ~/.config/loom/art
 
+# Export all memories as JSONL (portability, backup, embedding-model migration)
+npx github:jbarket/loom memory export --context-dir ~/.config/loom/art > memories.jsonl
+
+# Import JSONL into a fresh context dir (upserts by ref, re-embeds)
+npx github:jbarket/loom memory import memories.jsonl --context-dir ~/.config/loom/new-agent
+
 # Initialize a fresh agent
 npx github:jbarket/loom bootstrap --context-dir ~/.config/loom/new-agent
 

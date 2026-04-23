@@ -548,12 +548,22 @@ Do not commit `memories.db`, `memories.db-wal`, `memories.db-shm`, or
 
 ### 14.3 `memories.db` is a derivable cache
 
-The authoritative form of a memory is its JSONL export
-(`loom memory list --json`). Embeddings are deterministic for a given
-model + backend. `memories.db` is a materialized index — losing it is
-recoverable via replay. This invariant is load-bearing for `loom
-memory export/import --jsonl` (alpha.7+) and for the decision to keep
-`memories.db` out of git.
+The authoritative form of a memory is its JSONL export. Embeddings are
+deterministic for a given model + backend. `memories.db` is a
+materialized index — losing it is recoverable via replay. This invariant
+is load-bearing for the decision to keep `memories.db` out of git.
+
+**`loom memory export --jsonl`** emits all memories as newline-delimited
+JSON (one object per line). Each line contains: `ref`, `category`,
+`title`, `content`, `project`, `metadata`, `ttl`, `created`, `updated`.
+Optional filters: `--category`, `--project`.
+
+**`loom memory import [file]`** reads JSONL from a file argument or
+stdin, upserts by `ref` (update if content/metadata changed, skip if
+identical, insert with preserved ref and timestamps if new), and
+re-embeds on every write. Idempotent: importing the same JSONL twice
+produces no changes on the second run. Reports `imported`, `updated`,
+`skipped` counts. Use `--json` for machine-readable output.
 
 ### 14.4 Doctor reporting
 

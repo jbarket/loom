@@ -26,6 +26,9 @@ import type {
   PruneResult,
   ListInput,
   MemoryEntry,
+  MemoryExportEntry,
+  ExportInput,
+  ImportResult,
   EmbeddingProvider,
 } from './types.js';
 import { computeExpiresAt, isExpired } from './ttl.js';
@@ -357,6 +360,129 @@ export class SqliteVecBackend implements MemoryBackend {
       project: r.project ?? undefined,
       created: r.created,
     }));
+  }
+
+  async export(input: ExportInput): Promise<MemoryExportEntry[]> {
+    const clauses: string[] = [];
+    const params: unknown[] = [];
+    if (input.category) {
+      clauses.push('category = ?');
+      params.push(input.category);
+    }
+    if (input.project) {
+      clauses.push('project = ?');
+      params.push(input.project);
+    }
+    const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+
+    const rows = this.db
+      .prepare(
+        `SELECT ref, category, title, content, project, metadata, ttl, created, updated
+         FROM memories ${where}
+         ORDER BY created ASC`,
+      )
+      .all(...params) as {
+      ref: string;
+      category: string;
+      title: string;
+      content: string;
+      project: string | null;
+      metadata: string;
+      ttl: string | null;
+      created: string;
+      updated: string | null;
+    }[];
+
+    return rows.map((r) => ({
+      ref: r.ref,
+      category: r.category,
+      title: r.title,
+      content: r.content,
+      ...(r.project !== null && { project: r.project }),
+      metadata: JSON.parse(r.metadata) as Record<string, unknown>,
+      ...(r.ttl !== null && { ttl: r.ttl }),
+      created: r.created,
+      ...(r.updated !== null && { updated: r.updated }),
+    }));
+  }
+
+  async import(entries: MemoryExportEntry[]): Promise<ImportResult> {
+    let imported = 0;
+    let updated = 0;
+    let skipped = 0;
+
+    for (const entry of entries) {
+      const existing = this.db
+        .prepare('SELECT id, content, metadata FROM memories WHERE ref = ?')
+        .get(entry.ref) as { id: number; content: string; metadata: string } | undefined;
+
+      const expiresAt = computeExpiresAt(entry.created, entry.ttl);
+      const vector = await this.embedder.embed(`${entry.title}\n\n${entry.content}`);
+
+      if (existing) {
+        const existingMeta = JSON.parse(existing.metadata) as Record<string, unknown>;
+        const sameMeta =
+          JSON.stringify(existingMeta) === JSON.stringify(entry.metadata);
+        if (existing.content === entry.content && sameMeta) {
+          skipped++;
+          continue;
+        }
+
+        const now = new Date().toISOString();
+        const tx = this.db.transaction(() => {
+          this.db
+            .prepare(
+              `UPDATE memories
+               SET content = ?, metadata = ?, ttl = ?, expires_at = ?, updated = ?
+               WHERE id = ?`,
+            )
+            .run(
+              entry.content,
+              JSON.stringify(entry.metadata),
+              entry.ttl ?? null,
+              expiresAt,
+              now,
+              existing.id,
+            );
+          this.db
+            .prepare('UPDATE vec_memories SET embedding = ? WHERE rowid = ?')
+            .run(toVecBuffer(vector), BigInt(existing.id));
+        });
+        tx();
+        updated++;
+      } else {
+        const uuid = randomUUID();
+        const tx = this.db.transaction(() => {
+          const result = this.db
+            .prepare(
+              `INSERT INTO memories (
+                uuid, ref, title, category, project, content, metadata,
+                created, updated, ttl, expires_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            )
+            .run(
+              uuid,
+              entry.ref,
+              entry.title,
+              entry.category,
+              entry.project ?? null,
+              entry.content,
+              JSON.stringify(entry.metadata),
+              entry.created,
+              entry.updated ?? null,
+              entry.ttl ?? null,
+              expiresAt,
+            );
+          this.db
+            .prepare('INSERT INTO vec_memories(rowid, embedding) VALUES (?, ?)')
+            .run(BigInt(result.lastInsertRowid), toVecBuffer(vector));
+        });
+        tx();
+        imported++;
+      }
+    }
+
+    return { imported, updated, skipped };
   }
 
   close(): void {

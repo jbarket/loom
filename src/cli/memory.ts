@@ -1,13 +1,16 @@
 /**
- * loom memory — list / prune the memory store.
+ * loom memory — list / prune / export / import the memory store.
  */
 import { parseArgs } from 'node:util';
+import { readFile } from 'node:fs/promises';
 import { memoryList } from '../tools/memory-list.js';
 import { prune } from '../tools/prune.js';
+import { memoryExport, entriesToJsonl } from '../tools/memory-export.js';
+import { memoryImport, parseJsonl } from '../tools/memory-import.js';
 import { createBackend } from '../backends/index.js';
 import { assertStackVersionCompatible } from '../config.js';
 import { extractGlobalFlags, resolveEnv } from './args.js';
-import { renderJson } from './io.js';
+import { renderJson, readStdin } from './io.js';
 import type { IOStreams } from './io.js';
 
 const USAGE = `Usage: loom memory <subcommand> [options]
@@ -15,6 +18,8 @@ const USAGE = `Usage: loom memory <subcommand> [options]
 Subcommands:
   list    Browse memories (table or --json)
   prune   Report / remove expired and stale memories
+  export  Emit memories as newline-delimited JSON to stdout
+  import  Load memories from JSONL (stdin or file argument)
 
 Options (list):
   --category <name>    Filter
@@ -26,6 +31,14 @@ Options (prune):
   --stale-days <n>     Stale threshold in days
   --dry-run            Report what would be pruned, don't delete
   --json               Emit PruneResult
+
+Options (export):
+  --category <name>    Filter by category
+  --project <name>     Filter by project
+
+Options (import):
+  [file]               JSONL file to import (reads stdin when omitted)
+  --json               Emit ImportResult as JSON
 
 Global: --context-dir, --help/-h
 `;
@@ -39,7 +52,7 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
     io.stdout(USAGE);
     return sub ? 0 : 2;
   }
-  if (sub !== 'list' && sub !== 'prune') {
+  if (sub !== 'list' && sub !== 'prune' && sub !== 'export' && sub !== 'import') {
     io.stderr(`Unknown memory subcommand: ${sub}\n${USAGE}`);
     return 2;
   }
@@ -84,6 +97,79 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
     }
     const text = await memoryList(env.contextDir, input);
     io.stdout(text.endsWith('\n') ? text : text + '\n');
+    return 0;
+  }
+
+  if (sub === 'export') {
+    let parsed;
+    try {
+      parsed = parseArgs({
+        args: subRest,
+        options: {
+          category: { type: 'string' },
+          project:  { type: 'string' },
+        },
+        strict: true,
+        allowPositionals: false,
+      });
+    } catch (err) {
+      io.stderr(`${(err as Error).message}\n${USAGE}`);
+      return 2;
+    }
+    const entries = await memoryExport(env.contextDir, {
+      category: parsed.values.category,
+      project:  parsed.values.project,
+    });
+    io.stdout(entriesToJsonl(entries));
+    return 0;
+  }
+
+  if (sub === 'import') {
+    let parsed;
+    try {
+      parsed = parseArgs({
+        args: subRest,
+        options: {},
+        strict: true,
+        allowPositionals: true,
+      });
+    } catch (err) {
+      io.stderr(`${(err as Error).message}\n${USAGE}`);
+      return 2;
+    }
+    const fileArg = parsed.positionals[0] as string | undefined;
+
+    let text: string;
+    if (fileArg !== undefined) {
+      try {
+        text = await readFile(fileArg, 'utf-8');
+      } catch (err) {
+        io.stderr(`Cannot read file "${fileArg}": ${(err as Error).message}\n`);
+        return 1;
+      }
+    } else if (!io.stdinIsTTY) {
+      text = await readStdin(io.stdin);
+    } else {
+      io.stderr('Provide a JSONL file argument or pipe from stdin.\n');
+      return 2;
+    }
+
+    let entries;
+    try {
+      entries = parseJsonl(text);
+    } catch (err) {
+      io.stderr(`${(err as Error).message}\n`);
+      return 1;
+    }
+
+    const result = await memoryImport(env.contextDir, entries);
+    if (env.json) {
+      renderJson(io, result);
+      return 0;
+    }
+    io.stdout(
+      `Imported: ${result.imported}  Updated: ${result.updated}  Skipped: ${result.skipped}\n`,
+    );
     return 0;
   }
 
