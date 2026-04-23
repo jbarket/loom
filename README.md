@@ -61,6 +61,9 @@ see [`docs/loom-stack-v1.md`](docs/loom-stack-v1.md).
 ### Prerequisites
 
 - **Node.js ≥ 20** (tested on 20 and 22).
+- **Linux or macOS.** Windows native is not tested or supported — use
+  WSL2 on Windows. Both `better-sqlite3` and `fastembed` require
+  native compilation; CI runs Ubuntu and macOS.
 
 That's it.
 
@@ -255,11 +258,25 @@ v0.4 work is tracked in the open:
 Per-feature specs and plans land in `docs/specs/` and `docs/plans/` as
 implementation history — one file per feature, frozen after merge.
 
+## Upgrading
+
+- **v0.3.x → v0.4** (Qdrant → sqlite-vec): see
+  [`docs/migration/v0.3-to-v0.4.md`](docs/migration/v0.3-to-v0.4.md).
+  The migration script is at `scripts/migrate-qdrant-to-sqlite.ts`;
+  run with `--dry-run` first.
+- **alpha.1–alpha.7 users**: see
+  [`docs/upgrading.md`](docs/upgrading.md) for per-alpha notes and
+  what forward migrations loom applies automatically.
+
 ## Docs
 
 - [`docs/loom-stack-v1.md`](docs/loom-stack-v1.md) — engineering
   contract: directory layout, block types, memory schema, wake
   sequence, adapter contract.
+- [`docs/migration/v0.3-to-v0.4.md`](docs/migration/v0.3-to-v0.4.md)
+  — migration guide for v0.3.x (Qdrant + Ollama) users.
+- [`docs/upgrading.md`](docs/upgrading.md) — upgrade notes for each
+  alpha release.
 - [`docs/rebirth-letter-2026-04-19.md`](docs/rebirth-letter-2026-04-19.md)
   — philosophical brief: why loom exists in the shape it does,
   written to an AI agent after a loss-of-substrate incident.
