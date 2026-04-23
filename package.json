@@ -10,6 +10,7 @@
   "files": [
     "dist",
     "assets",
+    "skills",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"

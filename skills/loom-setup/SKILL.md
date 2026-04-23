@@ -1,6 +1,7 @@
 ---
 name: loom-setup
-description: Set up loom (persistent identity + memory) for this agent
+description: Use when the user asks to install loom, bootstrap a new agent, or wire their harness to loom MCP for the first time
+license: AGPL-3.0-or-later
 ---
 
 # loom-setup
