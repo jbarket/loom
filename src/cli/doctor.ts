@@ -6,11 +6,15 @@
  * the exit code.
  */
 import { parseArgs } from 'node:util';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { extractGlobalFlags } from './args.js';
 import type { IOStreams } from './io.js';
 import { renderJson } from './io.js';
+
+const execFileAsync = promisify(execFile);
 
 const USAGE = `Usage: loom doctor [options]
 
@@ -63,12 +67,24 @@ async function probeGit(agentDir: string): Promise<GitState> {
   const dotGit = join(agentDir, '.git');
   const initialized = await fileExists(dotGit);
   const gitignorePresent = await fileExists(join(agentDir, '.gitignore'));
-  return {
-    initialized,
-    hasRemote: false,
-    dirty: false,
-    gitignorePresent,
-  };
+
+  if (!initialized) {
+    return { initialized, hasRemote: false, dirty: false, gitignorePresent };
+  }
+
+  let hasRemote = false;
+  try {
+    const { stdout } = await execFileAsync('git', ['remote'], { cwd: agentDir });
+    hasRemote = stdout.trim().length > 0;
+  } catch { /* best effort */ }
+
+  let dirty = false;
+  try {
+    const { stdout } = await execFileAsync('git', ['status', '--porcelain'], { cwd: agentDir });
+    dirty = stdout.trim().length > 0;
+  } catch { /* best effort */ }
+
+  return { initialized, hasRemote, dirty, gitignorePresent };
 }
 
 async function probeAgents(home: string): Promise<{ root: string; agents: AgentReport[] }> {
