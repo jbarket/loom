@@ -33,3 +33,47 @@ jobs:
 
       - name: Test
         run: npm test
+
+  smoke-test:
+    name: smoke-test (${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Pack
+        run: npm pack
+
+      - name: Smoke-test tarball
+        shell: bash
+        run: |
+          set -euo pipefail
+          tarball="$PWD/$(ls *.tgz)"
+
+          tar tf "$tarball" | grep -q "package/assets/skill/SKILL.md" \
+            || { echo "ERROR: assets/skill/SKILL.md missing from tarball" >&2; exit 1; }
+          echo "PASS: assets/skill/SKILL.md present"
+
+          tmpdir=$(mktemp -d)
+          trap 'rm -rf "$tmpdir"' EXIT
+          npm install --prefix "$tmpdir" "$tarball"
+          BIN="$tmpdir/node_modules/.bin/loom"
+
+          "$BIN" --help
+
+          "$BIN" doctor --json \
+            | node -e "let b='';process.stdin.on('data',d=>b+=d);process.stdin.on('end',()=>{const d=JSON.parse(b);console.log('doctor --json OK, nodeOk='+d.nodeOk)})"

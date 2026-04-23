@@ -43,6 +43,29 @@ jobs:
             exit 1
           fi
 
+      - name: Pack
+        run: npm pack
+
+      - name: Smoke-test tarball
+        shell: bash
+        run: |
+          set -euo pipefail
+          tarball="$PWD/$(ls *.tgz)"
+
+          tar tf "$tarball" | grep -q "package/assets/skill/SKILL.md" \
+            || { echo "ERROR: assets/skill/SKILL.md missing from tarball" >&2; exit 1; }
+          echo "PASS: assets/skill/SKILL.md present"
+
+          tmpdir=$(mktemp -d)
+          trap 'rm -rf "$tmpdir"' EXIT
+          npm install --prefix "$tmpdir" "$tarball"
+          BIN="$tmpdir/node_modules/.bin/loom"
+
+          "$BIN" --help
+
+          "$BIN" doctor --json \
+            | node -e "let b='';process.stdin.on('data',d=>b+=d);process.stdin.on('end',()=>{const d=JSON.parse(b);console.log('doctor --json OK, nodeOk='+d.nodeOk)})"
+
       - name: Publish to npm
         run: npm publish
         env:
