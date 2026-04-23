@@ -33,3 +33,35 @@ jobs:
 
       - name: Test
         run: npm test
+
+  harness-integration:
+    name: harness integration (install + MCP round-trip)
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Use Node.js 22.x
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Install Codex CLI
+        run: npm install -g @openai/codex
+
+      - name: Install Gemini CLI
+        run: npm install -g @google/gemini-cli --yes
+        continue-on-error: true
+
+      - name: Run harness round-trip integration tests
+        run: npm run test:harness

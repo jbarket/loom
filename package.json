@@ -30,7 +30,8 @@
     "prepare": "tsc",
     "dev": "tsx src/index.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:harness": "vitest run src/harness-roundtrip.integration.test.ts"
   },
   "publishConfig": {
     "access": "public",
