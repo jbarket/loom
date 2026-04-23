@@ -13,12 +13,38 @@
  * Context dir resolution order:
  *   1. LOOM_CONTEXT_DIR environment variable
  *   2. --context-dir CLI argument
- *   3. ~/.config/loom/default (fallback)
+ *   3. ~/.config/loom/current  →  ~/.config/loom/<name>
+ *   4. ~/.config/loom/default (fallback)
  */
-import { resolve, dirname } from 'node:path';
+import { resolve, join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+
+/** Filename of the active-agent pointer under ~/.config/loom/. */
+export const CURRENT_POINTER_FILENAME = 'current';
+
+/**
+ * Read the active-agent pointer file synchronously.
+ * Returns the agent name if the file exists and contains a valid name,
+ * or null otherwise. Used in context-dir resolution.
+ */
+export function readCurrentPointerSync(home: string): string | null {
+  const p = join(home, '.config', 'loom', CURRENT_POINTER_FILENAME);
+  if (!existsSync(p)) return null;
+  try {
+    const name = readFileSync(p, 'utf-8').trim();
+    if (
+      name.length > 0 &&
+      !name.includes('/') &&
+      !name.includes('\\') &&
+      name !== CURRENT_POINTER_FILENAME
+    ) {
+      return name;
+    }
+  } catch { /* fall through */ }
+  return null;
+}
 
 export function resolveContextDir(): string {
   if (process.env.LOOM_CONTEXT_DIR) {
@@ -30,7 +56,13 @@ export function resolveContextDir(): string {
     return resolve(process.argv[argIdx + 1]);
   }
 
-  return resolve(homedir(), '.config', 'loom', 'default');
+  const home = homedir();
+  const pointed = readCurrentPointerSync(home);
+  if (pointed) {
+    return resolve(join(home, '.config', 'loom', pointed));
+  }
+
+  return resolve(home, '.config', 'loom', 'default');
 }
 
 /**

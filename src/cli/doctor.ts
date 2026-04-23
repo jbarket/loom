@@ -1,16 +1,21 @@
 /**
  * loom doctor — read-only environment probe. Reports node version
  * compatibility, stack version, existing agents under
- * ~/.config/loom/*, and forward-looking git fields per agent. Never
- * writes. Exit 0 regardless of findings; health is the output, not
- * the exit code.
+ * ~/.config/loom/*, the active-agent pointer, and forward-looking
+ * git fields per agent. Never writes. Exit 0 regardless of findings;
+ * health is the output, not the exit code.
  */
 import { parseArgs } from 'node:util';
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { extractGlobalFlags } from './args.js';
+import { homedir } from 'node:os';
+import { extractGlobalFlags, resolveEnv } from './args.js';
 import type { IOStreams } from './io.js';
 import { renderJson } from './io.js';
+import { probeAgents, readCurrentPointer } from './agents.js';
+import type { AgentReport } from './agents.js';
+
+export type { AgentReport };
 
 const USAGE = `Usage: loom doctor [options]
 
@@ -21,80 +26,14 @@ Options:
   --help    Show this help
 `;
 
-interface GitState {
-  initialized: boolean;
-  hasRemote: boolean;
-  dirty: boolean;
-  gitignorePresent: boolean;
-}
-
-interface AgentReport {
-  name: string;
-  path: string;
-  hasIdentity: boolean;
-  hasMemoriesDb: boolean;
-  hasProcedures: boolean;
-  git: GitState;
-}
-
 interface DoctorReport {
   nodeOk: boolean;
   nodeVersion: string;
   stackVersionOk: boolean;
   contextDirResolved: string;
   agentsRoot: string;
+  currentPointer: string | null;
   existingAgents: AgentReport[];
-}
-
-async function fileExists(p: string): Promise<boolean> {
-  try { await stat(p); return true; } catch { return false; }
-}
-
-async function dirNonEmpty(p: string): Promise<boolean> {
-  try {
-    const entries = await readdir(p);
-    return entries.length > 0;
-  } catch {
-    return false;
-  }
-}
-
-async function probeGit(agentDir: string): Promise<GitState> {
-  const dotGit = join(agentDir, '.git');
-  const initialized = await fileExists(dotGit);
-  const gitignorePresent = await fileExists(join(agentDir, '.gitignore'));
-  return {
-    initialized,
-    hasRemote: false,
-    dirty: false,
-    gitignorePresent,
-  };
-}
-
-async function probeAgents(home: string): Promise<{ root: string; agents: AgentReport[] }> {
-  const root = join(home, '.config', 'loom');
-  const agents: AgentReport[] = [];
-  let entries: string[] = [];
-  try {
-    entries = await readdir(root);
-  } catch {
-    return { root, agents };
-  }
-  for (const name of entries.sort()) {
-    const p = join(root, name);
-    let s;
-    try { s = await stat(p); } catch { continue; }
-    if (!s.isDirectory()) continue;
-    agents.push({
-      name,
-      path: p,
-      hasIdentity: await fileExists(join(p, 'IDENTITY.md')),
-      hasMemoriesDb: await fileExists(join(p, 'memories.db')),
-      hasProcedures: await dirNonEmpty(join(p, 'procedures')),
-      git: await probeGit(p),
-    });
-  }
-  return { root, agents };
 }
 
 function nodeOk(version: string): boolean {
@@ -132,16 +71,18 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
   }
   if (parsed.values.help) { io.stdout(USAGE); return 0; }
 
-  const home = io.env.HOME ?? process.env.HOME ?? '';
-  const contextDir = global.contextDir ?? io.env.LOOM_CONTEXT_DIR ?? join(home, '.config', 'loom', 'default');
+  const home = io.env.HOME ?? process.env.HOME ?? homedir();
+  const env = resolveEnv(global, io.env);
   const { root, agents } = await probeAgents(home);
+  const currentPointer = await readCurrentPointer(home);
 
   const report: DoctorReport = {
     nodeOk: nodeOk(process.version),
     nodeVersion: process.version,
-    stackVersionOk: await probeStackVersion(contextDir),
-    contextDirResolved: contextDir,
+    stackVersionOk: await probeStackVersion(env.contextDir),
+    contextDirResolved: env.contextDir,
     agentsRoot: root,
+    currentPointer,
     existingAgents: agents,
   };
 
@@ -155,6 +96,7 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
   lines.push(`node:        ${report.nodeVersion}${report.nodeOk ? '' : '  (unsupported — need ≥ 20)'}`);
   lines.push(`stack:       ${report.stackVersionOk ? 'compatible' : 'incompatible'}`);
   lines.push(`context dir: ${report.contextDirResolved}`);
+  lines.push(`pointer:     ${report.currentPointer ?? '(none — using "default")'}`);
   lines.push(`agents root: ${report.agentsRoot}`);
   if (report.existingAgents.length === 0) {
     lines.push('agents:      (none)');

@@ -3,8 +3,9 @@
  * precedence. Individual commands parse their own subcommand flags
  * via node:util parseArgs.
  */
-import { resolve } from 'node:path';
+import { resolve, join } from 'node:path';
 import { homedir } from 'node:os';
+import { readCurrentPointerSync } from '../config.js';
 
 export interface ResolvedEnv {
   contextDir: string;
@@ -24,12 +25,20 @@ export function resolveEnv(
   flags: RawGlobalFlags,
   processEnv: NodeJS.ProcessEnv,
 ): ResolvedEnv {
-  const contextDir =
-    flags.contextDir ??
-    processEnv.LOOM_CONTEXT_DIR ??
-    resolve(homedir(), '.config', 'loom', 'default');
+  let contextDir: string;
+  if (flags.contextDir) {
+    contextDir = resolve(flags.contextDir);
+  } else if (processEnv.LOOM_CONTEXT_DIR) {
+    contextDir = resolve(processEnv.LOOM_CONTEXT_DIR);
+  } else {
+    const home = processEnv.HOME ?? homedir();
+    const pointed = readCurrentPointerSync(home);
+    contextDir = pointed
+      ? resolve(join(home, '.config', 'loom', pointed))
+      : resolve(home, '.config', 'loom', 'default');
+  }
   return {
-    contextDir: resolve(contextDir),
+    contextDir,
     client: flags.client ?? processEnv.LOOM_CLIENT,
     model: flags.model ?? processEnv.LOOM_MODEL,
     json: Boolean(flags.json),
