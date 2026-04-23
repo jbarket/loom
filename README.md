@@ -88,6 +88,14 @@ npx github:jbarket/loom install --harness codex --json
 npx github:jbarket/loom install --harness claude-code --to ~/my/skills/loom-setup.md
 ```
 
+### Via Agent Skills
+
+```bash
+npx skills add jbarket/loom
+```
+
+Installs the loom-setup skill from the skills.sh registry directly into your harness. Once installed, run it — the agent handles the rest of setup interactively.
+
 ### Finish setup inside the harness
 
 Open your chosen harness. Run the skill:
