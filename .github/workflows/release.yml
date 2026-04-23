@@ -43,6 +43,22 @@ jobs:
             exit 1
           fi
 
+
+      - name: Pre-publish smoke test
+        run: |
+          npm pack
+          TARBALL=$(ls loomai-*.tgz)
+          TMPDIR=$(mktemp -d)
+          npm install --prefix "$TMPDIR" "$TARBALL"
+          LOOM_BIN="$TMPDIR/node_modules/.bin/loom"
+          LOOM_ROOT="$TMPDIR/node_modules/loomai"
+          "$LOOM_BIN" --help
+          "$LOOM_BIN" doctor --json | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8')); if(typeof d.nodeOk!=='boolean') process.exit(1);"
+          test -f "$LOOM_ROOT/assets/skill/SKILL.md"
+          tar -tzf "$TARBALL" | grep -q "package/assets/skill/SKILL.md"
+          rm "$TARBALL"
+          echo "Pre-publish smoke test passed"
+
       - name: Publish to npm
         run: npm publish
         env:

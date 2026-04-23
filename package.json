@@ -4,6 +4,10 @@
   "description": "System 3 MCP server — persistent identity, memory, and self-model for AI agents. Single-file sqlite-vec + fastembed; zero external services.",
   "type": "module",
   "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./adapters/memory-20250818": "./dist/adapters/memory-20250818.js"
+  },
   "bin": {
     "loom": "dist/index.js"
   },
@@ -30,7 +34,8 @@
     "prepare": "tsc",
     "dev": "tsx src/index.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:integration": "npm run build && tsx scripts/integration-harness.ts"
   },
   "publishConfig": {
     "access": "public",

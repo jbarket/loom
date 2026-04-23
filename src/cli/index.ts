@@ -27,6 +27,7 @@ Commands:
   harness init      Scaffold a harness manifest from template
   install           Write loom-setup skill into a harness's skills dir
   doctor            Probe the loom environment (read-only)
+  snapshot          Commit the context dir to git (auto-inits on first use)
 
 Global flags:
   --context-dir <path>   Agent context dir (default: $LOOM_CONTEXT_DIR or ~/.config/loom/default)
@@ -122,6 +123,10 @@ export async function runCli(argv: string[], io: IOStreams = realStreams()): Pro
     }
     case 'doctor': {
       const { run } = await import('./doctor.js');
+      return run(rest, io);
+    }
+    case 'snapshot': {
+      const { run } = await import('./snapshot.js');
       return run(rest, io);
     }
     default:
