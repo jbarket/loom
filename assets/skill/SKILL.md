@@ -7,9 +7,8 @@ description: Set up loom (persistent identity + memory) for this agent
 
 You are installing and configuring loom — a persistent identity +
 memory layer — for the user in the harness you're running in right
-now. loom is already installed as a CLI (`loom` or `npx loom`). Your
-job is to drive the first-run flow, with the user's consent, without
-clobbering anything that already exists.
+now. Your job is to drive the first-run flow, with the user's consent,
+without clobbering anything that already exists.
 
 ## Ground rules
 
@@ -22,6 +21,8 @@ clobbering anything that already exists.
 - **When you can do it, do it.** Don't ask the user to edit JSON by
   hand if you can edit the file yourself. Don't print a config
   snippet as advice when you can write it.
+
+**CLI binary:** Use `loom` if it is on your PATH; otherwise fall back to `npx loomai` (available after SLE-13 npm publish); otherwise fall back to `npx github:jbarket/loom` (pre-publish). All step commands below write `loom` — substitute whichever binary resolves.
 
 ## Step 1 — Probe the environment
 
@@ -115,8 +116,7 @@ Procedure:
    `[mcp_servers.loom]` (TOML). If one exists and points to the right
    context dir, skip this step.
 3. If absent, add an entry that runs `loom serve` with the env vars
-   above. Use `loom` as the command (or `npx loom` if `loom` isn't on
-   PATH).
+   above. Use the resolved binary from the **CLI binary** note above.
 4. Re-read the file to verify your edit took.
 
 If the file format confuses you, stop and ask the user rather than
