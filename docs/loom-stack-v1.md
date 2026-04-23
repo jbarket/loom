@@ -456,15 +456,17 @@ surface.
 
 Added in alpha.4. `loom inject` writes a marker-bounded managed section
 into harness dotfiles (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`,
-`~/.gemini/GEMINI.md`) telling the agent to load identity via loom at
-session start. Content outside the `<!-- loom:start / loom:end -->`
-markers is preserved; re-running is idempotent.
+`~/.gemini/GEMINI.md`, `~/.config/opencode/AGENTS.md`) telling the agent
+to load identity via loom at session start. Content outside the
+`<!-- loom:start / loom:end -->` markers is preserved; re-running is
+idempotent.
 
-| Harness        | Default path            |
-|----------------|-------------------------|
-| claude-code    | `~/.claude/CLAUDE.md`   |
-| codex          | `~/.codex/AGENTS.md`    |
-| gemini-cli     | `~/.gemini/GEMINI.md`   |
+| Harness        | Default path                        | Tool prefix   |
+|----------------|-------------------------------------|---------------|
+| claude-code    | `~/.claude/CLAUDE.md`               | `mcp__loom__` |
+| codex          | `~/.codex/AGENTS.md`                | `mcp__loom__` |
+| gemini-cli     | `~/.gemini/GEMINI.md`               | `mcp__loom__` |
+| opencode       | `~/.config/opencode/AGENTS.md`      | `loom_`       |
 
 Selection is interactive when stdin is a TTY and no harness flags are
 given; non-interactive via `--harness <keys>` or `--all`. `--to <path>`

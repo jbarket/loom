@@ -37,6 +37,20 @@ describe('loom inject (flag-driven)', () => {
     expect(written).toContain(`Context dir: ${ctx}`);
   });
 
+  it('writes opencode to ~/.config/opencode/AGENTS.md with loom_ prefix', async () => {
+    const { code } = await runCliCaptured(
+      ['inject', '--harness', 'opencode', '--context-dir', ctx],
+      { env: { HOME: home } },
+    );
+    expect(code).toBe(0);
+    const written = await readFile(join(home, '.config', 'opencode', 'AGENTS.md'), 'utf-8');
+    expect(written).toContain('<!-- loom:start v1 harness=opencode -->');
+    expect(written).toContain('<!-- loom:end -->');
+    expect(written).toContain('loom_identity');
+    expect(written).not.toContain('mcp__loom__identity');
+    expect(written).toContain(`Context dir: ${ctx}`);
+  });
+
   it('writes the subset requested by --harness <a,b>', async () => {
     const { stdout, code } = await runCliCaptured(
       ['inject', '--harness', 'claude-code,gemini-cli', '--context-dir', ctx],
@@ -52,7 +66,7 @@ describe('loom inject (flag-driven)', () => {
     expect(geminiText).toContain('harness=gemini-cli');
   });
 
-  it('--all writes all three defaults', async () => {
+  it('--all writes all four defaults', async () => {
     const { code } = await runCliCaptured(
       ['inject', '--all', '--context-dir', ctx],
       { env: { HOME: home } },
@@ -61,6 +75,7 @@ describe('loom inject (flag-driven)', () => {
     expect((await readFile(join(home, '.claude', 'CLAUDE.md'), 'utf-8'))).toContain('harness=claude-code');
     expect((await readFile(join(home, '.codex', 'AGENTS.md'), 'utf-8'))).toContain('harness=codex');
     expect((await readFile(join(home, '.gemini', 'GEMINI.md'), 'utf-8'))).toContain('harness=gemini-cli');
+    expect((await readFile(join(home, '.config', 'opencode', 'AGENTS.md'), 'utf-8'))).toContain('harness=opencode');
   });
 
   it('--dry-run writes nothing and prints a diff', async () => {
@@ -111,7 +126,7 @@ describe('loom inject (flag-driven)', () => {
       { env: { HOME: home } },
     );
     expect(code).toBe(0);
-    expect((stdout.match(/no change/g) ?? []).length).toBe(3);
+    expect((stdout.match(/no change/g) ?? []).length).toBe(4);
   });
 
   it('exits 2 on unknown --harness', async () => {
@@ -209,7 +224,7 @@ describe('loom inject (flag-driven)', () => {
       const actual = await vi.importActual<typeof import('./tui/multi-select.js')>('./tui/multi-select.js');
       return {
         ...actual,
-        multiSelect: async () => new Set(['claude-code', 'codex', 'gemini-cli']),
+        multiSelect: async () => new Set(['claude-code', 'codex', 'gemini-cli', 'opencode']),
       };
     });
     vi.doMock('node:readline/promises', () => ({
@@ -230,6 +245,7 @@ describe('loom inject (flag-driven)', () => {
     await readFile(join(home, '.claude', 'CLAUDE.md'), 'utf-8');
     await readFile(join(home, '.codex', 'AGENTS.md'), 'utf-8');
     await readFile(join(home, '.gemini', 'GEMINI.md'), 'utf-8');
+    await readFile(join(home, '.config', 'opencode', 'AGENTS.md'), 'utf-8');
   });
 
   it('wizard cancel (null from multiSelect) exits 130 with no writes', async () => {

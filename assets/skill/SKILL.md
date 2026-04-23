@@ -131,8 +131,8 @@ loom inject --harness <HARNESS_KEY> --context-dir ~/.config/loom/<NAME>
 ```
 
 This writes a marker-bounded block into the harness's CLAUDE.md /
-AGENTS.md / GEMINI.md telling the agent to call the `identity` tool
-on session start.
+AGENTS.md / GEMINI.md / `~/.config/opencode/AGENTS.md` telling the
+agent to call the `identity` tool on session start.
 
 ## Step 7 — Verify
 
