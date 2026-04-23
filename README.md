@@ -255,8 +255,24 @@ v0.4 work is tracked in the open:
 Per-feature specs and plans land in `docs/specs/` and `docs/plans/` as
 implementation history — one file per feature, frozen after merge.
 
+## Upgrading from v0.3.x
+
+v0.3.x used Qdrant for memory storage and Ollama/OpenAI for
+embeddings. v0.4 replaces both with a single portable SQLite file —
+no daemon, no external service.
+
+If you have an existing v0.3.x agent with memories in Qdrant,
+[`docs/migration/v0.3-to-v0.4.md`](docs/migration/v0.3-to-v0.4.md)
+covers the full migration path: running `scripts/migrate-qdrant-to-sqlite.ts`,
+verifying the round-trip, updating your config, and what to do
+with the old collection. The license also changed (MIT → AGPL-3.0-or-later)
+in v0.4.0-alpha.1; the guide explains what that means for forks and
+bundled products.
+
 ## Docs
 
+- [`docs/migration/v0.3-to-v0.4.md`](docs/migration/v0.3-to-v0.4.md)
+  — migration guide for Qdrant-era users upgrading to v0.4.
 - [`docs/loom-stack-v1.md`](docs/loom-stack-v1.md) — engineering
   contract: directory layout, block types, memory schema, wake
   sequence, adapter contract.
