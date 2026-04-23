@@ -1,7 +1,7 @@
 {
   "name": "loomai",
   "version": "0.4.0-alpha.7",
-  "description": "System 3 MCP server — persistent identity, memory, and self-model for AI agents. Single-file sqlite-vec + fastembed; zero external services.",
+  "description": "Persistent identity and memory for AI agents, as an MCP server. Single-file SQLite + fastembed, CPU-only, zero external services. Works with Claude Code, Codex, Gemini CLI, OpenCode.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -38,11 +38,19 @@
   },
   "keywords": [
     "mcp",
-    "system3",
+    "mcp-server",
+    "ai",
+    "llm",
     "agent",
+    "claude",
+    "claude-code",
+    "codex",
+    "gemini-cli",
+    "opencode",
+    "anthropic",
     "identity",
     "memory",
-    "persistent"
+    "persistent-memory"
   ],
   "author": "Art E Fish + Jonathan Barket",
   "license": "AGPL-3.0-or-later",
