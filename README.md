@@ -16,6 +16,15 @@ directory. When the runtime changes, the stack survives.
 
 > *Identity is operational. Voice is substrate.*
 
+## Demo
+
+[![asciicast](https://asciinema.org/a/5bUMXCLmCRc8lg51.svg)](https://asciinema.org/a/5bUMXCLmCRc8lg51)
+
+60 seconds: cold install → `/loom-setup` in Claude Code → agent wakes with
+identity in the next session → save and recall a memory.
+
+To play locally: `asciinema play assets/demo.cast`
+
 ## What it is
 
 A Model Context Protocol server exposing ten tools that read and write
