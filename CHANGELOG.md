@@ -7,14 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-04-23
+
+Stabilization release consolidating v0.4.0-alpha.1 through alpha.7.
+This is the first externally-promoted release: `npx loomai install` is
+the canonical Quick Start path.
+
 ### Added
 
+- **`loom install`** — writes the bundled `loom-setup` skill into a
+  target harness's skills directory. Flag-driven (`--harness <key>`) or
+  interactive single-select TUI. Targets: `claude-code`, `codex`,
+  `gemini-cli`, `opencode`, `other`.
+- **`loom doctor`** — read-only probe reporting node version, stack
+  version compatibility, context dir resolution, and per-agent git
+  fields.
+- **`loom inject`** — writes a marker-bounded managed section into
+  harness dotfiles (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`,
+  `~/.gemini/GEMINI.md`) telling the agent to load identity via loom.
+  Idempotent; re-running is safe.
+- **`loom procedures list|show|adopt`** — CLI for procedural-identity
+  seed templates (stack spec v1 §4.9). Ships 6 seed templates:
+  `verify-before-completion`, `cold-testing`,
+  `reflection-at-end-of-unit`, `handoff-to-unpushable-repo`,
+  `confidence-calibration`, `RLHF-resistance`.
+- **`loom harness init <name>`** — scaffolds a harness manifest from
+  the template (stack spec v1 §4.7).
+- **Full CLI surface** — every MCP tool has a `loom <subcommand>` shell
+  equivalent: `wake`, `recall`, `remember`, `update`, `forget`,
+  `memory list`, `memory prune`, `pursuits`, `update-identity`,
+  `bootstrap`, `serve`. Write commands take body via stdin or
+  `$VISUAL`/`$EDITOR`. `--json` on any command emits structured output.
+- **MCP tools** for procedures and harness init:
+  `mcp__loom__procedure_list`, `procedure_show`, `procedure_adopt`,
+  `harness_init`.
+- **Harness manifest block** (`harnesses/<client>.md`) and **model
+  manifest block** (`models/<model>.md`) — loaded by `identity()` when
+  `LOOM_CLIENT` / `LOOM_MODEL` resolve. Missing-manifest nudges emitted
+  when set but absent.
+- **Procedures block** (`procedures/*.md`) with seed nudge — emitted by
+  `identity()` whenever `procedures/` is missing or empty.
+- `LOOM_STACK_VERSION` file auto-stamped on server boot; startup
+  refuses stacks ahead of what this loom understands.
+- `LOOM_MODEL` env var + optional `model` param on the `identity` tool.
+- Reusable `src/cli/tui/multi-select.ts` keyboard-nav checkbox
+  primitive with `single: boolean` option.
+- `src/install/names.ts` — canonical agent-name validation and
+  reserved-names list.
+- `assets/skill/SKILL.md` — bundled first-run setup skill.
+- `.github/workflows/release.yml` — tag-triggered publish pipeline.
+  Push a `v*` tag → `npm ci`, `npm test`, `npm run build`,
+  `npm publish --provenance`, GitHub release with auto-generated notes.
+  Pre-release tags flagged as prereleases. Requires `NPM_TOKEN` secret.
 - `docs/privacy.md` — trust doc covering data locality (everything
   local, only outbound call is the first-run fastembed model
   download), the no-opt-out-telemetry policy, and a walkthrough for
   verifying release provenance via `npm audit signatures` and
-  `gh attestation verify`. Linked from README (new "Trust &
-  security" section) and CONTRIBUTING.
+  `gh attestation verify`. Linked from README and CONTRIBUTING.
+- Stack spec §11 (Injection), §13 (Multi-agent layout), §14
+  (Git-backed agent dirs).
+
+### Changed
+
+- **npm package renamed `loom` → `loomai`.** Brand (`loom`), CLI
+  binary (`loom`), MCP server key (`loom`), and tool prefix
+  (`mcp__loom__*`) are unchanged — only the `npx` install surface
+  moves: `npx loom install` → `npx loomai install`.
+- **License: MIT → AGPL-3.0-or-later.** Forks that modify loom and
+  expose it over a network must offer source. Pre-alpha-1 releases
+  remain MIT.
+- `package.json` adds `publishConfig: { access: public, provenance: true }`
+  and a `files` array so `assets/` ships in the published tarball.
+- `loom bootstrap --name` validates against canonical name rules.
+- `assertStackVersionCompatible()` called at MCP startup and every CLI
+  command.
+- README Quick Start rewritten around `npx loomai install` +
+  `/loom-setup`.
 
 ## [0.4.0-alpha.7] - 2026-04-22
 
@@ -238,7 +306,8 @@ Initial public release.
   stack and all added external-service dependencies or operational
   overhead.
 
-[Unreleased]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.7...HEAD
+[Unreleased]: https://github.com/jbarket/loom/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/jbarket/loom/compare/v0.3.1...v0.4.1
 [0.4.0-alpha.7]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.6...v0.4.0-alpha.7
 [0.4.0-alpha.6]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.5...v0.4.0-alpha.6
 [0.4.0-alpha.5]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.4...v0.4.0-alpha.5
