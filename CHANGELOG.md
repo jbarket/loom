@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **`release.yml` switches to npm Trusted Publishing (OIDC).** Removes
+  `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}` from the publish step.
+  Auth is handled by the OIDC token exchange between GitHub Actions and
+  npm — no long-lived secret required. Requires a one-time bootstrap
+  publish and Trusted Publisher configuration on npmjs.com
+  (Jonathan-only steps, see SLE-91).
+
 ## [0.4.1] - 2026-04-23
 
 Stabilization release consolidating v0.4.0-alpha.1 through alpha.7.
