@@ -1,6 +1,6 @@
 {
   "name": "loomai",
-  "version": "0.4.0-alpha.7",
+  "version": "0.4.1",
   "description": "System 3 MCP server — persistent identity, memory, and self-model for AI agents. Single-file sqlite-vec + fastembed; zero external services.",
   "type": "module",
   "main": "dist/index.js",

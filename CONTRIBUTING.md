@@ -49,6 +49,10 @@ this case.
 - Features that require an external service, daemon, cloud account, or
   GPU to run loom itself.
 - Any loosening of the "no secrets in the stack" invariant.
+- Opt-out telemetry, usage pings, or analytics. loom's
+  [privacy posture](docs/privacy.md#telemetry-policy) is local-only;
+  any future telemetry must be opt-in, off by default, and explicit
+  about what it sends.
 
 ## Workflow
 
