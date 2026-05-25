@@ -10,7 +10,7 @@ import type { IOStreams } from './io.js';
 const USAGE = `Usage: loom wake [options]
 
 Prints the agent's wake output (identity, preferences, self-model,
-harness manifest, model manifest, procedures) to stdout.
+harness manifest, model manifest) to stdout.
 
 Options:
   --project <name>       Load projects/<name>.md as additional context

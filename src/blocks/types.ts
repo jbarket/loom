@@ -2,7 +2,7 @@
  * Shared block types for loom stack blocks.
  *
  * A "block" is a markdown file in the stack that an adapter loads during
- * the wake sequence — a harness manifest, a model manifest, a procedure.
+ * the wake sequence — a harness manifest or a model manifest.
  * This module defines the common shape and a tiny frontmatter parser.
  * We intentionally avoid a YAML dep: frontmatter here is key: value lines,
  * small and strict.
@@ -10,7 +10,7 @@
 
 /** A single block read from disk. */
 export interface Block {
-  /** Filename without `.md`. Also the harness / model / procedure name. */
+  /** Filename without `.md`. Also the harness / model name. */
   key: string;
   /** Parsed frontmatter as flat key→value. Empty object when absent or malformed. */
   frontmatter: Record<string, string>;

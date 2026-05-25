@@ -91,8 +91,8 @@ describe('stack version', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('exposes CURRENT_STACK_VERSION = 1', () => {
-    expect(CURRENT_STACK_VERSION).toBe(1);
+  it('exposes CURRENT_STACK_VERSION = 2', () => {
+    expect(CURRENT_STACK_VERSION).toBe(2);
   });
 
   it('exposes STACK_VERSION_FILE = "LOOM_STACK_VERSION"', () => {
@@ -113,10 +113,10 @@ describe('stack version', () => {
     expect(Number.isNaN(readStackVersion(dir))).toBe(true);
   });
 
-  it('ensureStackVersion writes 1 when the file is missing', () => {
+  it('ensureStackVersion writes CURRENT_STACK_VERSION when the file is missing', () => {
     ensureStackVersion(dir);
     expect(existsSync(join(dir, 'LOOM_STACK_VERSION'))).toBe(true);
-    expect(readFileSync(join(dir, 'LOOM_STACK_VERSION'), 'utf-8')).toBe('1\n');
+    expect(readFileSync(join(dir, 'LOOM_STACK_VERSION'), 'utf-8')).toBe(`${CURRENT_STACK_VERSION}\n`);
   });
 
   it('ensureStackVersion leaves an existing file untouched', () => {

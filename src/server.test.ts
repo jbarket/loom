@@ -6,6 +6,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createLoomServer, type LoomServerConfig } from './server.js';
+import { CURRENT_STACK_VERSION } from './config.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -60,7 +61,7 @@ describe('createLoomServer — stack version', () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('writes LOOM_STACK_VERSION=1 on boot for a fresh context dir', () => {
+  it('writes CURRENT_STACK_VERSION on boot for a fresh context dir', () => {
     const contextDir = makeContextDir(tmpDir);
     const stampPath = join(contextDir, 'LOOM_STACK_VERSION');
     expect(existsSync(stampPath)).toBe(false);
@@ -68,10 +69,10 @@ describe('createLoomServer — stack version', () => {
     createLoomServer({ contextDir });
 
     expect(existsSync(stampPath)).toBe(true);
-    expect(readFileSync(stampPath, 'utf-8')).toBe('1\n');
+    expect(readFileSync(stampPath, 'utf-8')).toBe(`${CURRENT_STACK_VERSION}\n`);
   });
 
-  it('leaves an existing LOOM_STACK_VERSION=1 alone', () => {
+  it('leaves an existing in-range LOOM_STACK_VERSION alone', () => {
     const contextDir = makeContextDir(tmpDir);
     writeFileSync(join(contextDir, 'LOOM_STACK_VERSION'), '1\n');
 
@@ -82,9 +83,10 @@ describe('createLoomServer — stack version', () => {
 
   it('throws on boot when on-disk version is ahead of what loom understands', () => {
     const contextDir = makeContextDir(tmpDir);
-    writeFileSync(join(contextDir, 'LOOM_STACK_VERSION'), '2\n');
+    const ahead = CURRENT_STACK_VERSION + 1;
+    writeFileSync(join(contextDir, 'LOOM_STACK_VERSION'), `${ahead}\n`);
 
-    expect(() => createLoomServer({ contextDir })).toThrow(/is version 2/i);
+    expect(() => createLoomServer({ contextDir })).toThrow(new RegExp(`is version ${ahead}`, 'i'));
   });
 
   it('throws on boot when LOOM_STACK_VERSION is unparseable', () => {

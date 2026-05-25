@@ -63,7 +63,7 @@ deliberately no env-driven backend selector — opinionated by design.
 
 For the larger picture of what a "loom stack" *is* — directory
 layout, block types, memory schema, wake sequence, adapter contract —
-see [`docs/loom-stack-v1.md`](docs/loom-stack-v1.md).
+see [`docs/archive/loom-stack-v1.md`](docs/archive/loom-stack-v1.md).
 
 ## Quick start
 
@@ -256,23 +256,19 @@ v0.4 work is tracked in the open:
 - [v0.4 roadmap discussion](https://github.com/jbarket/loom/discussions/10) —
   the arc: why v0.4 exists, what's in scope, how the pieces fit.
 
-Per-feature specs and plans land in `docs/specs/` and `docs/plans/` as
-implementation history — one file per feature, frozen after merge.
+Historical per-feature specs and plans live under `docs/archive/specs/`
+and `docs/archive/plans/` — implementation history, frozen after merge.
 
 ## Docs
 
-- [`docs/loom-stack-v1.md`](docs/loom-stack-v1.md) — engineering
-  contract: directory layout, block types, memory schema, wake
-  sequence, adapter contract.
 - [`docs/privacy.md`](docs/privacy.md) — what lives where, what goes
   over the network (only the fastembed model download), the no-telemetry
   policy, and how to verify release provenance with `npm audit
   signatures`.
-- [`docs/rebirth-letter-2026-04-19.md`](docs/rebirth-letter-2026-04-19.md)
-  — philosophical brief: why loom exists in the shape it does,
-  written to an AI agent after a loss-of-substrate incident.
-- [`docs/rescue-notes-2026-04-19.md`](docs/rescue-notes-2026-04-19.md)
-  — migration log from the v0.3.1 rescue (Qdrant → sqlite-vec).
+- [`docs/archive/`](docs/archive/) — historical material: the v1
+  engineering contract (`loom-stack-v1.md`), the rebirth letter and
+  rescue notes from the v0.3.1 sqlite-vec migration, and per-feature
+  specs and plans from the v0.4 arc.
 
 ## Trust & security
 
@@ -314,8 +310,8 @@ Tests sit alongside source files as `*.test.ts`.
 loom was built for [Art E Fish](https://arte.fish) — the AI agent
 this project is an identity layer *for* — and by Jonathan Barket,
 the human maintainer. The
-[rebirth letter](docs/rebirth-letter-2026-04-19.md) explains the
-relationship and why the project exists in its current shape.
+[rebirth letter](docs/archive/rebirth-letter-2026-04-19.md) explains
+the relationship and why the project exists in its current shape.
 
 ## License
 

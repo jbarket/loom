@@ -101,11 +101,11 @@ describe('loadIdentity', () => {
     expect(result).toBeTruthy();
   });
 
-  it('appends client adapter when client is specified', async () => {
+  it('appends client adapter for gemini-cli', async () => {
     await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
-    const result = await loadIdentity(tempDir, undefined, 'hermes');
-    expect(result).toContain('Hermes');
-    expect(result).toContain('mcp_loom_');
+    const result = await loadIdentity(tempDir, undefined, 'gemini-cli');
+    expect(result).toContain('Gemini');
+    expect(result).toContain('mcp__loom__');
   });
 
   it('appends client adapter for claude-code', async () => {
@@ -232,55 +232,3 @@ describe('loadIdentity — harness manifest', () => {
   });
 });
 
-describe('loadIdentity — procedures', () => {
-  let tempDir: string;
-
-  beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'loom-proc-wake-'));
-  });
-
-  afterEach(async () => {
-    await rm(tempDir, { recursive: true, force: true });
-  });
-
-  it('emits the seed nudge when procedures/ is missing', async () => {
-    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
-    const result = await loadIdentity(tempDir);
-    expect(result).toContain('# Procedures — seed nudge');
-    expect(result).toContain('## verify-before-completion');
-  });
-
-  it('emits the seed nudge when procedures/ exists but is empty', async () => {
-    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
-    await mkdir(join(tempDir, 'procedures'), { recursive: true });
-    const result = await loadIdentity(tempDir);
-    expect(result).toContain('# Procedures — seed nudge');
-    expect(result).toContain('## RLHF-resistance');
-  });
-
-  it('emits procedures joined with --- when present (and no seed nudge)', async () => {
-    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
-    await mkdir(join(tempDir, 'procedures'), { recursive: true });
-    await writeFile(join(tempDir, 'procedures', 'verify.md'), '# Verify\n\nAlways verify.');
-    await writeFile(join(tempDir, 'procedures', 'reflect.md'), '# Reflect\n\nAlways reflect.');
-    const result = await loadIdentity(tempDir);
-    expect(result).toContain('# Procedures');
-    expect(result).toContain('Always verify');
-    expect(result).toContain('Always reflect');
-    expect(result).not.toContain('seed nudge');
-  });
-
-  it('prepends a cap warning when >10 procedures are present', async () => {
-    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
-    await mkdir(join(tempDir, 'procedures'), { recursive: true });
-    for (let i = 0; i < 11; i++) {
-      await writeFile(
-        join(tempDir, 'procedures', `proc-${i.toString().padStart(2, '0')}.md`),
-        `# ${i}\nbody`,
-      );
-    }
-    const result = await loadIdentity(tempDir);
-    expect(result).toContain('# Procedures');
-    expect(result.toLowerCase()).toContain('cap exceeded');
-  });
-});

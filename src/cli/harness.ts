@@ -1,9 +1,10 @@
 /**
+/**
  * loom harness — manifest lifecycle for harness adapters.
  *
- * For v0.4.0-alpha.5 the only subcommand is `init`: writes a manifest
- * template to <contextDir>/harnesses/<name>.md. Reading is implicit —
- * identity() already composes the manifest from disk.
+ * The only subcommand is `init`: writes a manifest template to
+ * <contextDir>/harnesses/<name>.md. Reading is implicit — identity()
+ * already composes the manifest from disk.
  */
 import { parseArgs } from 'node:util';
 import { assertStackVersionCompatible } from '../config.js';

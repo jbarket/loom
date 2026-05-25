@@ -33,7 +33,6 @@ interface AgentReport {
   path: string;
   hasIdentity: boolean;
   hasMemoriesDb: boolean;
-  hasProcedures: boolean;
   git: GitState;
 }
 
@@ -48,15 +47,6 @@ interface DoctorReport {
 
 async function fileExists(p: string): Promise<boolean> {
   try { await stat(p); return true; } catch { return false; }
-}
-
-async function dirNonEmpty(p: string): Promise<boolean> {
-  try {
-    const entries = await readdir(p);
-    return entries.length > 0;
-  } catch {
-    return false;
-  }
 }
 
 async function probeGit(agentDir: string): Promise<GitState> {
@@ -90,7 +80,6 @@ async function probeAgents(home: string): Promise<{ root: string; agents: AgentR
       path: p,
       hasIdentity: await fileExists(join(p, 'IDENTITY.md')),
       hasMemoriesDb: await fileExists(join(p, 'memories.db')),
-      hasProcedures: await dirNonEmpty(join(p, 'procedures')),
       git: await probeGit(p),
     });
   }
@@ -164,7 +153,6 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
       const flags: string[] = [];
       if (a.hasIdentity) flags.push('identity');
       if (a.hasMemoriesDb) flags.push('memories.db');
-      if (a.hasProcedures) flags.push('procedures');
       if (a.git.initialized) flags.push('git');
       lines.push(`  - ${a.name} (${flags.join(', ') || 'empty'})`);
     }

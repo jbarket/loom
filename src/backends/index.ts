@@ -1,7 +1,7 @@
 /**
  * Memory backend factory.
  *
- * loom v0.3.1 ships a single opinionated stack: SqliteVecBackend
+ * loom ships a single opinionated stack: SqliteVecBackend
  * (sqlite + sqlite-vec virtual table) backed by FastEmbedProvider
  * (BGE-small-en-v1.5 ONNX, CPU-only). Zero external services. One DB
  * file per agent under the context dir.

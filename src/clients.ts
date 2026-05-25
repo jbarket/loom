@@ -8,7 +8,8 @@
  * Built-in adapters ship with loom. User overrides live in
  * `<contextDir>/clients/<client>.md` and take precedence.
  *
- * Supported clients: claude-code, gemini-cli, hermes, openclaw, nemoclaw
+ * Supported clients: claude-code, gemini-cli. Any other runtime can drop a
+ * user override at `<contextDir>/clients/<name>.md`.
  */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -19,7 +20,7 @@ import { join } from 'node:path';
 const TOOLS = [
   'identity', 'remember', 'recall', 'update', 'forget',
   'memory_list', 'memory_prune', 'update_identity',
-  'pursuits', 'bootstrap',
+  'bootstrap',
 ];
 
 function toolList(prefix: string): string {
@@ -38,27 +39,6 @@ ${toolList('mcp__loom__')}`,
 
 You are running in Gemini CLI (Google). Loom tools use double-underscore prefix:
 ${toolList('mcp__loom__')}`,
-
-  'hermes': `## Runtime: Hermes
-
-You are running in Hermes (Nous Research). Loom tools use single-underscore prefix:
-${toolList('mcp_loom_')}
-
-Hermes local memory (MEMORY.md, USER.md) is capped at ~3,600 chars total. Prefer
-\`mcp_loom_remember\` for anything that needs to persist reliably across sessions.`,
-
-  'openclaw': `## Runtime: OpenClaw
-
-You are running in OpenClaw. Loom tools use single-underscore prefix:
-${toolList('mcp_loom_')}`,
-
-  'nemoclaw': `## Runtime: NemoClaw
-
-You are running in NemoClaw (NVIDIA). Loom tools use single-underscore prefix:
-${toolList('mcp_loom_')}
-
-NemoClaw sandbox files (IDENTITY.md, SOUL.md, MEMORY.md) are local to the sandbox.
-Loom provides the cross-session semantic memory layer on top.`,
 };
 
 // ─── Loader ──────────────────────────────────────────────────────────────────

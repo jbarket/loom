@@ -18,12 +18,10 @@ Commands:
   update <ref>       Modify an existing memory
   forget <ref|scope> Remove memories
   memory list|prune  Browse or clean the memory store
-  pursuits <action>  Manage active pursuits
   update-identity    Edit preferences.md / self-model.md sections
   bootstrap          Initialize a fresh agent
   serve              Explicit MCP stdio startup (same as no args)
   inject             Write loom identity pointer into harness dotfiles
-  procedures        Browse/adopt procedural-identity seed templates
   harness init      Scaffold a harness manifest from template
   install           Write loom-setup skill into a harness's skills dir
   doctor            Probe the loom environment (read-only)
@@ -92,10 +90,6 @@ export async function runCli(argv: string[], io: IOStreams = realStreams()): Pro
       const { run } = await import('./bootstrap.js');
       return run(rest, io);
     }
-    case 'pursuits': {
-      const { run } = await import('./pursuits.js');
-      return run(rest, io);
-    }
     case 'serve': {
       const { run } = await import('./serve.js');
       return run(rest, io);
@@ -106,10 +100,6 @@ export async function runCli(argv: string[], io: IOStreams = realStreams()): Pro
     }
     case 'inject': {
       const { run } = await import('./inject.js');
-      return run(rest, io);
-    }
-    case 'procedures': {
-      const { run } = await import('./procedures.js');
       return run(rest, io);
     }
     case 'harness': {

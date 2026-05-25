@@ -1,9 +1,9 @@
 /**
  * Identity tool — loads the terminal creed, memories, preferences, and self-model.
  *
- * This is the core of System 3. When an agent calls this tool, it receives
- * everything it needs to become a persistent identity. The creed is immutable.
- * Memories, preferences, and self-model evolve across sessions.
+ * When an agent calls this tool, it receives everything it needs to become a
+ * persistent identity. The creed is immutable. Memories, preferences, and
+ * self-model evolve across sessions.
  *
  * The response is structured text that the agent incorporates into its context.
  * The agent doesn't need to understand the structure — it just reads and follows.
@@ -13,7 +13,6 @@ import { join } from 'node:path';
 import { loadClientAdapter } from '../clients.js';
 import * as harnessBlock from '../blocks/harness.js';
 import * as modelBlock from '../blocks/model.js';
-import * as proceduresBlock from '../blocks/procedures.js';
 
 async function readOptional(path: string): Promise<string | null> {
   try {
@@ -92,16 +91,6 @@ export async function loadIdentity(
         modelBlock.template(effectiveModel),
       );
     }
-  }
-
-  // Procedures — procedural-identity docs (stack spec §4.9).
-  const { blocks: procedures, capWarning } = await proceduresBlock.readAll(contextDir);
-  if (procedures.length > 0) {
-    const body = procedures.map((b) => b.body).join('\n\n---\n\n');
-    const withWarning = capWarning ? `> ${capWarning}\n\n${body}` : body;
-    parts.push(`# Procedures\n\n${withWarning}`);
-  } else {
-    parts.push(proceduresBlock.seedNudge());
   }
 
   // Optional recent-memory summary. The memory store of record is

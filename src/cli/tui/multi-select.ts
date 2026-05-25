@@ -1,12 +1,9 @@
 /**
+/**
  * Reusable keyboard-nav multi-select primitive. The reducer is pure and
  * fully unit-tested; the TTY adapter (`multiSelect`) is a thin
  * stdin+render wrapper exercised by the inject integration test and
- * manual verification only.
- *
- * Pattern intentionally mirrors Hermes's curses_checklist (see
- * ~/.hermes/hermes-agent/hermes_cli/curses_ui.py) but uses Node stdlib
- * instead of curses: raw-mode stdin + ANSI cursor codes.
+ * manual verification only. Raw-mode stdin + ANSI cursor codes.
  */
 import { emitKeypressEvents } from 'node:readline';
 

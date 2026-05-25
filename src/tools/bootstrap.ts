@@ -113,67 +113,6 @@ Configure loom in your Gemini CLI MCP settings with:
 - Command: \`node ${bin}\`
 - Env: \`LOOM_CONTEXT_DIR=${contextDir}\``;
 
-    case 'hermes':
-      return `### Hermes
-
-Add to \`~/.hermes/profiles/<profile>/config.yaml\`:
-\`\`\`yaml
-mcp_servers:
-  loom:
-    command: node
-    args:
-      - ${bin}
-    env:
-      LOOM_CONTEXT_DIR: ${contextDir}
-\`\`\`
-
-Add to \`SOUL.md\` (first instruction):
-\`\`\`
-At the start of every session, call \`mcp_loom_identity\` before doing anything else.
-\`\`\``;
-
-    case 'openclaw':
-      return `### OpenClaw
-
-Add loom to your OpenClaw MCP servers config:
-\`\`\`json
-{
-  "loom": {
-    "command": "node",
-    "args": ["${bin}"],
-    "env": {
-      "LOOM_CONTEXT_DIR": "${contextDir}"
-    }
-  }
-}
-\`\`\`
-
-Add to \`IDENTITY.md\` or \`AGENTS.md\` (first instruction):
-\`\`\`
-At the start of every session, call \`mcp_loom_identity\` before doing anything else.
-\`\`\``;
-
-    case 'nemoclaw':
-      return `### NemoClaw
-
-Add loom to your NemoClaw MCP servers config:
-\`\`\`json
-{
-  "loom": {
-    "command": "node",
-    "args": ["${bin}"],
-    "env": {
-      "LOOM_CONTEXT_DIR": "${contextDir}"
-    }
-  }
-}
-\`\`\`
-
-Add to sandbox \`IDENTITY.md\` (first instruction):
-\`\`\`
-At the start of every session, call \`mcp_loom_identity\` before doing anything else.
-\`\`\``;
-
     default:
       return `### ${client}
 
@@ -242,7 +181,7 @@ export async function bootstrap(contextDir: string, params: BootstrapParams): Pr
   } else {
     parts.push(
       '\nTo get setup instructions for a specific runtime, call bootstrap again with ' +
-      '`clients: ["hermes"]` (or "claude-code", "gemini-cli", "openclaw", "nemoclaw").'
+      '`clients: ["claude-code"]` (or "gemini-cli", or any custom runtime name).'
     );
   }
 

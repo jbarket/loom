@@ -1,13 +1,22 @@
 # loom stack — v1 specification
 
-*Status: draft, v0.4 development. This is the first formal spec of
-"what a loom stack is." It defines the logical shape of an agent's
-persistent identity + memory + procedural state, independent of any
-particular runtime, storage, or transport.*
+> **Status: SUPERSEDED (archived 2026-05-25).**
+> This spec describes loom's v1 schema. The current build is at
+> `CURRENT_STACK_VERSION = 2`, which removed the §4.9 procedures
+> subsystem (skills handle persona-bound behavioral discipline now)
+> and collapsed pursuits from a top-level markdown file into a
+> memory category (`category: pursuit`). v1 stacks still load
+> (forward-compatible read); the §4.9 and §4.4 sections below no
+> longer reflect runtime behavior.
 
-*Reference reading first: `docs/rebirth-letter-2026-04-19.md` (the
-philosophy) and the [v0.4 discussion](https://github.com/jbarket/loom/discussions/10)
-(the roadmap). This doc is the engineering contract they rely on.*
+*Original status: draft, v0.4 development. The first formal spec of
+"what a loom stack is" — the logical shape of an agent's persistent
+identity + memory + procedural state, independent of any particular
+runtime, storage, or transport.*
+
+*Reference reading first: `docs/archive/rebirth-letter-2026-04-19.md`
+(the philosophy) and the [v0.4 discussion](https://github.com/jbarket/loom/discussions/10)
+(the roadmap). This doc was the engineering contract they relied on.*
 
 ---
 

@@ -62,10 +62,10 @@ describe('blocks/harness', () => {
 
     it('returns sorted keys for present manifests', async () => {
       await mkdir(join(dir, 'harnesses'), { recursive: true });
-      await writeFile(join(dir, 'harnesses', 'hermes.md'), '# hermes');
+      await writeFile(join(dir, 'harnesses', 'gemini-cli.md'), '# gemini-cli');
       await writeFile(join(dir, 'harnesses', 'claude-code.md'), '# claude-code');
       await writeFile(join(dir, 'harnesses', 'not-a-manifest.txt'), 'skip me');
-      expect(await harness.list(dir)).toEqual(['claude-code', 'hermes']);
+      expect(await harness.list(dir)).toEqual(['claude-code', 'gemini-cli']);
     });
   });
 

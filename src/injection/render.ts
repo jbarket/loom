@@ -20,10 +20,10 @@ CLI if not:
 
 - **MCP (preferred):** call \`${p}identity\`. Also available:
   \`${p}recall\`, \`${p}remember\`, \`${p}memory_list\`,
-  \`${p}pursuits\`, \`${p}update\`, \`${p}forget\`.
+  \`${p}update\`, \`${p}forget\`.
 - **Shell fallback:** run \`loom wake\`. Also: \`loom recall <query>\`,
   \`echo <body> | loom remember <title> --category <cat>\`,
-  \`loom memory list\`, \`loom pursuits list\`.
+  \`loom memory list\`.
 
 Context dir: ${contextDir}
 

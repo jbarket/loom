@@ -72,14 +72,6 @@ describe('bootstrap', () => {
     expect(content).not.toContain('Old identity');
   });
 
-  it('includes hermes setup snippet when requested', async () => {
-    const result = await bootstrap(tempDir, { ...BASE, clients: ['hermes'] });
-    expect(result).toContain('Hermes');
-    expect(result).toContain('mcp_loom_identity');
-    expect(result).toContain('SOUL.md');
-    expect(result).toContain('config.yaml');
-  });
-
   it('includes claude-code setup snippet when requested', async () => {
     const result = await bootstrap(tempDir, { ...BASE, clients: ['claude-code'] });
     expect(result).toContain('Claude Code');
@@ -87,15 +79,25 @@ describe('bootstrap', () => {
     expect(result).toContain('.mcp.json');
   });
 
+  it('includes gemini-cli setup snippet when requested', async () => {
+    const result = await bootstrap(tempDir, { ...BASE, clients: ['gemini-cli'] });
+    expect(result).toContain('Gemini CLI');
+  });
+
   it('includes setup snippets for multiple clients', async () => {
-    const result = await bootstrap(tempDir, { ...BASE, clients: ['hermes', 'claude-code'] });
-    expect(result).toContain('Hermes');
+    const result = await bootstrap(tempDir, { ...BASE, clients: ['claude-code', 'gemini-cli'] });
     expect(result).toContain('Claude Code');
+    expect(result).toContain('Gemini');
+  });
+
+  it('falls back to a generic snippet for unknown runtimes', async () => {
+    const result = await bootstrap(tempDir, { ...BASE, clients: ['multica'] });
+    expect(result).toContain('multica');
+    expect(result).toContain('identity');
   });
 
   it('hints about available clients when none requested', async () => {
     const result = await bootstrap(tempDir, BASE);
-    expect(result).toContain('hermes');
     expect(result).toContain('claude-code');
   });
 });

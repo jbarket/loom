@@ -17,9 +17,7 @@ import { forget } from './tools/forget.js';
 import { prune } from './tools/prune.js';
 import { memoryList } from './tools/memory-list.js';
 import { updateIdentity } from './tools/update-identity.js';
-import { pursuits } from './tools/pursuits.js';
 import { bootstrap } from './tools/bootstrap.js';
-import { procedureList, procedureShow, procedureAdopt } from './tools/procedures.js';
 import { harnessInit } from './tools/harness.js';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -42,7 +40,7 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
 
   const server = new McpServer({
     name: 'loom',
-    version: '0.4.0-alpha.1', // Keep in sync with package.json
+    version: '0.4.1', // Keep in sync with package.json
   });
 
   // ─── Identity ───────────────────────────────────────────────────────────────
@@ -56,7 +54,7 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     {
       project: z.string().optional().describe('Project context to load (loads project-specific memories)'),
       client: z.string().optional().describe(
-        'Runtime client name for tool-prefix context: "claude-code", "gemini-cli", "hermes", "openclaw", "nemoclaw". ' +
+        'Runtime client name for tool-prefix context: "claude-code", "gemini-cli", or a custom name with a matching <contextDir>/clients/<name>.md override. ' +
         'Overrides the LOOM_CLIENT environment variable.',
       ),
       model: z.string().optional().describe(
@@ -78,8 +76,8 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     'learn something important about the user, a project, or yourself that ' +
     'should be available in future sessions.',
     {
-      category: z.enum(['user', 'project', 'self', 'feedback', 'reference']).describe(
-        'Memory category: user (about the human), project (about work), self (capability/learning), feedback (corrections/confirmations), reference (external pointers)'
+      category: z.enum(['user', 'project', 'self', 'feedback', 'reference', 'pursuit']).describe(
+        'Memory category: user (about the human), project (about work), self (capability/learning), feedback (corrections/confirmations), reference (external pointers), pursuit (active goal or ongoing creative thread)'
       ),
       title: z.string().describe('Short title for the memory'),
       content: z.string().describe('The memory content — what you learned, observed, or were told'),
@@ -214,78 +212,13 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
       voice: z.string().describe('Communication style and personality'),
       preferences: z.string().optional().describe('Seed preferences about the user or working style'),
       clients: z.array(z.string()).optional().describe(
-        'Runtimes to generate setup instructions for: "claude-code", "gemini-cli", "hermes", "openclaw", "nemoclaw"'
+        'Runtimes to generate setup instructions for: "claude-code", "gemini-cli", or any custom runtime name (uses a generic template)'
       ),
       force: z.boolean().optional().describe('Overwrite existing identity files (default: false)'),
     },
     async ({ name, purpose, voice, preferences, clients, force }) => {
       const result = await bootstrap(contextDir, { name, purpose, voice, preferences, clients, force });
       return { content: [{ type: 'text' as const, text: result }] };
-    },
-  );
-
-  // ─── Pursuits ───────────────────────────────────────────────────────────────
-
-  server.tool(
-    'pursuits',
-    'Manage active interests, creative threads, and personal goals. ' +
-    'Pursuits track what you\'re working on and provide continuity across sessions.',
-    {
-      action: z.enum(['add', 'update', 'complete', 'park', 'resume', 'list']).describe(
-        'add, update, complete, park, resume, or list'
-      ),
-      name: z.string().optional().describe('Name of the pursuit'),
-      goal: z.string().optional().describe('Goal for a new pursuit'),
-      progress: z.string().optional().describe('Progress note for update/resume'),
-      reason: z.string().optional().describe('Reason for completing or parking'),
-    },
-    async ({ action, name, goal, progress, reason }) => {
-      const result = await pursuits(contextDir, { action, name, goal, progress, reason });
-      return { content: [{ type: 'text' as const, text: result }] };
-    },
-  );
-
-  // ─── Procedures ─────────────────────────────────────────────────────────────
-
-  server.tool(
-    'procedure_list',
-    'List available procedural-identity seed templates and their adoption state in this stack. ' +
-    'Procedures are prescriptive docs for how this agent acts (verify, cold-test, reflect, handoff). ' +
-    'Use this when you want to see which seeds are available or which have already been adopted.',
-    {},
-    async () => {
-      const text = await procedureList(contextDir);
-      return { content: [{ type: 'text' as const, text }] };
-    },
-  );
-
-  server.tool(
-    'procedure_show',
-    'Preview the body of a procedure — the seed template if not adopted, or the current ' +
-    'on-disk body if adopted. Useful before calling procedure_adopt or as a primitive for ' +
-    'future customization wizards.',
-    {
-      key: z.string().describe('Seed procedure key (e.g. "verify-before-completion")'),
-    },
-    async ({ key }) => {
-      const text = await procedureShow(contextDir, key);
-      return { content: [{ type: 'text' as const, text }] };
-    },
-  );
-
-  server.tool(
-    'procedure_adopt',
-    'Materialize one or more procedural-identity seed templates into ' +
-    '<contextDir>/procedures/<key>.md. Idempotent: skip-exists by default. ' +
-    'Pass overwrite: true to replace already-adopted files. Call this in response ' +
-    'to the procedures seed nudge in the identity payload.',
-    {
-      keys: z.array(z.string()).describe('Seed procedure keys to adopt'),
-      overwrite: z.boolean().optional().describe('Replace already-adopted files (default: false)'),
-    },
-    async ({ keys, overwrite }) => {
-      const text = await procedureAdopt(contextDir, { keys, overwrite });
-      return { content: [{ type: 'text' as const, text }] };
     },
   );
 

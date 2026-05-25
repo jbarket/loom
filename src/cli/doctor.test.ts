@@ -36,9 +36,8 @@ describe('loom doctor', () => {
 
   it('discovers agents under ~/.config/loom/*', async () => {
     const artDir = join(work, '.config', 'loom', 'art');
-    await mkdir(join(artDir, 'procedures'), { recursive: true });
+    await mkdir(artDir, { recursive: true });
     await writeFile(join(artDir, 'IDENTITY.md'), '# Art\n', 'utf-8');
-    await writeFile(join(artDir, 'procedures', 'cold-testing.md'), '# x\n', 'utf-8');
 
     const { io, out } = mkIo({ HOME: work });
     const code = await run(['--json'], io);
@@ -49,7 +48,6 @@ describe('loom doctor', () => {
     expect(art.name).toBe('art');
     expect(art.hasIdentity).toBe(true);
     expect(art.hasMemoriesDb).toBe(false);
-    expect(art.hasProcedures).toBe(true);
     expect(art.git.initialized).toBe(false);
     expect(art.git.hasRemote).toBe(false);
     expect(art.git.dirty).toBe(false);

@@ -58,7 +58,6 @@ describe('loom bootstrap', () => {
     expect(parsed.wrote).toEqual(expect.arrayContaining([
       expect.stringMatching(/IDENTITY\.md$/),
     ]));
-    expect(parsed.wrote.some((p: string) => p.endsWith('pursuits.md'))).toBe(false);
   });
 
   it('exits 1 when the stack version stamp is ahead of this build', async () => {

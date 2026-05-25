@@ -7,8 +7,7 @@
  *   IDENTITY.md       — the terminal creed (who this agent is)
  *   preferences.md    — user preferences and working style
  *   self-model.md     — agent capability tracking
- *   memories.db       — sqlite + sqlite-vec memory store
- *   pursuits.md       — active goals
+ *   memories.db       — sqlite + sqlite-vec memory store (pursuits live here too, as category=pursuit)
  *
  * Context dir resolution order:
  *   1. LOOM_CONTEXT_DIR environment variable
@@ -57,7 +56,7 @@ export function resolveFastEmbedCacheDir(): string | undefined {
 // ─── Stack version ────────────────────────────────────────────────────────────
 
 /** The stack schema version this loom build understands. */
-export const CURRENT_STACK_VERSION = 1;
+export const CURRENT_STACK_VERSION = 2;
 
 /** The filename at the stack root that records the on-disk schema version. */
 export const STACK_VERSION_FILE = 'LOOM_STACK_VERSION';
