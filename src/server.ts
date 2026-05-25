@@ -16,6 +16,8 @@ import { update } from './tools/update.js';
 import { forget } from './tools/forget.js';
 import { prune } from './tools/prune.js';
 import { memoryList } from './tools/memory-list.js';
+import { findSimilar } from './tools/find-similar.js';
+import { memoryAudit } from './tools/memory-audit.js';
 import { updateIdentity } from './tools/update-identity.js';
 import { bootstrap } from './tools/bootstrap.js';
 import { harnessInit } from './tools/harness.js';
@@ -167,6 +169,49 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     },
     async ({ category, project, limit }) => {
       const result = await memoryList(contextDir, { category, project, limit });
+      return { content: [{ type: 'text' as const, text: result }] };
+    },
+  );
+
+  server.tool(
+    'find_similar',
+    'Surface memories semantically near an existing ref or free-form text. ' +
+    'Use during consolidation/dream workflows to find overlap and dedupe ' +
+    'candidates. Anchor with `ref` (an existing memory) or `text` (a fresh ' +
+    'query). Self is always excluded when `ref` is given.',
+    {
+      ref: z.string().optional().describe('Anchor on an existing memory ref (excludes self from results)'),
+      text: z.string().optional().describe('Or anchor on fresh text — embedded on the fly'),
+      limit: z.number().optional().describe('Max neighbours to return (default 10)'),
+      category: z.string().optional().describe('Restrict candidates to a category'),
+      project: z.string().optional().describe('Restrict candidates to a project'),
+      min_relevance: z.number().optional().describe('Drop matches below this cosine similarity (0..1)'),
+    },
+    async ({ ref, text, limit, category, project, min_relevance }) => {
+      const result = await findSimilar(contextDir, {
+        ref, text, limit, category, project, minRelevance: min_relevance,
+      });
+      return { content: [{ type: 'text' as const, text: result }] };
+    },
+  );
+
+  server.tool(
+    'memory_audit',
+    'One-shot health report for the memory store: totals, category breakdown, ' +
+    'stale memories (untouched beyond threshold), near-duplicate pairs (above ' +
+    'similarity threshold), and expired refs. Read-only — pair with `forget`/' +
+    '`update` to act on findings.',
+    {
+      stale_days: z.number().optional().describe('Stale threshold in days (default 30)'),
+      similarity_threshold: z.number().optional().describe('Cosine floor for duplicate pairs, 0..1 (default 0.85)'),
+      max_duplicates: z.number().optional().describe('Cap on duplicate pairs returned (default 20)'),
+    },
+    async ({ stale_days, similarity_threshold, max_duplicates }) => {
+      const result = await memoryAudit(contextDir, {
+        staleDays: stale_days,
+        similarityThreshold: similarity_threshold,
+        maxDuplicates: max_duplicates,
+      });
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );

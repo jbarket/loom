@@ -19,8 +19,8 @@ import { join } from 'node:path';
 // Canonical tool names — used to generate the prefix-specific list per client
 const TOOLS = [
   'identity', 'remember', 'recall', 'update', 'forget',
-  'memory_list', 'memory_prune', 'update_identity',
-  'bootstrap',
+  'memory_list', 'memory_prune', 'find_similar', 'memory_audit',
+  'update_identity', 'bootstrap',
 ];
 
 function toolList(prefix: string): string {

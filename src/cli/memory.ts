@@ -1,9 +1,11 @@
 /**
- * loom memory — list / prune the memory store.
+ * loom memory — list / prune / similar / audit the memory store.
  */
 import { parseArgs } from 'node:util';
 import { memoryList } from '../tools/memory-list.js';
 import { prune } from '../tools/prune.js';
+import { findSimilar } from '../tools/find-similar.js';
+import { memoryAudit } from '../tools/memory-audit.js';
 import { createBackend } from '../backends/index.js';
 import { assertStackVersionCompatible } from '../config.js';
 import { extractGlobalFlags, resolveEnv } from './args.js';
@@ -13,8 +15,10 @@ import type { IOStreams } from './io.js';
 const USAGE = `Usage: loom memory <subcommand> [options]
 
 Subcommands:
-  list    Browse memories (table or --json)
-  prune   Report / remove expired and stale memories
+  list      Browse memories (table or --json)
+  prune     Report / remove expired and stale memories
+  similar   Surface memories semantically near a ref or text
+  audit     One-shot health report (counts, stale, duplicates, expired)
 
 Options (list):
   --category <name>    Filter
@@ -27,8 +31,25 @@ Options (prune):
   --dry-run            Report what would be pruned, don't delete
   --json               Emit PruneResult
 
+Options (similar):
+  --ref <ref>          Anchor memory ref (excludes self from results)
+  --text <text>        Or anchor on fresh text
+  --category <name>    Restrict candidates
+  --project <name>     Restrict candidates
+  --limit <n>          Max neighbours (default 10)
+  --min-relevance <f>  Drop matches below this cosine (0..1)
+  --json               Emit MemoryMatch[]
+
+Options (audit):
+  --stale-days <n>             Stale threshold in days (default 30)
+  --similarity-threshold <f>   Duplicate floor, 0..1 (default 0.85)
+  --max-duplicates <n>         Cap on duplicate pairs (default 20)
+  --json                       Emit AuditReport
+
 Global: --context-dir, --help/-h
 `;
+
+const SUBCOMMANDS = new Set(['list', 'prune', 'similar', 'audit']);
 
 export async function run(argv: string[], io: IOStreams): Promise<number> {
   const { flags: global, rest } = extractGlobalFlags(argv);
@@ -39,7 +60,7 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
     io.stdout(USAGE);
     return sub ? 0 : 2;
   }
-  if (sub !== 'list' && sub !== 'prune') {
+  if (!SUBCOMMANDS.has(sub)) {
     io.stderr(`Unknown memory subcommand: ${sub}\n${USAGE}`);
     return 2;
   }
@@ -83,6 +104,117 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
       return 0;
     }
     const text = await memoryList(env.contextDir, input);
+    io.stdout(text.endsWith('\n') ? text : text + '\n');
+    return 0;
+  }
+
+  if (sub === 'similar') {
+    let parsed;
+    try {
+      parsed = parseArgs({
+        args: subRest,
+        options: {
+          ref:             { type: 'string' },
+          text:            { type: 'string' },
+          category:        { type: 'string' },
+          project:         { type: 'string' },
+          limit:           { type: 'string' },
+          'min-relevance': { type: 'string' },
+        },
+        strict: true,
+        allowPositionals: false,
+      });
+    } catch (err) {
+      io.stderr(`${(err as Error).message}\n${USAGE}`);
+      return 2;
+    }
+    if (!parsed.values.ref && !parsed.values.text) {
+      io.stderr(`memory similar requires --ref or --text.\n`);
+      return 2;
+    }
+    const limit = parsed.values.limit !== undefined
+      ? Number.parseInt(parsed.values.limit, 10)
+      : undefined;
+    if (limit !== undefined && (!Number.isInteger(limit) || limit <= 0)) {
+      io.stderr(`--limit must be a positive integer.\n`);
+      return 2;
+    }
+    const minRelevance = parsed.values['min-relevance'] !== undefined
+      ? Number.parseFloat(parsed.values['min-relevance'])
+      : undefined;
+    if (minRelevance !== undefined && (Number.isNaN(minRelevance) || minRelevance < 0 || minRelevance > 1)) {
+      io.stderr(`--min-relevance must be between 0 and 1.\n`);
+      return 2;
+    }
+    const input = {
+      ref: parsed.values.ref,
+      text: parsed.values.text,
+      category: parsed.values.category,
+      project: parsed.values.project,
+      limit,
+      minRelevance,
+    };
+    try {
+      if (env.json) {
+        const backend = createBackend(env.contextDir);
+        renderJson(io, await backend.findSimilar(input));
+        return 0;
+      }
+      const text = await findSimilar(env.contextDir, input);
+      io.stdout(text.endsWith('\n') ? text : text + '\n');
+      return 0;
+    } catch (err) {
+      io.stderr(`${(err as Error).message}\n`);
+      return 1;
+    }
+  }
+
+  if (sub === 'audit') {
+    let parsed;
+    try {
+      parsed = parseArgs({
+        args: subRest,
+        options: {
+          'stale-days':            { type: 'string' },
+          'similarity-threshold':  { type: 'string' },
+          'max-duplicates':        { type: 'string' },
+        },
+        strict: true,
+        allowPositionals: false,
+      });
+    } catch (err) {
+      io.stderr(`${(err as Error).message}\n${USAGE}`);
+      return 2;
+    }
+    const staleDays = parsed.values['stale-days'] !== undefined
+      ? Number.parseInt(parsed.values['stale-days'], 10)
+      : undefined;
+    if (staleDays !== undefined && (!Number.isInteger(staleDays) || staleDays <= 0)) {
+      io.stderr(`--stale-days must be a positive integer.\n`);
+      return 2;
+    }
+    const similarityThreshold = parsed.values['similarity-threshold'] !== undefined
+      ? Number.parseFloat(parsed.values['similarity-threshold'])
+      : undefined;
+    if (similarityThreshold !== undefined &&
+        (Number.isNaN(similarityThreshold) || similarityThreshold < 0 || similarityThreshold > 1)) {
+      io.stderr(`--similarity-threshold must be between 0 and 1.\n`);
+      return 2;
+    }
+    const maxDuplicates = parsed.values['max-duplicates'] !== undefined
+      ? Number.parseInt(parsed.values['max-duplicates'], 10)
+      : undefined;
+    if (maxDuplicates !== undefined && (!Number.isInteger(maxDuplicates) || maxDuplicates <= 0)) {
+      io.stderr(`--max-duplicates must be a positive integer.\n`);
+      return 2;
+    }
+    const options = { staleDays, similarityThreshold, maxDuplicates };
+    if (env.json) {
+      const backend = createBackend(env.contextDir);
+      renderJson(io, await backend.audit(options));
+      return 0;
+    }
+    const text = await memoryAudit(env.contextDir, options);
     io.stdout(text.endsWith('\n') ? text : text + '\n');
     return 0;
   }

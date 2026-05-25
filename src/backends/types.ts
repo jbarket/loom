@@ -107,6 +107,56 @@ export interface MemoryEntry {
   created: string;
 }
 
+export interface FindSimilarInput {
+  /** Anchor on an existing memory's embedding. Exactly one of `ref`/`text`. */
+  ref?: string;
+  /** Or anchor on fresh text — embedded on the fly. */
+  text?: string;
+  /** Max neighbours to return (default 10). */
+  limit?: number;
+  /** Restrict candidates to a category. */
+  category?: string;
+  /** Restrict candidates to a project. */
+  project?: string;
+  /** Filter out matches below this cosine similarity (0..1). */
+  minRelevance?: number;
+}
+
+export interface DuplicatePair {
+  a: { ref: string; title: string };
+  b: { ref: string; title: string };
+  relevance: number;
+}
+
+export interface AuditOptions {
+  /** Stale threshold in days (last_accessed/updated/created). Default 30. */
+  staleDays?: number;
+  /** Cosine-similarity floor for duplicate pairs (0..1). Default 0.85. */
+  similarityThreshold?: number;
+  /** Max duplicate pairs to surface. Default 20. */
+  maxDuplicates?: number;
+}
+
+export interface AuditStaleEntry {
+  ref: string;
+  title: string;
+  category: string;
+  project?: string;
+  /** ISO timestamp of last_accessed, falling back to updated, then created. */
+  lastTouch: string;
+}
+
+export interface AuditReport {
+  totalMemories: number;
+  byCategory: Record<string, number>;
+  /** Memories not touched within `staleDays`, excluding TTL=permanent. */
+  stale: AuditStaleEntry[];
+  /** Pairs of memories whose vector similarity ≥ `similarityThreshold`. */
+  duplicates: DuplicatePair[];
+  /** Memories whose TTL has expired (would be removed by `prune`). */
+  expired: string[];
+}
+
 // ─── Backend Interface ───────────────────────────────────────────────────────
 
 export interface MemoryBackend {
@@ -117,6 +167,10 @@ export interface MemoryBackend {
   /** Remove expired memories and report stale ones. */
   prune(options?: { dryRun?: boolean; staleDays?: number }): Promise<PruneResult>;
   list(input: ListInput): Promise<MemoryEntry[]>;
+  /** Surface memories near (in embedding space) an existing ref or fresh text. */
+  findSimilar(input: FindSimilarInput): Promise<MemoryMatch[]>;
+  /** One-shot health report: counts, stale, duplicates, expired. Read-only. */
+  audit(options?: AuditOptions): Promise<AuditReport>;
 }
 
 // ─── Embedding Interface (used by vector backends) ───────────────────────────

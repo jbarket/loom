@@ -17,7 +17,8 @@ Commands:
   remember <title>   Save a new memory (body via stdin/$EDITOR)
   update <ref>       Modify an existing memory
   forget <ref|scope> Remove memories
-  memory list|prune  Browse or clean the memory store
+  memory list|prune|similar|audit
+                     Browse / clean / find duplicates / health report
   update-identity    Edit preferences.md / self-model.md sections
   bootstrap          Initialize a fresh agent
   serve              Explicit MCP stdio startup (same as no args)

@@ -27,6 +27,11 @@ import type {
   ListInput,
   MemoryEntry,
   EmbeddingProvider,
+  FindSimilarInput,
+  AuditOptions,
+  AuditReport,
+  AuditStaleEntry,
+  DuplicatePair,
 } from './types.js';
 import { computeExpiresAt, isExpired } from './ttl.js';
 import { globToMatcher } from './glob.js';
@@ -357,6 +362,163 @@ export class SqliteVecBackend implements MemoryBackend {
       project: r.project ?? undefined,
       created: r.created,
     }));
+  }
+
+  async findSimilar(input: FindSimilarInput): Promise<MemoryMatch[]> {
+    if (!input.ref && !input.text) {
+      throw new Error('findSimilar requires either ref or text');
+    }
+
+    let anchorId: number | null = null;
+    let queryVector: number[];
+
+    if (input.ref) {
+      const row = this.db
+        .prepare('SELECT id FROM memories WHERE ref = ?')
+        .get(input.ref) as { id: number } | undefined;
+      if (!row) throw new Error(`findSimilar: memory not found: ${input.ref}`);
+      anchorId = row.id;
+      const vecRow = this.db
+        .prepare('SELECT embedding FROM vec_memories WHERE rowid = ?')
+        .get(BigInt(row.id)) as { embedding: Buffer } | undefined;
+      if (!vecRow) throw new Error(`findSimilar: embedding missing for ${input.ref}`);
+      queryVector = Array.from(new Float32Array(
+        vecRow.embedding.buffer,
+        vecRow.embedding.byteOffset,
+        vecRow.embedding.byteLength / 4,
+      ));
+    } else {
+      queryVector = await (this.embedder.embedQuery?.(input.text!) ??
+        this.embedder.embed(input.text!));
+    }
+
+    const limit = input.limit ?? 10;
+    // Over-fetch so filters + self-exclusion don't starve the result set.
+    const fetchK = Math.max((limit + 1) * 4, 16);
+
+    const vecRows = this.db
+      .prepare(
+        `SELECT rowid, distance FROM vec_memories
+         WHERE embedding MATCH ? AND k = ?
+         ORDER BY distance`,
+      )
+      .all(toVecBuffer(queryVector), fetchK) as VecMatch[];
+
+    if (vecRows.length === 0) return [];
+
+    const ids = vecRows.map((r) => r.rowid);
+    const placeholders = ids.map(() => '?').join(',');
+    const memRows = this.db
+      .prepare(`SELECT * FROM memories WHERE id IN (${placeholders})`)
+      .all(...ids) as MemoryRow[];
+    const byId = new Map(memRows.map((r) => [r.id, r]));
+
+    const minRelevance = input.minRelevance ?? 0;
+    const categoryFilter = input.category ?? null;
+    const projectFilter = input.project ?? null;
+
+    const results: MemoryMatch[] = [];
+    for (const vr of vecRows) {
+      if (anchorId !== null && vr.rowid === anchorId) continue;
+      const mem = byId.get(vr.rowid);
+      if (!mem) continue;
+      if (categoryFilter && mem.category !== categoryFilter) continue;
+      if (projectFilter && (mem.project ?? null) !== projectFilter) continue;
+      const match = rowToMatch(mem, vr.distance);
+      if (match.relevance < minRelevance) continue;
+      results.push(match);
+      if (results.length >= limit) break;
+    }
+    return results;
+  }
+
+  async audit(options?: AuditOptions): Promise<AuditReport> {
+    const staleDays = options?.staleDays ?? 30;
+    const similarityThreshold = options?.similarityThreshold ?? 0.85;
+    const maxDuplicates = options?.maxDuplicates ?? 20;
+
+    const now = new Date();
+    const staleThreshold = new Date(now.getTime() - staleDays * 24 * 60 * 60 * 1000);
+
+    const rows = this.db
+      .prepare(
+        `SELECT id, ref, title, category, project, ttl, expires_at,
+                last_accessed, updated, created
+         FROM memories`,
+      )
+      .all() as (Pick<MemoryRow,
+        'id' | 'ref' | 'title' | 'category' | 'project' | 'ttl' |
+        'expires_at' | 'last_accessed' | 'updated' | 'created'>)[];
+
+    const byCategory: Record<string, number> = {};
+    const stale: AuditStaleEntry[] = [];
+    const expired: string[] = [];
+
+    for (const r of rows) {
+      byCategory[r.category] = (byCategory[r.category] ?? 0) + 1;
+      if (r.expires_at && isExpired(r.expires_at, now)) {
+        expired.push(r.ref);
+        continue;
+      }
+      if (r.ttl === 'permanent') continue;
+      const lastTouch = r.last_accessed ?? r.updated ?? r.created;
+      if (new Date(lastTouch) < staleThreshold) {
+        stale.push({
+          ref: r.ref,
+          title: r.title,
+          category: r.category,
+          project: r.project ?? undefined,
+          lastTouch,
+        });
+      }
+    }
+
+    // Duplicate detection: for each memory, MATCH its stored embedding,
+    // take the top non-self neighbour, keep pairs above threshold, dedupe.
+    const duplicates: DuplicatePair[] = [];
+    const seenPair = new Set<string>();
+    const pairKey = (a: number, b: number) =>
+      a < b ? `${a}:${b}` : `${b}:${a}`;
+    const byIdRow = new Map(rows.map((r) => [r.id, r]));
+
+    const vecStmt = this.db.prepare(
+      `SELECT rowid, distance FROM vec_memories
+       WHERE embedding MATCH ? AND k = 2
+       ORDER BY distance`,
+    );
+
+    for (const r of rows) {
+      if (duplicates.length >= maxDuplicates) break;
+      const stored = this.db
+        .prepare('SELECT embedding FROM vec_memories WHERE rowid = ?')
+        .get(BigInt(r.id)) as { embedding: Buffer } | undefined;
+      if (!stored) continue;
+      const hits = vecStmt.all(stored.embedding) as VecMatch[];
+      for (const h of hits) {
+        if (h.rowid === r.id) continue;
+        const relevance = 1 - h.distance;
+        if (relevance < similarityThreshold) break;
+        const key = pairKey(r.id, h.rowid);
+        if (seenPair.has(key)) continue;
+        seenPair.add(key);
+        const other = byIdRow.get(h.rowid);
+        if (!other) continue;
+        duplicates.push({
+          a: { ref: r.ref, title: r.title },
+          b: { ref: other.ref, title: other.title },
+          relevance,
+        });
+        if (duplicates.length >= maxDuplicates) break;
+      }
+    }
+
+    return {
+      totalMemories: rows.length,
+      byCategory,
+      stale,
+      duplicates,
+      expired,
+    };
   }
 
   close(): void {
