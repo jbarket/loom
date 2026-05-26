@@ -31,8 +31,7 @@ Parse the output. You'll see:
 
 - `stackVersionOk`, `nodeOk`, `contextDirResolved`
 - `existingAgents: [{ name, path, hasIdentity, hasMemoriesDb,
-  hasProcedures, git: { initialized, hasRemote, dirty,
-  gitignorePresent } }, ...]`
+  git: { initialized, hasRemote, dirty, gitignorePresent } }, ...]`
 
 If `stackVersionOk` is false or `nodeOk` is false, stop and tell the
 user what's wrong.
@@ -42,7 +41,7 @@ user what's wrong.
 If `existingAgents` is non-empty, summarize them to the user:
 
 > I see these agents already set up:
-> - `art` at `~/.config/loom/art/` (has identity, 3 procedures)
+> - `myagent` at `~/.config/loom/myagent/` (has identity)
 >
 > Do you want to (a) use an existing one, (b) create a new one with a
 > different name, or (c) stop?
@@ -76,12 +75,6 @@ Run:
 ```
 echo '{"name":"<NAME>","purpose":"<PURPOSE>","voice":"<VOICE>"}' \
   | loom bootstrap --context-dir ~/.config/loom/<NAME>
-```
-
-Then adopt the default procedural-identity seeds:
-
-```
-loom procedures adopt --all --context-dir ~/.config/loom/<NAME>
 ```
 
 Then scaffold the harness manifest for this harness:
