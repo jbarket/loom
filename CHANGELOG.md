@@ -5,6 +5,10 @@ All notable changes to loom are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+> **Publish status:** `loomai@0.4.1` is **not yet published to npm** (confirmed 2026-05-26).
+> The release pipeline is tag-triggered; publish will happen when Jonathan pushes `v0.4.1`.
+> Until then, install via `npx github:jbarket/loom install`.
+
 ## [0.4.1] - 2026-04-23
 
 Stabilization release consolidating v0.4.0-alpha.1 through alpha.7.

@@ -1,7 +1,7 @@
 {
   "name": "loomai",
   "version": "0.4.1",
-  "description": "System 3 MCP server — persistent identity, memory, and self-model for AI agents. Single-file sqlite-vec + fastembed; zero external services.",
+  "description": "MCP server for persistent AI agent identity and memory. Single-file sqlite-vec + fastembed; zero external services.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -28,6 +28,7 @@
   "scripts": {
     "build": "tsc",
     "prepare": "tsc",
+    "prepublishOnly": "npm run build && npm test",
     "dev": "tsx src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -38,7 +39,6 @@
   },
   "keywords": [
     "mcp",
-    "system3",
     "agent",
     "identity",
     "memory",
