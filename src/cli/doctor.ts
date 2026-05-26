@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { extractGlobalFlags } from './args.js';
 import type { IOStreams } from './io.js';
 import { renderJson } from './io.js';
+import { CURRENT_STACK_VERSION } from '../config.js';
 
 const USAGE = `Usage: loom doctor [options]
 
@@ -96,7 +97,7 @@ async function probeStackVersion(contextDir: string): Promise<boolean> {
   try {
     const body = (await readFile(file, 'utf-8')).trim();
     const v = Number(body);
-    return Number.isInteger(v) && v <= 1;
+    return Number.isInteger(v) && v <= CURRENT_STACK_VERSION;
   } catch {
     return true;
   }

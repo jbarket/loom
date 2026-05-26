@@ -68,6 +68,18 @@ describe('loom doctor', () => {
     expect(parsed.existingAgents[0].git.gitignorePresent).toBe(true);
   });
 
+  it('reports stackVersionOk=true when LOOM_STACK_VERSION=2', async () => {
+    const contextDir = join(work, 'ctx');
+    await mkdir(contextDir, { recursive: true });
+    await writeFile(join(contextDir, 'LOOM_STACK_VERSION'), '2\n', 'utf-8');
+
+    const { io, out } = mkIo({ HOME: work, LOOM_CONTEXT_DIR: contextDir });
+    const code = await run(['--json'], io);
+    expect(code).toBe(0);
+    const parsed = JSON.parse(out.join(''));
+    expect(parsed.stackVersionOk).toBe(true);
+  });
+
   it('human-readable output lists each agent on its own line', async () => {
     const artDir = join(work, '.config', 'loom', 'art');
     await mkdir(artDir, { recursive: true });
