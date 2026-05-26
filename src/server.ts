@@ -6,9 +6,11 @@
  * no chat clients. Just the tools that carry a persistent persona across
  * any MCP-compatible runtime.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { assertStackVersionCompatible } from './config.js';
+import { assertStackVersionCompatible, resolveRepoRoot } from './config.js';
 import { loadIdentity } from './tools/identity.js';
 import { remember } from './tools/remember.js';
 import { recall } from './tools/recall.js';
@@ -40,9 +42,10 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
   // Refuse to boot against a stack this loom build doesn't understand.
   assertStackVersionCompatible(contextDir);
 
+  const pkg = JSON.parse(readFileSync(join(resolveRepoRoot(), 'package.json'), 'utf-8')) as { version: string };
   const server = new McpServer({
     name: 'loom',
-    version: '0.4.1', // Keep in sync with package.json
+    version: pkg.version,
   });
 
   // ─── Identity ───────────────────────────────────────────────────────────────

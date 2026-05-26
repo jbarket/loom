@@ -20,7 +20,7 @@ import { join } from 'node:path';
 const TOOLS = [
   'identity', 'remember', 'recall', 'update', 'forget',
   'memory_list', 'memory_prune', 'find_similar', 'memory_audit',
-  'update_identity', 'bootstrap',
+  'update_identity', 'bootstrap', 'harness_init',
 ];
 
 function toolList(prefix: string): string {

@@ -14,7 +14,6 @@
  */
 import { writeFile, readFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { resolveRepoRoot } from '../config.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -67,13 +66,7 @@ function buildSelfModelMd(): string {
 
 // ─── Setup snippets ───────────────────────────────────────────────────────────
 
-function loomBinPath(): string {
-  return join(resolveRepoRoot(), 'dist', 'index.js');
-}
-
 function setupSnippet(client: string, contextDir: string): string {
-  const bin = loomBinPath();
-
   switch (client) {
     case 'claude-code':
       return `### Claude Code
@@ -83,8 +76,8 @@ Add to \`.mcp.json\` (or \`~/.claude/.mcp.json\` for global):
 {
   "mcpServers": {
     "loom": {
-      "command": "node",
-      "args": ["${bin}"],
+      "command": "npx",
+      "args": ["-y", "loomai"],
       "env": {
         "LOOM_CONTEXT_DIR": "${contextDir}"
       }
@@ -110,14 +103,16 @@ At session start, call the \`identity\` tool from the loom MCP server before doi
 \`\`\`
 
 Configure loom in your Gemini CLI MCP settings with:
-- Command: \`node ${bin}\`
+- Command: \`npx\`
+- Args: \`-y loomai\`
 - Env: \`LOOM_CONTEXT_DIR=${contextDir}\``;
 
     default:
       return `### ${client}
 
 Add loom as an MCP server:
-- Command: \`node ${bin}\`
+- Command: \`npx\`
+- Args: \`-y loomai\`
 - Env: \`LOOM_CONTEXT_DIR=${contextDir}\`
 
 At session start, call \`identity\` (or the runtime-prefixed equivalent) before doing anything else.`;
