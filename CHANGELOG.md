@@ -85,8 +85,7 @@ the canonical Quick Start path.
   `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}` from the publish step.
   Auth is handled by the OIDC token exchange between GitHub Actions and
   npm — no long-lived secret required. Requires a one-time bootstrap
-  publish and Trusted Publisher configuration on npmjs.com
-  (Jonathan-only steps, see SLE-91).
+  publish and Trusted Publisher configuration on npmjs.com.
 
 ## [0.4.0-alpha.7] - 2026-04-22
 
@@ -294,7 +293,7 @@ Initial public release.
   BGE-small-en-v1.5 (384-dim, ~33MB ONNX, CPU-only). First run
   downloads the model to `~/.cache/loom/fastembed/`. No GPU, no
   Docker, no daemon.
-- Stack specification — [`docs/loom-stack-v1.md`](docs/loom-stack-v1.md)
+- Stack specification — [`docs/archive/loom-stack-v1.md`](docs/archive/loom-stack-v1.md)
   defines the directory layout, block types, memory schema, wake
   sequence, and adapter contract that v0.4 work builds on.
 

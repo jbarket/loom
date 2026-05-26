@@ -13,8 +13,9 @@
 
 ## What belongs in loom
 
-loom is opinionated. Read [`docs/loom-stack-v1.md`](docs/loom-stack-v1.md)
-— the stack contract — before opening a PR that touches the core. For the
+loom is opinionated. Read [`docs/archive/loom-stack-v1.md`](docs/archive/loom-stack-v1.md)
+— the v1 stack contract (archived; v2 is in progress) — before opening a PR
+that touches the core. For the
 current roadmap, see the
 [v0.4 discussion](https://github.com/jbarket/loom/discussions/10) and the
 [project board](https://github.com/users/jbarket/projects/1/views/1).

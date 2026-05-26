@@ -12,7 +12,7 @@ timelines, include a proposed timeline in your report.
 ## Scope
 
 - The loom MCP server and client adapters in this repo.
-- The stack schema (`docs/loom-stack-v1.md`).
+- The stack schema (`docs/archive/loom-stack-v1.md`).
 
 ## Not in scope
 
