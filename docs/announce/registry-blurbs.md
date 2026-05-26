@@ -1,7 +1,6 @@
 # Registry submission blurbs
 
-Pre-staged content for the announce push tracked in
-[SLE-32](https://github.com/jbarket/loom/issues). One section per
+Pre-staged content for the announce push (SLE-32). One section per
 registry — each is its own PR / submission, filed separately. Do not
 batch.
 

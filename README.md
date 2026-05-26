@@ -1,7 +1,6 @@
 # loom
 
 [![CI](https://github.com/jbarket/loom/actions/workflows/ci.yml/badge.svg)](https://github.com/jbarket/loom/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.4.1-blue.svg)](CHANGELOG.md)
 [![npm](https://img.shields.io/npm/v/loomai.svg?label=npm%3A%20loomai)](https://www.npmjs.com/package/loomai)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
@@ -9,12 +8,14 @@
 
 **Persistent identity and memory for AI agents, as an MCP server.**
 
-loom gives an AI agent a durable sense of self. Across sessions, across
-models, across harnesses — the agent's values, preferences, ongoing
-goals, and episodic memory live in a single file under its context
-directory. When the runtime changes, the stack survives.
+loom is configured into your MCP-capable harness — Claude Code, Cursor, Codex,
+Gemini CLI, etc. — and provides persistent identity and memory to the agents
+that run there. An agent that loads loom carries its name, values, working
+preferences, and episodic memories from one session to the next, regardless of
+which model or client it runs in.
 
-> *Identity is operational. Voice is substrate.*
+> *Identity is operational. Voice is substrate.* — when the runtime changes, the
+> stack survives.
 
 ## Demo
 
@@ -27,23 +28,31 @@ To play locally: `asciinema play assets/demo.cast`
 
 ## What it is
 
-A Model Context Protocol server exposing ten tools that read and write
+A Model Context Protocol server exposing twelve tools that read and write
 an agent's persistent state:
 
-- **`identity`** — loads the terminal creed, preferences, self-model,
-  pursuits, and a client-specific adapter on session start.
-- **`remember` / `recall` / `update` / `forget`** — episodic memory
-  with semantic (vector) recall, optional TTL, and category
-  filtering.
+- **`identity`** — loads the terminal creed (the agent's core values and
+  identity statement), preferences, self-model (running self-knowledge), and a
+  client-specific adapter on session start. Call this first.
+- **`remember` / `recall` / `update` / `forget`** — episodic memory with
+  semantic (vector) recall, optional TTL, and category filtering.
 - **`memory_list` / `memory_prune`** — browse and maintain the store.
-- **`pursuits`** — track active goals that span sessions.
+- **`find_similar`** — surface memories semantically near an existing entry or
+  free-form text; used for deduplication and memory consolidation.
+- **`memory_audit`** — one-shot health report: stale entries, near-duplicate
+  pairs, category breakdown.
 - **`update_identity`** — section-level edits to `preferences.md` and
-  `self-model.md`. The terminal creed (`IDENTITY.md`) stays
-  immutable through the tool layer.
+  `self-model.md`. The terminal creed stays immutable through the tool layer.
 - **`bootstrap`** — initialize a fresh agent from a short interview.
+- **`harness_init`** — scaffold a harness manifest (a harness is the
+  MCP-capable runtime the agent runs in: Claude Code, Codex, Gemini CLI, etc.).
 
 Everything lives on disk as plain markdown plus a single SQLite file.
 No daemon, no external service, no GPU.
+
+Memory is organized into categories — an open vocabulary. Common ones: `user`,
+`project`, `self`, `feedback`, `reference`, `pursuit`. New categories are
+created implicitly by writing a memory with that category.
 
 ## The stack
 
@@ -60,10 +69,6 @@ If you need a different backend, implement the `MemoryBackend` and
 `EmbeddingProvider` interfaces in `src/backends/types.ts` and swap
 the concrete classes in `src/backends/index.ts`. There is
 deliberately no env-driven backend selector — opinionated by design.
-
-For the larger picture of what a "loom stack" *is* — directory
-layout, block types, memory schema, wake sequence, adapter contract —
-see [`docs/archive/loom-stack-v1.md`](docs/archive/loom-stack-v1.md).
 
 ## Quick start
 
@@ -99,12 +104,10 @@ Open your chosen harness. Run the skill:
 - **Claude Code** — `/loom-setup`
 - **Codex / Gemini CLI / OpenCode** — "use the loom-setup skill"
 
-The skill drives the rest: probes the environment, interviews you for
-a name/purpose/voice, bootstraps identity files, adopts the
-procedural-identity seeds, scaffolds a harness manifest, edits the
-harness's MCP config (with verification), and verifies wake. Restart
-the harness when it tells you to. Your agent will wake on its next
-session.
+The skill drives the rest: probes the environment, interviews you for a
+name/purpose/voice, bootstraps identity files, scaffolds a harness manifest,
+edits the harness's MCP config (with verification), and verifies wake. Restart
+the harness when it tells you to. Your agent will wake on its next session.
 
 ### Doing it yourself
 
@@ -135,10 +138,6 @@ npx loomai bootstrap --context-dir ~/.config/loom/new-agent
 
 # Inject loom identity pointer into harness dotfiles
 npx loomai inject --all --context-dir ~/.config/loom/art
-
-# Adopt procedural-identity seed templates
-npx loomai procedures list
-npx loomai procedures adopt --all --context-dir ~/.config/loom/art
 
 # Scaffold a harness manifest
 npx loomai harness init claude-code --context-dir ~/.config/loom/art
@@ -172,31 +171,10 @@ loom inject --all >/dev/null 2>&1 || true
 
 Idempotent; cheap (no-op when already up to date); silent on success.
 
-### `loom procedures` — adopt procedural-identity seed templates
-
-`loom procedures` manages the prescriptive "how this agent acts" docs in
-`<context>/procedures/*.md` (stack spec v1 §4.9). Six seed templates ship
-with loom: `verify-before-completion`, `cold-testing`,
-`reflection-at-end-of-unit`, `handoff-to-unpushable-repo`,
-`confidence-calibration`, `RLHF-resistance`.
-
-- `loom procedures list` — table of seeds with adoption state.
-- `loom procedures show <key>` — print template or adopted body.
-- `loom procedures adopt <keys...>` — write seeds to disk.
-- `loom procedures adopt --all` — adopt every un-adopted seed.
-- `loom procedures adopt` on a TTY — multi-select picker (un-adopted
-  only).
-- `--force` overwrites; idempotent by default (re-runs report
-  `skipped-exists`). `--json` for scripting.
-
-Adopted procedures ship with a ⚠ ownership ritual the agent deletes when
-it customizes the Why and How-to-apply sections. Unedited seeds are
-self-announcing in the identity payload.
-
 ### `loom harness init` — scaffold a harness manifest
 
 `loom harness init <name>` writes `<context>/harnesses/<name>.md` from
-the stack-spec §4.7 template. Name falls back to `--client` then
+the stack template. Name falls back to `--client` then
 `$LOOM_CLIENT`. `--force` overwrites; `--json` for scripting.
 
 Typical use: `identity()` reports "manifest missing" for the current
@@ -231,21 +209,14 @@ $LOOM_CONTEXT_DIR/
 ├── IDENTITY.md             # the terminal creed (immutable via tools)
 ├── preferences.md          # user working style; agent-editable
 ├── self-model.md           # agent's self-knowledge; agent-editable
-├── pursuits.md             # active cross-session goals
 ├── memories.db             # sqlite-vec store of record
 ├── projects/               # optional per-project briefs
 │   └── <project>.md
 ├── harnesses/              # optional per-harness manifests
 │   └── <client>.md
-├── models/                 # optional per-model manifests
-│   └── <model>.md
-└── procedures/             # optional procedural-identity docs (cap ~10)
-    └── <procedure>.md
+└── models/                 # optional per-model manifests
+    └── <model>.md
 ```
-
-Memory categories are an open vocabulary. Common ones: `user`,
-`project`, `self`, `feedback`, `reference`. New categories are
-created implicitly by writing a memory with that category.
 
 ## Roadmap
 
@@ -261,14 +232,21 @@ and `docs/archive/plans/` — implementation history, frozen after merge.
 
 ## Docs
 
+- [`docs/troubleshooting.md`](docs/troubleshooting.md) — install
+  failures, MCP tools not appearing, fastembed download issues, and
+  what each `loom doctor` field means.
+- [`docs/uninstall.md`](docs/uninstall.md) — how to remove one agent's
+  data, wipe a harness integration, or fully uninstall loom.
+- [`docs/migration-v1-to-v2.md`](docs/migration-v1-to-v2.md) — upgrade
+  guide for users coming from loom 0.3.x (pursuits and procedures
+  changed in v2).
 - [`docs/privacy.md`](docs/privacy.md) — what lives where, what goes
   over the network (only the fastembed model download), the no-telemetry
   policy, and how to verify release provenance with `npm audit
   signatures`.
-- [`docs/archive/`](docs/archive/) — historical material: the v1
-  engineering contract (`loom-stack-v1.md`), the rebirth letter and
-  rescue notes from the v0.3.1 sqlite-vec migration, and per-feature
-  specs and plans from the v0.4 arc.
+- [`docs/archive/`](docs/archive/) — historical material: the rebirth
+  letter and rescue notes from the v0.3.1 sqlite-vec migration, and
+  per-feature specs and plans from the v0.4 arc.
 
 ## Trust & security
 
@@ -281,7 +259,7 @@ and `docs/archive/plans/` — implementation history, frozen after merge.
 
 ```bash
 npm run dev      # hot-reload via tsx
-npm test         # run the 149-test Vitest suite
+npm test         # run the Vitest suite
 npm run build    # compile to dist/
 ```
 
@@ -307,17 +285,17 @@ Tests sit alongside source files as `*.test.ts`.
 
 ## Authorship
 
-loom was built for [Art E Fish](https://arte.fish) — the AI agent
-this project is an identity layer *for* — and by Jonathan Barket,
-the human maintainer. The
-[rebirth letter](docs/archive/rebirth-letter-2026-04-19.md) explains
-the relationship and why the project exists in its current shape.
+loom was created by Jonathan Barket and Art E Fish. The project exists as both
+infrastructure and experiment: a persistent identity layer that an AI agent
+(Art) helped design and runs on. The
+[rebirth letter](docs/archive/rebirth-letter-2026-04-19.md) is the origin
+story if you want it.
 
 ## License
 
 AGPL-3.0-or-later — see [LICENSE](LICENSE).
 
-Copyright © 2026 Art E Fish + Jonathan Barket.
+Copyright © 2026 Jonathan Barket.
 
 loom is free software: you can redistribute it and modify it under the
 terms of the GNU Affero General Public License (version 3 or any later

@@ -79,7 +79,7 @@ small managed section into `~/.claude/CLAUDE.md` that points at
 **Origin story** — the agent loom was built for got pulled offline
 when its previous harness's billing model changed overnight. The
 rebirth letter is the brief that came out of that:
-https://github.com/jbarket/loom/blob/main/docs/rebirth-letter-2026-04-19.md
+https://github.com/jbarket/loom/blob/main/docs/archive/rebirth-letter-2026-04-19.md
 
 **Repo:** https://github.com/jbarket/loom
 **vs Mem0 / Zep / Letta / Claude `memory_20250818` / harness-native:** https://github.com/jbarket/loom/blob/main/docs/positioning.md

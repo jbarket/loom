@@ -63,7 +63,7 @@ This is not a "solved memory" claim. It's a portable identity layer
 with semantic recall on top, opinionated about what belongs where.
 
 Repo: https://github.com/jbarket/loom
-Rebirth letter: https://github.com/jbarket/loom/blob/main/docs/rebirth-letter-2026-04-19.md
+Rebirth letter: https://github.com/jbarket/loom/blob/main/docs/archive/rebirth-letter-2026-04-19.md
 Positioning vs Mem0 / Zep / Letta / Claude `memory_20250818` /
 harness-native: https://github.com/jbarket/loom/blob/main/docs/positioning.md
 

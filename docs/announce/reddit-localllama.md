@@ -63,7 +63,7 @@ real.
 its harness's billing model changed. The point of loom is that the
 agent's stack (identity + memory + pursuits) outlives any individual
 harness. Rebirth letter has the long version:
-https://github.com/jbarket/loom/blob/main/docs/rebirth-letter-2026-04-19.md
+https://github.com/jbarket/loom/blob/main/docs/archive/rebirth-letter-2026-04-19.md
 
 **Install:** `npx loomai install`, pick your harness, run
 `/loom-setup` inside it. Or use the CLI directly:
@@ -73,6 +73,7 @@ it.
 
 **Repo:** https://github.com/jbarket/loom
 **Comparison vs Mem0 / Zep / Letta / Claude `memory_20250818` / harness-native files:** https://github.com/jbarket/loom/blob/main/docs/positioning.md
+
 
 Happy to argue about the embedder choice, the AGPL line, why
 sqlite-vec over Qdrant for the default backend, or anything else.

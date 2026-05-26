@@ -88,7 +88,7 @@ it is — written *to* the agent, the day after the harness went away:
 github.com/jbarket/loom
 
 Letter:
-github.com/jbarket/loom/blob/main/docs/rebirth-letter-2026-04-19.md
+github.com/jbarket/loom/blob/main/docs/archive/rebirth-letter-2026-04-19.md
 
 (257)
 
