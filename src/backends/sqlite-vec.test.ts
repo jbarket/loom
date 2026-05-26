@@ -11,7 +11,7 @@ import type { EmbeddingProvider } from './types.js';
  * ONNX model while still exercising cosine-distance ranking.
  */
 function makeKeywordEmbedder(): EmbeddingProvider {
-  const axes = ['loom', 'earworm', 'samplebank', 'hermes'];
+  const axes = ['loom', 'alpha', 'beta', 'gamma'];
 
   const encode = (text: string): number[] => {
     const lower = text.toLowerCase();
@@ -64,8 +64,8 @@ describe('SqliteVecBackend', () => {
   it('ranks by semantic similarity', async () => {
     await backend.remember({
       category: 'project',
-      title: 'Earworm release',
-      content: 'earworm phase 5 shipped',
+      title: 'Alpha release',
+      content: 'alpha phase 5 shipped',
     });
     await backend.remember({
       category: 'project',
@@ -101,32 +101,32 @@ describe('SqliteVecBackend', () => {
   it('filters by project', async () => {
     await backend.remember({
       category: 'project',
-      title: 'Loom on earworm-proj',
+      title: 'Loom on alpha-proj',
       content: 'loom integration',
-      project: 'earworm',
+      project: 'alpha',
     });
     await backend.remember({
       category: 'project',
-      title: 'Loom on samplebank-proj',
+      title: 'Loom on beta-proj',
       content: 'loom support',
-      project: 'samplebank',
+      project: 'beta',
     });
 
-    const earworm = await backend.recall({ query: 'loom', project: 'earworm' });
-    expect(earworm).toHaveLength(1);
-    expect(earworm[0].project).toBe('earworm');
+    const alpha = await backend.recall({ query: 'loom', project: 'alpha' });
+    expect(alpha).toHaveLength(1);
+    expect(alpha[0].project).toBe('alpha');
   });
 
   it('forgets by ref', async () => {
     const { ref } = await backend.remember({
       category: 'project',
-      title: 'Hermes import',
-      content: 'hermes work',
+      title: 'Gamma import',
+      content: 'gamma work',
     });
     const result = await backend.forget({ ref });
     expect(result.deleted).toEqual([ref]);
 
-    const after = await backend.recall({ query: 'hermes' });
+    const after = await backend.recall({ query: 'gamma' });
     expect(after).toHaveLength(0);
   });
 
@@ -135,34 +135,34 @@ describe('SqliteVecBackend', () => {
       category: 'project',
       title: 'A',
       content: 'loom a',
-      project: 'earworm',
+      project: 'alpha',
     });
     await backend.remember({
       category: 'project',
       title: 'B',
       content: 'loom b',
-      project: 'earworm',
+      project: 'alpha',
     });
     await backend.remember({
       category: 'project',
       title: 'C',
       content: 'loom c',
-      project: 'samplebank',
+      project: 'beta',
     });
 
-    const result = await backend.forget({ project: 'earworm' });
+    const result = await backend.forget({ project: 'alpha' });
     expect(result.deleted).toHaveLength(2);
 
     const remaining = await backend.recall({ query: 'loom' });
     expect(remaining).toHaveLength(1);
-    expect(remaining[0].project).toBe('samplebank');
+    expect(remaining[0].project).toBe('beta');
   });
 
   it('updates content and re-embeds', async () => {
     const { ref } = await backend.remember({
       category: 'project',
       title: 'Migration',
-      content: 'hermes import',
+      content: 'gamma import',
     });
     const result = await backend.update({
       ref,
@@ -279,8 +279,8 @@ describe('SqliteVecBackend', () => {
       });
       await backend.remember({
         category: 'project',
-        title: 'Earworm phase 5',
-        content: 'earworm shipped',
+        title: 'Alpha phase 5',
+        content: 'alpha shipped',
       });
 
       const results = await backend.findSimilar({ ref: anchor, limit: 5 });
@@ -291,7 +291,7 @@ describe('SqliteVecBackend', () => {
 
     it('returns neighbours of free-form text when no ref is given', async () => {
       await backend.remember({ category: 'project', title: 'A', content: 'loom' });
-      await backend.remember({ category: 'project', title: 'B', content: 'earworm' });
+      await backend.remember({ category: 'project', title: 'B', content: 'alpha' });
 
       const results = await backend.findSimilar({ text: 'loom work', limit: 5 });
       expect(results[0].title).toBe('A');
@@ -353,12 +353,12 @@ describe('SqliteVecBackend', () => {
       await backend.remember({
         category: 'reference',
         title: 'Solo',
-        content: 'earworm',
+        content: 'alpha',
       });
       await backend.remember({
         category: 'reference',
         title: 'Expired',
-        content: 'samplebank',
+        content: 'beta',
         ttl: '1h',
       });
 

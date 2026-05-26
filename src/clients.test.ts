@@ -46,10 +46,10 @@ describe('loadClientAdapter', () => {
 
   it('returns user override when present', async () => {
     await mkdir(join(tempDir, 'clients'), { recursive: true });
-    await writeFile(join(tempDir, 'clients', 'multica.md'), '## Custom Multica Adapter\nCustom content');
+    await writeFile(join(tempDir, 'clients', 'custom.md'), '## Custom Adapter\nCustom content');
 
-    const adapter = await loadClientAdapter(tempDir, 'multica');
-    expect(adapter).toContain('Custom Multica Adapter');
+    const adapter = await loadClientAdapter(tempDir, 'custom');
+    expect(adapter).toContain('Custom Adapter');
   });
 
   it('returns null for unknown client with no override', async () => {

@@ -252,7 +252,7 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     'and self-model.md from an onboarding interview, then returns setup instructions for ' +
     'the requested runtimes. Will not overwrite existing files unless force is true.',
     {
-      name: z.string().describe('Name for the agent identity (e.g. "Art E Fish")'),
+      name: z.string().describe('Name for the agent identity (e.g. "Aria")'),
       purpose: z.string().describe('What this agent exists to do — its reason for being'),
       voice: z.string().describe('Communication style and personality'),
       preferences: z.string().optional().describe('Seed preferences about the user or working style'),

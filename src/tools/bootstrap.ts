@@ -8,7 +8,7 @@
  *   - self-model.md  — capability tracking skeleton
  *
  * Also returns setup snippets for the requested runtimes so the user
- * knows exactly what to add to their Hermes config, CLAUDE.md, etc.
+ * knows exactly what to add to their MCP host's config, CLAUDE.md, etc.
  *
  * Will not overwrite existing files unless force: true.
  */

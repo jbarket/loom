@@ -91,8 +91,8 @@ describe('bootstrap', () => {
   });
 
   it('falls back to a generic snippet for unknown runtimes', async () => {
-    const result = await bootstrap(tempDir, { ...BASE, clients: ['multica'] });
-    expect(result).toContain('multica');
+    const result = await bootstrap(tempDir, { ...BASE, clients: ['custom-runtime'] });
+    expect(result).toContain('custom-runtime');
     expect(result).toContain('identity');
   });
 

@@ -1,10 +1,7 @@
 /**
  * Harness preset table for `loom inject`. Each entry names a target
  * harness, its canonical default path, and the MCP tool prefix to emit
- * in the injected instruction block. Tool prefix is `mcp__loom__`
- * (double underscore) for all three — the single-underscore variant is
- * a Hermes/OpenClaw/NemoClaw quirk, not in scope for filesystem
- * injection.
+ * in the injected instruction block.
  */
 import { homedir } from 'node:os';
 import { join } from 'node:path';
