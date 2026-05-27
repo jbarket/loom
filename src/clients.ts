@@ -17,7 +17,7 @@ import { join } from 'node:path';
 // ─── Tool list ────────────────────────────────────────────────────────────────
 
 // Canonical tool names — used to generate the prefix-specific list per client
-const TOOLS = [
+export const TOOLS = [
   'identity', 'remember', 'recall', 'update', 'forget',
   'memory_list', 'memory_prune', 'find_similar', 'memory_audit',
   'update_identity', 'bootstrap', 'harness_init',

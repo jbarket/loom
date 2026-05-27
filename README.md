@@ -141,6 +141,9 @@ npx loomai inject --all --context-dir ~/.config/loom/art
 
 # Scaffold a harness manifest
 npx loomai harness init claude-code --context-dir ~/.config/loom/art
+
+# Edit identity sections (preferences.md or self-model.md)
+npx loomai update-identity preferences --context-dir ~/.config/loom/art
 ```
 
 `npx loomai --help` lists subcommands; `npx loomai <cmd> --help` shows
