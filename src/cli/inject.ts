@@ -10,7 +10,7 @@ import { createInterface } from 'node:readline/promises';
 import { assertStackVersionCompatible } from '../config.js';
 import { extractGlobalFlags, resolveEnv } from './args.js';
 import type { IOStreams } from './io.js';
-import { renderJson } from './io.js';
+import { renderJson, stderrWritable } from './io.js';
 import { multiSelect } from './tui/multi-select.js';
 import {
   HARNESSES,
@@ -260,7 +260,7 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
       io.stderr('loom inject: no harnesses selected\n');
       return 2;
     }
-    const rl = createInterface({ input: process.stdin, output: process.stderr });
+    const rl = createInterface({ input: io.stdin, output: stderrWritable(io) });
     try {
       io.stderr('\nPress enter to accept defaults, or type a path:\n');
       for (const k of harnesses) {

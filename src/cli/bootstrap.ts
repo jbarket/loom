@@ -12,7 +12,7 @@ import { createInterface } from 'node:readline/promises';
 import { bootstrap } from '../tools/bootstrap.js';
 import { assertStackVersionCompatible } from '../config.js';
 import { extractGlobalFlags, resolveEnv } from './args.js';
-import { readStdin, renderJson } from './io.js';
+import { readStdin, renderJson, stderrWritable } from './io.js';
 import type { IOStreams } from './io.js';
 import type { BootstrapParams } from '../tools/bootstrap.js';
 import { validateAgentName } from '../install/names.js';
@@ -47,7 +47,7 @@ function checkName(name: string, io: IOStreams): number | null {
 }
 
 async function promptInteractive(io: IOStreams): Promise<BootstrapParams | null> {
-  const rl = createInterface({ input: io.stdin, output: process.stderr });
+  const rl = createInterface({ input: io.stdin, output: stderrWritable(io) });
 
   // Race each question against the readline 'close' event (fires when stdin
   // ends before the user answers — e.g. piped /dev/null or empty test streams).

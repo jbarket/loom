@@ -6,6 +6,7 @@ import { readFile, writeFile, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
+import { Writable } from 'node:stream';
 
 export interface IOStreams {
   stdout: (s: string) => void;
@@ -69,4 +70,13 @@ export async function readBody(
 
 export function renderJson(io: IOStreams, value: unknown): void {
   io.stdout(JSON.stringify(value, null, 2) + '\n');
+}
+
+export function stderrWritable(io: IOStreams): Writable {
+  return new Writable({
+    write(chunk: Buffer | string, _encoding: BufferEncoding, callback: () => void) {
+      io.stderr(Buffer.isBuffer(chunk) ? chunk.toString() : String(chunk));
+      callback();
+    },
+  });
 }

@@ -35,30 +35,30 @@ describe('loom doctor', () => {
   });
 
   it('discovers agents under ~/.config/loom/*', async () => {
-    const artDir = join(work, '.config', 'loom', 'art');
-    await mkdir(artDir, { recursive: true });
-    await writeFile(join(artDir, 'IDENTITY.md'), '# Art\n', 'utf-8');
+    const agentDir = join(work, '.config', 'loom', 'myagent');
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(join(agentDir, 'IDENTITY.md'), '# MyAgent\n', 'utf-8');
 
     const { io, out } = mkIo({ HOME: work });
     const code = await run(['--json'], io);
     expect(code).toBe(0);
     const parsed = JSON.parse(out.join(''));
     expect(parsed.existingAgents).toHaveLength(1);
-    const [art] = parsed.existingAgents;
-    expect(art.name).toBe('art');
-    expect(art.hasIdentity).toBe(true);
-    expect(art.hasMemoriesDb).toBe(false);
-    expect(art.git.initialized).toBe(false);
-    expect(art.git.hasRemote).toBe(false);
-    expect(art.git.dirty).toBe(false);
-    expect(art.git.gitignorePresent).toBe(false);
+    const [agent] = parsed.existingAgents;
+    expect(agent.name).toBe('myagent');
+    expect(agent.hasIdentity).toBe(true);
+    expect(agent.hasMemoriesDb).toBe(false);
+    expect(agent.git.initialized).toBe(false);
+    expect(agent.git.hasRemote).toBe(false);
+    expect(agent.git.dirty).toBe(false);
+    expect(agent.git.gitignorePresent).toBe(false);
   });
 
   it('reports git.initialized=true when a .git dir is present', async () => {
-    const artDir = join(work, '.config', 'loom', 'art');
-    await mkdir(join(artDir, '.git'), { recursive: true });
-    await writeFile(join(artDir, 'IDENTITY.md'), '# Art\n', 'utf-8');
-    await writeFile(join(artDir, '.gitignore'), 'memories.db\n', 'utf-8');
+    const agentDir = join(work, '.config', 'loom', 'myagent');
+    await mkdir(join(agentDir, '.git'), { recursive: true });
+    await writeFile(join(agentDir, 'IDENTITY.md'), '# MyAgent\n', 'utf-8');
+    await writeFile(join(agentDir, '.gitignore'), 'memories.db\n', 'utf-8');
 
     const { io, out } = mkIo({ HOME: work });
     const code = await run(['--json'], io);
@@ -81,15 +81,15 @@ describe('loom doctor', () => {
   });
 
   it('human-readable output lists each agent on its own line', async () => {
-    const artDir = join(work, '.config', 'loom', 'art');
-    await mkdir(artDir, { recursive: true });
-    await writeFile(join(artDir, 'IDENTITY.md'), '# Art\n', 'utf-8');
+    const agentDir = join(work, '.config', 'loom', 'myagent');
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(join(agentDir, 'IDENTITY.md'), '# MyAgent\n', 'utf-8');
 
     const { io, out } = mkIo({ HOME: work });
     const code = await run([], io);
     expect(code).toBe(0);
     const joined = out.join('');
-    expect(joined).toMatch(/art/);
+    expect(joined).toMatch(/myagent/);
     expect(joined).toMatch(/node/i);
   });
 });

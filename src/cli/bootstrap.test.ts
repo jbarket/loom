@@ -86,7 +86,7 @@ describe('loom bootstrap', () => {
   it('rejects an uppercase name', async () => {
     const { stderr, code } = await runCliCaptured([
       'bootstrap',
-      '--name', 'Art',
+      '--name', 'Agent',
       '--purpose', 'p',
       '--voice', 'v',
       '--context-dir', tempDir,

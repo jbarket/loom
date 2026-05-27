@@ -14,7 +14,7 @@ describe('validateAgentName', () => {
   });
 
   it('rejects uppercase letters', () => {
-    const r = validateAgentName('Art');
+    const r = validateAgentName('Agent');
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.reason).toMatch(/lowercase/);
