@@ -44,7 +44,7 @@ $ codex
 (same agent, same identity, different harness — codex picks up the
  same context dir via $LOOM_CONTEXT_DIR, loads the same stack, loads
  a codex manifest instead of claude-code, replies as the same agent
- sleeved into a different body)
+ running in a different harness)
 ```
 
 **The harness-portability angle** — that last bit is the point. The

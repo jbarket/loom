@@ -74,7 +74,7 @@ agent on.
 Setup: `npx loomai install`, pick your harness, run /loom-setup.
 The skill scaffolds the context dir, edits the MCP config, verifies
 wake. Or use the CLI directly — `loom wake` dumps identity to
-stdout, so any tool that can read stdin can sleeve into your agent.
+stdout, so any tool that can read stdin can load your agent from it.
 
 (287)
 

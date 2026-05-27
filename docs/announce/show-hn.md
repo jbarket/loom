@@ -1,7 +1,7 @@
 # Show HN: loom — persistent identity for AI agents as an MCP server
 
 loom is an MCP server that gives an AI agent a durable sense of self
-across sessions, models, and harnesses. The agent's terminal creed,
+across sessions, models, and harnesses. The agent's identity document,
 preferences, self-model, active pursuits, and episodic memory live in
 one context directory: a handful of markdown files plus a single
 `memories.db` (SQLite + sqlite-vec). No daemon, no hosted service, no
@@ -57,7 +57,7 @@ coexist, with a visible seam.
   the harness.
 - A CLI binary that mirrors every MCP tool. If MCP dies tomorrow,
   `loom wake` still dumps your identity to stdout and any harness
-  that can shell out can sleeve you.
+  that can shell out can load the agent into that context.
 
 This is not a "solved memory" claim. It's a portable identity layer
 with semantic recall on top, opinionated about what belongs where.

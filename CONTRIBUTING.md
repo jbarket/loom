@@ -44,7 +44,8 @@ this case.
 
 - Env-driven backend selection. One opinionated stack, inside the stack.
 - Voice-bound content in example manifests, defaults, or seeds. Stack
-  content is voice-neutral; voice is substrate.
+  content is voice-neutral — an agent's voice belongs in its identity files,
+  not in loom's templates.
 - Multi-agent orchestration. loom is identity + memory per agent.
   Orchestration belongs upstream.
 - Features that require an external service, daemon, cloud account, or

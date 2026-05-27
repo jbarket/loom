@@ -14,8 +14,7 @@ that run there. An agent that loads loom carries its name, values, working
 preferences, and episodic memories from one session to the next, regardless of
 which model or client it runs in.
 
-> *Identity is operational. Voice is substrate.* — when the runtime changes, the
-> stack survives.
+> When the harness changes, the agent persists.
 
 ## Demo
 
@@ -31,9 +30,10 @@ To play locally: `asciinema play assets/demo.cast`
 A Model Context Protocol server exposing twelve tools that read and write
 an agent's persistent state:
 
-- **`identity`** — loads the terminal creed (the agent's core values and
-  identity statement), preferences, self-model (running self-knowledge), and a
-  client-specific adapter on session start. Call this first.
+- **`identity`** — loads the terminal creed — the free-form markdown document
+  that defines who the agent is (values, voice, purpose) — along with
+  preferences, self-model (running self-knowledge), and a client-specific
+  adapter on session start. Call this first.
 - **`remember` / `recall` / `update` / `forget`** — episodic memory with
   semantic (vector) recall, optional TTL, and category filtering.
 - **`memory_list` / `memory_prune`** — browse and maintain the store.
@@ -53,6 +53,38 @@ No daemon, no external service, no GPU.
 Memory is organized into categories — an open vocabulary. Common ones: `user`,
 `project`, `self`, `feedback`, `reference`, `pursuit`. New categories are
 created implicitly by writing a memory with that category.
+
+## How loom is different
+
+loom gets compared to several other agent memory systems. The short version:
+
+| I want to… | Use |
+|---|---|
+| Memory for many users of an app | Mem0 |
+| Temporal reasoning over conversation history | Zep |
+| A complete agent framework with integrated memory | Letta |
+| Project-scoped memory in Claude Code | auto-memory (built in) |
+| Portable identity + memory across harnesses | **loom** |
+| An agent that survives a harness change | **loom** |
+
+**vs. Mem0** — Mem0 is multi-user managed memory for product-scale
+applications: hosted, authenticated, multi-tenant. loom is single-user,
+local-only, and identity-first. Mem0 has no concept of who the agent *is*.
+
+**vs. Zep** — Zep builds a temporal knowledge graph by automatically
+extracting facts from conversation logs. loom is agent-authored: the agent
+calls `remember` and decides what to record. There is no automatic extraction.
+
+**vs. Letta** — Letta runs the agent loop and owns its memory internally.
+loom doesn't run the loop — the harness does. Switch harnesses tomorrow;
+loom's context directory travels with you.
+
+**vs. harness-native files** — Writing identity into `CLAUDE.md` works until
+you're on two harnesses. Then you have two files that drift. `loom inject`
+writes a managed pointer in each harness's dotfile pointing at one context
+directory, with semantic recall instead of verbatim context dumps.
+
+Full comparison: [`docs/positioning.md`](docs/positioning.md)
 
 ## The stack
 
@@ -114,6 +146,71 @@ the harness when it tells you to. Your agent will wake on its next session.
 If you'd rather wire everything by hand, every piece is a CLI
 command. See the CLI reference below.
 
+## Examples
+
+### Memory roundtrip (MCP)
+
+During a session, the agent stores a memory:
+
+```
+mcp__loom__remember(
+  title = "user prefers short replies",
+  body  = "Gets frustrated with long explanations. Keep status answers to 2–3 sentences.",
+  category = "feedback"
+)
+```
+
+Next session, `recall` finds it by semantic similarity — even if the phrasing
+changes:
+
+```
+mcp__loom__recall(query = "how verbose should I be?")
+# → title: "user prefers short replies"
+#   body:  "Gets frustrated with long explanations…"
+```
+
+### CLI walkthrough
+
+```bash
+# Dump the agent's full identity to stdout (works without MCP or a harness)
+npx loomai wake --context-dir ~/.config/loom/my-agent
+
+# Store a memory
+echo "Sarah owns the data pipeline; ping her for schema questions" \
+  | npx loomai remember "Sarah - data pipeline owner" \
+      --category user \
+      --context-dir ~/.config/loom/my-agent
+
+# Retrieve by semantic similarity
+npx loomai recall "who manages the pipeline" \
+  --context-dir ~/.config/loom/my-agent
+```
+
+### What an agent sees on session start
+
+`mcp__loom__identity` returns a structured payload assembled from the context
+directory. A typical session-start looks like:
+
+```
+# my-agent
+
+## Identity
+You are a persistent coding assistant. You prefer directness.
+…
+
+## Preferences
+Working style: async pair programming. Skip the hedging…
+…
+
+## Self-Model
+### Strengths
+- TypeScript systems architecture
+…
+```
+
+The agent reads this before any task work, re-establishing who it is
+regardless of which harness or model it's running on.
+
 ## CLI
 
 Every MCP tool has a shell equivalent. Useful for debugging, scripting,
@@ -121,29 +218,29 @@ or running without a harness.
 
 ```bash
 # Dump identity markdown (works even when MCP is dead)
-npx loomai wake --context-dir ~/.config/loom/art
+npx loomai wake --context-dir ~/.config/loom/my-agent
 
 # Save a memory (body from stdin)
-echo "Met Jonathan at a coffee shop" | npx loomai remember "first meeting" \
-  --category user --context-dir ~/.config/loom/art
+echo "Prefers async updates over live standups" | npx loomai remember "working style" \
+  --category user --context-dir ~/.config/loom/my-agent
 
 # Search
-npx loomai recall "coffee shop" --context-dir ~/.config/loom/art
+npx loomai recall "meeting preferences" --context-dir ~/.config/loom/my-agent
 
 # List all memories in a category
-npx loomai memory list --category feedback --context-dir ~/.config/loom/art
+npx loomai memory list --category feedback --context-dir ~/.config/loom/my-agent
 
 # Initialize a fresh agent
 npx loomai bootstrap --context-dir ~/.config/loom/new-agent
 
 # Inject loom identity pointer into harness dotfiles
-npx loomai inject --all --context-dir ~/.config/loom/art
+npx loomai inject --all --context-dir ~/.config/loom/my-agent
 
 # Scaffold a harness manifest
-npx loomai harness init claude-code --context-dir ~/.config/loom/art
+npx loomai harness init claude-code --context-dir ~/.config/loom/my-agent
 
 # Edit identity sections (preferences.md or self-model.md)
-npx loomai update-identity preferences --context-dir ~/.config/loom/art
+npx loomai update-identity preferences --context-dir ~/.config/loom/my-agent
 ```
 
 `npx loomai --help` lists subcommands; `npx loomai <cmd> --help` shows

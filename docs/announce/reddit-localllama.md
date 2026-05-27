@@ -68,8 +68,8 @@ https://github.com/jbarket/loom/blob/main/docs/archive/rebirth-letter-2026-04-19
 **Install:** `npx loomai install`, pick your harness, run
 `/loom-setup` inside it. Or use the CLI directly:
 `loom wake --context-dir ~/.config/loom/<agent>` dumps the identity
-markdown to stdout and any tool that can read stdin can sleeve into
-it.
+markdown to stdout — any tool that can read stdin can load the agent
+from it.
 
 **Repo:** https://github.com/jbarket/loom
 **Comparison vs Mem0 / Zep / Letta / Claude `memory_20250818` / harness-native files:** https://github.com/jbarket/loom/blob/main/docs/positioning.md
