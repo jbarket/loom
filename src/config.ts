@@ -45,6 +45,47 @@ export function resolveSqliteDbPath(contextDir: string): string {
   return process.env.LOOM_SQLITE_DB_PATH ?? resolve(contextDir, 'memories.db');
 }
 
+export function resolveKnowledgeDbPath(contextDir: string): string {
+  return process.env.LOOM_KNOWLEDGE_DB_PATH ?? resolve(contextDir, 'knowledge.db');
+}
+
+/**
+ * Assert that the knowledge database path does not co-locate with the memory
+ * database path. If they resolve to the same file (or inode), throw.
+ */
+export function assertKnowledgePathsNotCoLocated(contextDir: string): void {
+  const memPath = resolveSqliteDbPath(contextDir);
+  const knPath = resolveKnowledgeDbPath(contextDir);
+
+  if (memPath === knPath) {
+    throw new Error(
+      `Knowledge database path is the same as memory database path (${memPath}). ` +
+      `This violates the isolation invariant. Set LOOM_SQLITE_DB_PATH or LOOM_KNOWLEDGE_DB_PATH to different files.`,
+    );
+  }
+
+  // Also check inode-level co-location (hard links)
+  const { statSync } = require('node:fs');
+  let memStat: { ino: number; dev: number } | null = null;
+  let knStat: { ino: number; dev: number } | null = null;
+  try {
+    memStat = statSync(memPath);
+  } catch {
+    // File doesn't exist yet
+  }
+  try {
+    knStat = statSync(knPath);
+  } catch {
+    // File doesn't exist yet
+  }
+  if (memStat && knStat && memStat.ino === knStat.ino && memStat.dev === knStat.dev) {
+    throw new Error(
+      `Knowledge database (${knPath}) and memory database (${memPath}) ` +
+      `are hard-linked to the same inode (${memStat.ino}). This violates the isolation invariant.`,
+    );
+  }
+}
+
 export function resolveFastEmbedModel(): string {
   return process.env.LOOM_FASTEMBED_MODEL ?? 'fast-bge-small-en-v1.5';
 }

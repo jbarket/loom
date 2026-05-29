@@ -183,3 +183,87 @@ export interface EmbeddingProvider {
   embedQuery?(text: string): Promise<number[]>;
   readonly dimensions: number;
 }
+
+// ─── Knowledge Backend Types ─────────────────────────────────────────────────
+
+export interface KnowledgePageInput {
+  slug: string;
+  title: string;
+  domain: string;
+  body: string;
+  sourcing?: 'sourced' | 'provisional';
+  provenance?: string;
+  citations?: KnowledgeCitationInput[];
+}
+
+export interface KnowledgeCitationInput {
+  claim: string;
+  source_kind: 'web' | 'loom_memory' | 'conversation';
+  source_locator?: string;
+  excerpt: string;
+}
+
+export interface KnowledgePage {
+  id: number;
+  uuid: string;
+  slug: string;
+  title: string;
+  domain: string;
+  body: string;
+  sourcing: string;
+  provenance: string | null;
+  status: string;
+  created: string;
+  updated: string | null;
+  last_accessed: string | null;
+  hit_count: number;
+}
+
+export interface KnowledgeCitation {
+  id: number;
+  page_id: number;
+  claim: string;
+  source_kind: string;
+  source_locator: string | null;
+  excerpt: string;
+  retrieved_at: string;
+  created: string;
+}
+
+export interface KnowledgePageWithCitations extends KnowledgePage {
+  citations: KnowledgeCitation[];
+}
+
+export interface KnowledgeQueryInput {
+  query?: string;
+  domain?: string;
+  excludeStatus?: string;
+  limit?: number;
+}
+
+export interface KnowledgePageRef {
+  uuid: string;
+  slug: string;
+  title: string;
+}
+
+export interface KnowledgeWriteResult extends KnowledgePageRef {
+  citationsAdded: number;
+}
+
+// ─── Knowledge Backend Interface ─────────────────────────────────────────────
+
+export interface KnowledgeBackend {
+  /** Upsert an entity page by slug; create or append. */
+  writePage(input: KnowledgePageInput): Promise<KnowledgeWriteResult>;
+  /** Get a single page by slug. */
+  getPage(slug: string): Promise<KnowledgePageWithCitations | null>;
+  /** List pages with optional filters. */
+  listPages(input?: KnowledgeQueryInput): Promise<KnowledgePageWithCitations[]>;
+  /** LIKE search over title, body, and domain. */
+  queryPages(input: KnowledgeQueryInput): Promise<KnowledgePageWithCitations[]>;
+  /** Add citations to an existing page by slug. */
+  addCitations(slug: string, citations: KnowledgeCitationInput[]): Promise<number>;
+  /** Close the underlying SQLite connection. */
+  close(): void;
+}
