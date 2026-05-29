@@ -13,12 +13,14 @@
  */
 import {
   resolveSqliteDbPath,
+  resolveKnowledgeDbPath,
   resolveFastEmbedModel,
   resolveFastEmbedCacheDir,
 } from '../config.js';
 import { SqliteVecBackend } from './sqlite-vec.js';
+import { SqliteKnowledgeBackend } from './sqlite-knowledge.js';
 import { FastEmbedProvider } from './fastembed.js';
-import type { MemoryBackend, EmbeddingProvider } from './types.js';
+import type { MemoryBackend, EmbeddingProvider, KnowledgeBackend } from './types.js';
 
 export function createEmbeddingProvider(): EmbeddingProvider {
   return new FastEmbedProvider({
