@@ -79,6 +79,34 @@ export interface ForgetResult {
   deleted: string[];
 }
 
+export interface ArchiveInput {
+  /** Direct reference (category/filename) for single archive */
+  ref?: string;
+  /** Find by category + title for single archive */
+  category?: string;
+  title?: string;
+  /** Tombstone note: who/why retired. Stored alongside the original body. */
+  note?: string;
+}
+
+export interface ArchiveResult {
+  /** Refs that were successfully archived (soft-retired) */
+  archived: string[];
+}
+
+export interface RestoreInput {
+  /** Direct reference (category/filename) to restore */
+  ref?: string;
+  /** Find by category + title */
+  category?: string;
+  title?: string;
+}
+
+export interface RestoreResult {
+  /** Refs that were successfully restored to the active set */
+  restored: string[];
+}
+
 export interface UpdateResult {
   /** Whether the update was applied */
   updated: boolean;
@@ -171,6 +199,10 @@ export interface MemoryBackend {
   findSimilar(input: FindSimilarInput): Promise<MemoryMatch[]>;
   /** One-shot health report: counts, stale, duplicates, expired. Read-only. */
   audit(options?: AuditOptions): Promise<AuditReport>;
+  /** Soft-retire a memory: archive with tombstone instead of hard delete. */
+  archive(input: ArchiveInput): Promise<ArchiveResult>;
+  /** Restore a previously archived memory to the active set. */
+  restore(input: RestoreInput): Promise<RestoreResult>;
 }
 
 // ─── Embedding Interface (used by vector backends) ───────────────────────────

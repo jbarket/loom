@@ -41,6 +41,9 @@ an agent's persistent state:
   free-form text; used for deduplication and memory consolidation.
 - **`memory_audit`** — one-shot health report: stale entries, near-duplicate
   pairs, category breakdown.
+- **`memory_archive` / `memory_restore`** — soft-retire a memory with a
+  tombstone (who/when/why + original body preserved) instead of deleting it.
+  Archived memories are excluded from recall and audit but remain recoverable.
 - **`update_identity`** — section-level edits to `preferences.md` and
   `self-model.md`. The terminal creed stays immutable through the tool layer.
 - **`bootstrap`** — initialize a fresh agent from a short interview.

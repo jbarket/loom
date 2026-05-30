@@ -6,6 +6,8 @@ import { memoryList } from '../tools/memory-list.js';
 import { prune } from '../tools/prune.js';
 import { findSimilar } from '../tools/find-similar.js';
 import { memoryAudit } from '../tools/memory-audit.js';
+import { archive } from '../tools/archive.js';
+import { restore } from '../tools/restore.js';
 import { createBackend } from '../backends/index.js';
 import { assertStackVersionCompatible } from '../config.js';
 import { extractGlobalFlags, resolveEnv } from './args.js';
@@ -19,6 +21,8 @@ Subcommands:
   prune     Report / remove expired and stale memories
   similar   Surface memories semantically near a ref or text
   audit     One-shot health report (counts, stale, duplicates, expired)
+  archive   Soft-retire a memory with a tombstone (recoverable)
+  restore   Return an archived memory to the active set
 
 Options (list):
   --category <name>    Filter
@@ -46,10 +50,23 @@ Options (audit):
   --max-duplicates <n>         Cap on duplicate pairs (default 20)
   --json                       Emit AuditReport
 
+Options (archive):
+  <ref>                Memory ref to archive (positional)
+  --category <name>    Category (used with --title)
+  --title <name>       Title of memory to archive (used with --category)
+  --note <text>        Tombstone note: why this memory is being retired
+  --json               Emit ArchiveResult
+
+Options (restore):
+  <ref>                Memory ref to restore (positional)
+  --category <name>    Category (used with --title)
+  --title <name>       Title of archived memory to restore (used with --category)
+  --json               Emit RestoreResult
+
 Global: --context-dir, --help/-h
 `;
 
-const SUBCOMMANDS = new Set(['list', 'prune', 'similar', 'audit']);
+const SUBCOMMANDS = new Set(['list', 'prune', 'similar', 'audit', 'archive', 'restore']);
 
 export async function run(argv: string[], io: IOStreams): Promise<number> {
   const { flags: global, rest } = extractGlobalFlags(argv);
@@ -217,6 +234,78 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
     const text = await memoryAudit(env.contextDir, options);
     io.stdout(text.endsWith('\n') ? text : text + '\n');
     return 0;
+  }
+
+  if (sub === 'archive') {
+    let parsed;
+    try {
+      parsed = parseArgs({
+        args: subRest,
+        options: {
+          category: { type: 'string' },
+          title:    { type: 'string' },
+          note:     { type: 'string' },
+        },
+        strict: true,
+        allowPositionals: true,
+      });
+    } catch (err) {
+      io.stderr(`${(err as Error).message}\n${USAGE}`);
+      return 2;
+    }
+    const input = {
+      ref:      parsed.positionals[0],
+      category: parsed.values.category,
+      title:    parsed.values.title,
+      note:     parsed.values.note,
+    };
+    if (!input.ref && !input.category) {
+      io.stderr(`Nothing to archive. Provide a ref or --category + --title.\n`);
+      return 2;
+    }
+    if (env.json) {
+      const backend = createBackend(env.contextDir);
+      renderJson(io, await backend.archive(input));
+      return 0;
+    }
+    const text = await archive(env.contextDir, input);
+    io.stdout(text.endsWith('\n') ? text : text + '\n');
+    return /not found/i.test(text) ? 3 : 0;
+  }
+
+  if (sub === 'restore') {
+    let parsed;
+    try {
+      parsed = parseArgs({
+        args: subRest,
+        options: {
+          category: { type: 'string' },
+          title:    { type: 'string' },
+        },
+        strict: true,
+        allowPositionals: true,
+      });
+    } catch (err) {
+      io.stderr(`${(err as Error).message}\n${USAGE}`);
+      return 2;
+    }
+    const input = {
+      ref:      parsed.positionals[0],
+      category: parsed.values.category,
+      title:    parsed.values.title,
+    };
+    if (!input.ref && !input.category) {
+      io.stderr(`Nothing to restore. Provide a ref or --category + --title.\n`);
+      return 2;
+    }
+    if (env.json) {
+      const backend = createBackend(env.contextDir);
+      renderJson(io, await backend.restore(input));
+      return 0;
+    }
+    const text = await restore(env.contextDir, input);
+    io.stdout(text.endsWith('\n') ? text : text + '\n');
+    return /not found/i.test(text) ? 3 : 0;
   }
 
   // prune

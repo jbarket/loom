@@ -32,6 +32,10 @@ import type {
   AuditReport,
   AuditStaleEntry,
   DuplicatePair,
+  ArchiveInput,
+  ArchiveResult,
+  RestoreInput,
+  RestoreResult,
 } from './types.js';
 import { computeExpiresAt, isExpired } from './ttl.js';
 import { globToMatcher } from './glob.js';
@@ -63,6 +67,8 @@ interface MemoryRow {
   last_accessed: string | null;
   ttl: string | null;
   expires_at: string | null;
+  archived: number;
+  archive_note: string | null;
 }
 
 interface VecMatch {
@@ -149,7 +155,7 @@ export class SqliteVecBackend implements MemoryBackend {
 
     const placeholders = vecRows.map(() => '?').join(',');
     const memRows = this.db
-      .prepare(`SELECT * FROM memories WHERE id IN (${placeholders})`)
+      .prepare(`SELECT * FROM memories WHERE id IN (${placeholders}) AND archived = 0`)
       .all(...vecRows.map((r) => r.rowid)) as MemoryRow[];
 
     const byId = new Map(memRows.map((r) => [r.id, r]));
@@ -291,7 +297,7 @@ export class SqliteVecBackend implements MemoryBackend {
     const rows = this.db
       .prepare(
         `SELECT id, ref, ttl, expires_at, last_accessed, updated, created
-         FROM memories`,
+         FROM memories WHERE archived = 0`,
       )
       .all() as {
       id: number;
@@ -338,7 +344,8 @@ export class SqliteVecBackend implements MemoryBackend {
       clauses.push('project = ?');
       params.push(input.project);
     }
-    const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+    clauses.push('archived = 0');
+    const where = `WHERE ${clauses.join(' AND ')}`;
     params.push(input.limit ?? 50);
 
     const rows = this.db
@@ -409,7 +416,7 @@ export class SqliteVecBackend implements MemoryBackend {
     const ids = vecRows.map((r) => r.rowid);
     const placeholders = ids.map(() => '?').join(',');
     const memRows = this.db
-      .prepare(`SELECT * FROM memories WHERE id IN (${placeholders})`)
+      .prepare(`SELECT * FROM memories WHERE id IN (${placeholders}) AND archived = 0`)
       .all(...ids) as MemoryRow[];
     const byId = new Map(memRows.map((r) => [r.id, r]));
 
@@ -444,7 +451,7 @@ export class SqliteVecBackend implements MemoryBackend {
       .prepare(
         `SELECT id, ref, title, category, project, ttl, expires_at,
                 last_accessed, updated, created
-         FROM memories`,
+         FROM memories WHERE archived = 0`,
       )
       .all() as (Pick<MemoryRow,
         'id' | 'ref' | 'title' | 'category' | 'project' | 'ttl' |
@@ -521,6 +528,67 @@ export class SqliteVecBackend implements MemoryBackend {
     };
   }
 
+  async archive(input: ArchiveInput): Promise<ArchiveResult> {
+    let rows: { id: number; ref: string }[] = [];
+
+    if (input.ref) {
+      const row = this.db
+        .prepare('SELECT id, ref FROM memories WHERE ref = ? AND archived = 0')
+        .get(input.ref) as { id: number; ref: string } | undefined;
+      if (row) rows = [row];
+    } else if (input.category && input.title) {
+      rows = this.db
+        .prepare('SELECT id, ref FROM memories WHERE category = ? AND title = ? AND archived = 0')
+        .all(input.category, input.title) as { id: number; ref: string }[];
+    } else {
+      return { archived: [] };
+    }
+
+    if (rows.length === 0) return { archived: [] };
+
+    const now = new Date().toISOString();
+    const tombstone = JSON.stringify({ note: input.note ?? null, archived_at: now });
+    const stmt = this.db.prepare(
+      'UPDATE memories SET archived = 1, archive_note = ?, updated = ? WHERE id = ?',
+    );
+    const tx = this.db.transaction(() => {
+      for (const row of rows) stmt.run(tombstone, now, row.id);
+    });
+    tx();
+
+    return { archived: rows.map((r) => r.ref) };
+  }
+
+  async restore(input: RestoreInput): Promise<RestoreResult> {
+    let rows: { id: number; ref: string }[] = [];
+
+    if (input.ref) {
+      const row = this.db
+        .prepare('SELECT id, ref FROM memories WHERE ref = ? AND archived = 1')
+        .get(input.ref) as { id: number; ref: string } | undefined;
+      if (row) rows = [row];
+    } else if (input.category && input.title) {
+      rows = this.db
+        .prepare('SELECT id, ref FROM memories WHERE category = ? AND title = ? AND archived = 1')
+        .all(input.category, input.title) as { id: number; ref: string }[];
+    } else {
+      return { restored: [] };
+    }
+
+    if (rows.length === 0) return { restored: [] };
+
+    const now = new Date().toISOString();
+    const stmt = this.db.prepare(
+      'UPDATE memories SET archived = 0, archive_note = NULL, updated = ? WHERE id = ?',
+    );
+    const tx = this.db.transaction(() => {
+      for (const row of rows) stmt.run(now, row.id);
+    });
+    tx();
+
+    return { restored: rows.map((r) => r.ref) };
+  }
+
   close(): void {
     this.db.close();
   }
@@ -546,11 +614,14 @@ export class SqliteVecBackend implements MemoryBackend {
         updated       TEXT,
         last_accessed TEXT,
         ttl           TEXT,
-        expires_at    TEXT
+        expires_at    TEXT,
+        archived      INTEGER NOT NULL DEFAULT 0,
+        archive_note  TEXT
       )`,
       `CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category)`,
       `CREATE INDEX IF NOT EXISTS idx_memories_project  ON memories(project)`,
       `CREATE INDEX IF NOT EXISTS idx_memories_ref      ON memories(ref)`,
+      `CREATE INDEX IF NOT EXISTS idx_memories_archived ON memories(archived)`,
       `CREATE VIRTUAL TABLE IF NOT EXISTS vec_memories USING vec0(
         embedding float[${this.embedder.dimensions}] distance_metric=cosine
       )`,
@@ -558,6 +629,17 @@ export class SqliteVecBackend implements MemoryBackend {
     for (const sql of statements) {
       this.db.prepare(sql).run();
     }
+    // Migration: add archive columns to existing databases.
+    // SQLite doesn't support IF NOT EXISTS on ALTER TABLE; catch the duplicate-column error.
+    for (const migration of [
+      'ALTER TABLE memories ADD COLUMN archived INTEGER NOT NULL DEFAULT 0',
+      'ALTER TABLE memories ADD COLUMN archive_note TEXT',
+    ]) {
+      try { this.db.prepare(migration).run(); } catch { /* column already exists */ }
+    }
+    try {
+      this.db.prepare('CREATE INDEX IF NOT EXISTS idx_memories_archived ON memories(archived)').run();
+    } catch { /* index already exists */ }
   }
 
   private deleteById(ids: number[]): void {

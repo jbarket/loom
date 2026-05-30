@@ -20,6 +20,8 @@ import { prune } from './tools/prune.js';
 import { memoryList } from './tools/memory-list.js';
 import { findSimilar } from './tools/find-similar.js';
 import { memoryAudit } from './tools/memory-audit.js';
+import { archive } from './tools/archive.js';
+import { restore } from './tools/restore.js';
 import { updateIdentity } from './tools/update-identity.js';
 import { bootstrap } from './tools/bootstrap.js';
 import { harnessInit } from './tools/harness.js';
@@ -215,6 +217,40 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
         similarityThreshold: similarity_threshold,
         maxDuplicates: max_duplicates,
       });
+      return { content: [{ type: 'text' as const, text: result }] };
+    },
+  );
+
+  server.tool(
+    'memory_archive',
+    'Soft-retire a memory: move it to the archive tier with a tombstone instead of ' +
+    'deleting it. Archived memories are excluded from recall, list, audit, and ' +
+    'find_similar but remain fully recoverable via memory_restore. Use this instead ' +
+    'of forget when the memory may need to be recovered or audited later.',
+    {
+      ref: z.string().optional().describe('Memory reference for single archive'),
+      category: z.string().optional().describe('Category (used with title)'),
+      title: z.string().optional().describe('Title of specific memory to archive'),
+      note: z.string().optional().describe('Tombstone note: why this memory is being retired'),
+    },
+    async ({ ref, category, title, note }) => {
+      const result = await archive(contextDir, { ref, category, title, note });
+      return { content: [{ type: 'text' as const, text: result }] };
+    },
+  );
+
+  server.tool(
+    'memory_restore',
+    'Restore a previously archived memory to the active set. Clears the archive ' +
+    'flag and tombstone note. The memory becomes visible to recall, list, audit, ' +
+    'and find_similar again.',
+    {
+      ref: z.string().optional().describe('Memory reference to restore'),
+      category: z.string().optional().describe('Category (used with title)'),
+      title: z.string().optional().describe('Title of the archived memory to restore'),
+    },
+    async ({ ref, category, title }) => {
+      const result = await restore(contextDir, { ref, category, title });
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );

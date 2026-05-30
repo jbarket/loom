@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > The release pipeline is tag-triggered; publish will happen when Jonathan pushes `v0.4.1`.
 > Until then, install via `npx github:jbarket/loom install`.
 
+## [Unreleased]
+
+### Added
+
+- **Soft-archive tier** (`memory_archive` / `memory_restore` MCP tools;
+  `loom memory archive` / `loom memory restore` CLI subcommands). Memories
+  can now be soft-retired with a tombstone (note + `archived_at` timestamp)
+  instead of hard-deleted. Archived memories are excluded from `recall`,
+  `memory_list`, `memory_prune`, `find_similar`, and `memory_audit` but
+  remain fully recoverable. The original body is preserved in the row;
+  `memory_restore` returns a memory to the active set and wipes the tombstone.
+  Existing databases are migrated automatically on first open (`ALTER TABLE`
+  guards against re-running on already-migrated schemas).
+
 ## [0.4.1] - 2026-04-23
 
 Stabilization release consolidating v0.4.0-alpha.1 through alpha.7.

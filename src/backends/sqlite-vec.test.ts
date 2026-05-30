@@ -424,4 +424,155 @@ describe('SqliteVecBackend', () => {
       expect(report.duplicates.length).toBeLessThanOrEqual(1);
     });
   });
+
+  describe('archive and restore', () => {
+    it('archives a memory by ref', async () => {
+      const { ref } = await backend.remember({
+        category: 'project',
+        title: 'Loom archive test',
+        content: 'loom work',
+      });
+      const result = await backend.archive({ ref, note: 'superseded' });
+      expect(result.archived).toEqual([ref]);
+    });
+
+    it('archived memory is excluded from recall', async () => {
+      const { ref } = await backend.remember({
+        category: 'project',
+        title: 'Loom invisible',
+        content: 'loom hidden',
+      });
+      await backend.archive({ ref });
+
+      const hits = await backend.recall({ query: 'loom hidden' });
+      expect(hits.map((h) => h.path)).not.toContain(ref);
+    });
+
+    it('archived memory is excluded from list', async () => {
+      const { ref } = await backend.remember({
+        category: 'project',
+        title: 'Loom list test',
+        content: 'loom',
+      });
+      await backend.archive({ ref });
+
+      const entries = await backend.list({});
+      expect(entries.map((e) => e.ref)).not.toContain(ref);
+    });
+
+    it('archived memory is excluded from audit', async () => {
+      const { ref } = await backend.remember({
+        category: 'project',
+        title: 'Loom audit test',
+        content: 'loom',
+      });
+      await backend.archive({ ref });
+
+      const report = await backend.audit();
+      const allRefs = [
+        ...report.stale.map((s) => s.ref),
+        ...report.expired,
+        ...report.duplicates.flatMap((d) => [d.a.ref, d.b.ref]),
+      ];
+      expect(allRefs).not.toContain(ref);
+      expect(report.totalMemories).toBe(0);
+    });
+
+    it('archives by category+title', async () => {
+      await backend.remember({
+        category: 'reference',
+        title: 'Old reference',
+        content: 'hermes',
+      });
+      const result = await backend.archive({ category: 'reference', title: 'Old reference' });
+      expect(result.archived).toHaveLength(1);
+      expect(result.archived[0]).toMatch(/^reference\//);
+    });
+
+    it('returns empty archived when memory not found', async () => {
+      const result = await backend.archive({ ref: 'project/does-not-exist' });
+      expect(result.archived).toHaveLength(0);
+    });
+
+    it('returns empty archived when memory already archived', async () => {
+      const { ref } = await backend.remember({
+        category: 'project',
+        title: 'Double archive',
+        content: 'loom',
+      });
+      await backend.archive({ ref });
+      const second = await backend.archive({ ref });
+      expect(second.archived).toHaveLength(0);
+    });
+
+    it('persists tombstone note with archived_at timestamp', async () => {
+      const { ref } = await backend.remember({
+        category: 'project',
+        title: 'Tombstone test',
+        content: 'loom',
+      });
+      await backend.archive({ ref, note: 'why retired' });
+
+      const db = backend.getDatabase();
+      const row = db
+        .prepare('SELECT archived, archive_note FROM memories WHERE ref = ?')
+        .get(ref) as { archived: number; archive_note: string };
+      expect(row.archived).toBe(1);
+      const parsed = JSON.parse(row.archive_note);
+      expect(parsed.note).toBe('why retired');
+      expect(parsed.archived_at).toBeTruthy();
+    });
+
+    it('restores an archived memory by ref', async () => {
+      const { ref } = await backend.remember({
+        category: 'project',
+        title: 'Loom restore test',
+        content: 'loom',
+      });
+      await backend.archive({ ref });
+
+      const result = await backend.restore({ ref });
+      expect(result.restored).toEqual([ref]);
+    });
+
+    it('restored memory is visible to recall again', async () => {
+      const { ref } = await backend.remember({
+        category: 'project',
+        title: 'Loom resurface',
+        content: 'loom restored',
+      });
+      await backend.archive({ ref });
+      await backend.restore({ ref });
+
+      const hits = await backend.recall({ query: 'loom restored' });
+      expect(hits.map((h) => h.path)).toContain(ref);
+    });
+
+    it('restored memory clears archive_note', async () => {
+      const { ref } = await backend.remember({
+        category: 'project',
+        title: 'Note cleared',
+        content: 'loom',
+      });
+      await backend.archive({ ref, note: 'temp retire' });
+      await backend.restore({ ref });
+
+      const db = backend.getDatabase();
+      const row = db
+        .prepare('SELECT archived, archive_note FROM memories WHERE ref = ?')
+        .get(ref) as { archived: number; archive_note: string | null };
+      expect(row.archived).toBe(0);
+      expect(row.archive_note).toBeNull();
+    });
+
+    it('returns empty restored when memory not in archive', async () => {
+      const { ref } = await backend.remember({
+        category: 'project',
+        title: 'Active memory',
+        content: 'loom',
+      });
+      const result = await backend.restore({ ref });
+      expect(result.restored).toHaveLength(0);
+    });
+  });
 });

@@ -20,6 +20,7 @@ import { join } from 'node:path';
 export const TOOLS = [
   'identity', 'remember', 'recall', 'update', 'forget',
   'memory_list', 'memory_prune', 'find_similar', 'memory_audit',
+  'memory_archive', 'memory_restore',
   'update_identity', 'bootstrap', 'harness_init',
 ];
 
