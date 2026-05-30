@@ -17,7 +17,7 @@
 import { resolve, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 
 export function resolveContextDir(): string {
   if (process.env.LOOM_CONTEXT_DIR) {
@@ -65,7 +65,6 @@ export function assertKnowledgePathsNotCoLocated(contextDir: string): void {
   }
 
   // Also check inode-level co-location (hard links)
-  const { statSync } = require('node:fs');
   let memStat: { ino: number; dev: number } | null = null;
   let knStat: { ino: number; dev: number } | null = null;
   try {

@@ -1,9 +1,20 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, linkSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, linkSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { SqliteKnowledgeBackend } from './sqlite-knowledge.js';
-import { resolveKnowledgeDbPath, assertKnowledgePathsNotCoLocated } from '../config.js';
+import { resolveKnowledgeDbPath, assertKnowledgePathsNotCoLocated, assertStackVersionCompatible } from '../config.js';
+import { SqliteVecBackend } from './sqlite-vec.js';
+import type { EmbeddingProvider } from './types.js';
+
+function makeNullEmbedder(): EmbeddingProvider {
+  const encode = (_text: string): number[] => [0.01, 0, 0, 0];
+  return {
+    dimensions: 4,
+    embed: async (t: string) => encode(t),
+    embedBatch: async (ts: string[]) => ts.map(encode),
+  };
+}
 
 describe('SqliteKnowledgeBackend', () => {
   let tmpDir: string;
@@ -437,9 +448,9 @@ describe('SqliteKnowledgeBackend', () => {
     }
   });
 
-  it('citations are cascaded on page delete', () => {
+  it('citations are cascaded on page delete', async () => {
     // Write page with citations, then delete page row directly and verify citations gone
-    backend.writePage({
+    await backend.writePage({
       slug: 'cascade-test',
       title: 'Cascade',
       domain: 'test',
@@ -464,5 +475,102 @@ describe('SqliteKnowledgeBackend', () => {
       .prepare('SELECT COUNT(*) as count FROM citations')
       .get() as { count: number };
     expect(citations.count).toBe(0);
+  });
+});
+
+// ── Isolation invariant tests (the #1 gate) ──────────────────────────────────
+
+describe('knowledge isolation invariants', () => {
+  let tmpDir: string;
+  const memDbPath = () => join(tmpDir, 'memories.db');
+  const knDbPath = () => join(tmpDir, 'knowledge.db');
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'loom-isolation-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('(a) a knowledge write that throws leaves memories.db readable and writable', async () => {
+    // Seed memories.db with a real SqliteVecBackend so the file exists.
+    const memBackend = new SqliteVecBackend(
+      { dbPath: memDbPath() },
+      makeNullEmbedder(),
+    );
+    await memBackend.remember({ category: 'test', title: 'Sentinel', content: 'ok' });
+    memBackend.close();
+
+    // Open knowledge backend and attempt a write that will throw (body cap exceeded).
+    const knBackend = new SqliteKnowledgeBackend({ dbPath: knDbPath() });
+    const oversizedBody = 'x'.repeat(64 * 1024 + 1);
+    await expect(
+      knBackend.writePage({ slug: 'boom', title: 'Boom', domain: 'test', body: oversizedBody }),
+    ).rejects.toThrow(/exceeds hard cap/);
+    knBackend.close();
+
+    // memories.db must still be readable and writable.
+    const memBackend2 = new SqliteVecBackend(
+      { dbPath: memDbPath() },
+      makeNullEmbedder(),
+    );
+    const results = await memBackend2.recall({ query: 'Sentinel' });
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].title).toBe('Sentinel');
+    // Write must still work.
+    await expect(
+      memBackend2.remember({ category: 'test', title: 'After knowledge error', content: 'still works' }),
+    ).resolves.toBeDefined();
+    memBackend2.close();
+  });
+
+  it('(b) a corrupt knowledge.db surfaces a contained error; memory wing unaffected', async () => {
+    // Seed memories.db.
+    const memBackend = new SqliteVecBackend(
+      { dbPath: memDbPath() },
+      makeNullEmbedder(),
+    );
+    await memBackend.remember({ category: 'test', title: 'Survivor', content: 'lives' });
+    memBackend.close();
+
+    // Write deliberate garbage into knowledge.db so SQLite rejects it.
+    writeFileSync(knDbPath(), 'THIS IS NOT A SQLITE DATABASE\n');
+
+    // Opening a corrupted knowledge.db should throw (SQLite rejects the file).
+    expect(() => new SqliteKnowledgeBackend({ dbPath: knDbPath() })).toThrow();
+
+    // memories.db must still be open-able and readable after the knowledge failure.
+    const memBackend2 = new SqliteVecBackend(
+      { dbPath: memDbPath() },
+      makeNullEmbedder(),
+    );
+    const results = await memBackend2.recall({ query: 'Survivor' });
+    expect(results.length).toBeGreaterThan(0);
+    memBackend2.close();
+  });
+
+  it('(c) memory boot path (assertStackVersionCompatible v2) boots with knowledge.db present', () => {
+    // Create a knowledge.db in the context dir (simulates a knowledge-enabled context dir).
+    const knBackend = new SqliteKnowledgeBackend({ dbPath: knDbPath() });
+    knBackend.close();
+
+    // assertStackVersionCompatible must not fail even when knowledge.db is present.
+    // This is the "older/knowledge-disabled build is not bricked" regression test.
+    expect(() => assertStackVersionCompatible(tmpDir)).not.toThrow();
+
+    // The LOOM_STACK_VERSION file must be stamped at v2, not at any knowledge version.
+    const stamp = readFileSync(join(tmpDir, 'LOOM_STACK_VERSION'), 'utf-8');
+    expect(stamp.trim()).toBe('2');
+  });
+
+  it('memories.db is never opened when operating on knowledge.db', async () => {
+    // Create a knowledge backend and do a write — memories.db must remain absent.
+    const knBackend = new SqliteKnowledgeBackend({ dbPath: knDbPath() });
+    await knBackend.writePage({ slug: 'isolated', title: 'Isolated', domain: 'test', body: 'ok' });
+    knBackend.close();
+
+    // memories.db must NOT exist — the knowledge backend never opens it.
+    expect(existsSync(memDbPath())).toBe(false);
   });
 });

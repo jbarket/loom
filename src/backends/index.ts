@@ -14,6 +14,7 @@
 import {
   resolveSqliteDbPath,
   resolveKnowledgeDbPath,
+  assertKnowledgePathsNotCoLocated,
   resolveFastEmbedModel,
   resolveFastEmbedCacheDir,
 } from '../config.js';
@@ -34,4 +35,11 @@ export function createBackend(contextDir: string): MemoryBackend {
     { dbPath: resolveSqliteDbPath(contextDir) },
     createEmbeddingProvider(),
   );
+}
+
+export function createKnowledgeBackend(contextDir: string): KnowledgeBackend {
+  assertKnowledgePathsNotCoLocated(contextDir);
+  return new SqliteKnowledgeBackend({
+    dbPath: resolveKnowledgeDbPath(contextDir),
+  });
 }
