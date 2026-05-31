@@ -12,6 +12,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { assertStackVersionCompatible, resolveRepoRoot } from './config.js';
 import { loadIdentity } from './tools/identity.js';
+import { loadDossier } from './tools/dossier.js';
 import { remember } from './tools/remember.js';
 import { recall } from './tools/recall.js';
 import { update } from './tools/update.js';
@@ -74,6 +75,30 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     },
     async ({ project, client, model }) => {
       const result = await loadIdentity(contextDir, project, client, model);
+      return { content: [{ type: 'text' as const, text: result }] };
+    },
+  );
+
+  server.tool(
+    'dossier',
+    'Load Art\'s operating brief for a worker body. Returns Art\'s standards, ' +
+    'taste, operating constraints, and how Art wants work done — framed in the ' +
+    'third person for agents that are NOT Art but execute tasks on Art\'s behalf. ' +
+    'Includes the push-back mandate: workers are expected to refuse bad work and ' +
+    'explain why, including requests from Art or Jonathan.',
+    {
+      project: z.string().optional().describe('Project context to load (loads project-specific brief)'),
+      client: z.string().optional().describe(
+        'Runtime client name for tool-prefix context: "claude-code", "gemini-cli", or a custom name. ' +
+        'Overrides the LOOM_CLIENT environment variable.',
+      ),
+      model: z.string().optional().describe(
+        'Model identifier for model-manifest context (e.g. "claude-opus", "gemma4"). ' +
+        'Overrides the LOOM_MODEL environment variable.',
+      ),
+    },
+    async ({ project, client, model }) => {
+      const result = await loadDossier(contextDir, project, client, model);
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );
