@@ -27,7 +27,7 @@ To play locally: `asciinema play assets/demo.cast`
 
 ## What it is
 
-A Model Context Protocol server exposing twelve tools that read and write
+A Model Context Protocol server exposing fifteen tools that read and write
 an agent's persistent state:
 
 - **`identity`** — loads the terminal creed — the free-form markdown document
@@ -44,6 +44,16 @@ an agent's persistent state:
 - **`memory_archive` / `memory_restore`** — soft-retire a memory with a
   tombstone (who/when/why + original body preserved) instead of deleting it.
   Archived memories are excluded from recall and audit but remain recoverable.
+- **`knowledge_write`** — upsert a knowledge entity page by slug (create or
+  revise body in place). Knowledge is facts true independent of Jonathan —
+  citation-backed and maintained. Epistemic gate: pages whose only citations
+  are conversation-sourced are stored `provisional`.
+- **`knowledge_recall`** — LIKE search over the knowledge store (title, body,
+  domain). Stamps `last_accessed` and increments `hit_count` on every hit.
+  Never returns archived pages.
+- **`knowledge_maintain`** — read-only maintenance report: expansion candidates
+  (thin body + high hit_count), cold pages (no recent access), misfile audit
+  (conversation-only citations — likely memories, not knowledge).
 - **`update_identity`** — section-level edits to `preferences.md` and
   `self-model.md`. The terminal creed stays immutable through the tool layer.
 - **`bootstrap`** — initialize a fresh agent from a short interview.
@@ -232,6 +242,16 @@ npx loomai recall "meeting preferences" --context-dir ~/.config/loom/my-agent
 
 # List all memories in a category
 npx loomai memory list --category feedback --context-dir ~/.config/loom/my-agent
+
+# Write a knowledge entity page
+echo "Body text here." | npx loomai knowledge write --title "The Strega" --domain "music/eurorack" \
+  --context-dir ~/.config/loom/my-agent
+
+# Search the knowledge store
+npx loomai knowledge recall "spring reverb" --domain music --context-dir ~/.config/loom/my-agent
+
+# Run a maintenance report
+npx loomai knowledge maintain --context-dir ~/.config/loom/my-agent
 
 # Initialize a fresh agent
 npx loomai bootstrap --context-dir ~/.config/loom/new-agent

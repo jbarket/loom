@@ -19,6 +19,8 @@ import type {
   KnowledgePageWithCitations,
   KnowledgeQueryInput,
   KnowledgeWriteResult,
+  KnowledgeMaintainOptions,
+  KnowledgeMaintainReport,
 } from './types.js';
 
 /** Hard size caps — enforced at write boundary (design §A3). */
@@ -52,8 +54,8 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
       const timestamp = new Date().toISOString();
 
       const existing = db.prepare(
-        'SELECT id, uuid, title FROM pages WHERE slug = ?',
-      ).get(input.slug) as { id: number; uuid: string; title: string } | undefined;
+        'SELECT id, uuid, title, sourcing FROM pages WHERE slug = ?',
+      ).get(input.slug) as { id: number; uuid: string; title: string; sourcing: string } | undefined;
 
       let pageId: number;
       let uuid: string;
@@ -63,7 +65,7 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
       if (existing) {
         uuid = existing.uuid;
         title = existing.title;
-        sourcing = 'sourced';
+        sourcing = existing.sourcing;
         pageId = existing.id;
 
         db.prepare(
@@ -122,6 +124,7 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
         slug: input.slug,
         title,
         citationsAdded,
+        sourcing,
       });
     } catch (e) {
       return Promise.reject(e);
@@ -162,8 +165,9 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
       }
 
       if (input?.domain) {
-        clauses.push("domain LIKE ?");
-        params.push(`${input.domain}/%`);
+        // Match exact flat domain OR hierarchical subdomain prefix
+        clauses.push('(domain = ? OR domain LIKE ?)');
+        params.push(input.domain, `${input.domain}/%`);
       }
 
       const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
@@ -199,8 +203,9 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
       }
 
       if (input.domain) {
-        clauses.push("domain LIKE ?");
-        params.push(`${input.domain}/%`);
+        // Match exact flat domain OR hierarchical subdomain prefix
+        clauses.push('(domain = ? OR domain LIKE ?)');
+        params.push(input.domain, `${input.domain}/%`);
       }
 
       if (input.excludeStatus) {
@@ -214,6 +219,18 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
       const rows = db.prepare(
         `SELECT * FROM pages ${where} ORDER BY hit_count DESC, updated DESC, created DESC LIMIT ?`,
       ).all(...params) as KnowledgePage[];
+
+      // Stamp last_accessed and increment hit_count in a transaction for all hits
+      if (rows.length > 0) {
+        const now = new Date().toISOString();
+        const stamp = db.prepare(
+          'UPDATE pages SET last_accessed = ?, hit_count = hit_count + 1 WHERE id = ?',
+        );
+        const tx = db.transaction((ids: number[]) => {
+          for (const id of ids) stamp.run(now, id);
+        });
+        tx(rows.map((r) => r.id));
+      }
 
       return Promise.resolve(rows.map((page) => ({
         ...page,
@@ -262,6 +279,78 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
       tx();
 
       return Promise.resolve(added);
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  }
+
+  maintain(options?: KnowledgeMaintainOptions): Promise<KnowledgeMaintainReport> {
+    try {
+      const db = this.ensureOpen();
+      const thinThreshold = options?.thinBodyThreshold ?? 1000;
+      const minHits = options?.expansionMinHits ?? 3;
+      const coldDays = options?.coldDays ?? 30;
+
+      // Expansion candidates: thin body + high hit_count, not archived
+      const expansionRows = db.prepare(
+        `SELECT slug, title, domain, LENGTH(body) as bodyLength, hit_count
+         FROM pages
+         WHERE status != 'archived'
+           AND LENGTH(body) < ?
+           AND hit_count >= ?
+         ORDER BY hit_count DESC`,
+      ).all(thinThreshold, minHits) as Array<{
+        slug: string; title: string; domain: string; bodyLength: number; hit_count: number;
+      }>;
+
+      // Cold pages: last_accessed IS NULL or older than coldDays, not archived
+      const cutoff = new Date(Date.now() - coldDays * 24 * 60 * 60 * 1000).toISOString();
+      const coldRows = db.prepare(
+        `SELECT slug, title, domain, last_accessed, hit_count
+         FROM pages
+         WHERE status != 'archived'
+           AND (last_accessed IS NULL OR last_accessed < ?)
+         ORDER BY last_accessed ASC NULLS FIRST`,
+      ).all(cutoff) as Array<{
+        slug: string; title: string; domain: string; last_accessed: string | null; hit_count: number;
+      }>;
+
+      // Misfile audit: pages with citations where ALL citations are 'conversation'
+      // i.e. has at least one citation, and none are non-conversation
+      const misfileRows = db.prepare(
+        `SELECT p.slug, p.title, p.domain
+         FROM pages p
+         WHERE p.status != 'archived'
+           AND EXISTS (
+             SELECT 1 FROM citations c WHERE c.page_id = p.id
+           )
+           AND NOT EXISTS (
+             SELECT 1 FROM citations c WHERE c.page_id = p.id AND c.source_kind != 'conversation'
+           )`,
+      ).all() as Array<{ slug: string; title: string; domain: string }>;
+
+      return Promise.resolve({
+        expansionCandidates: expansionRows.map((r) => ({
+          slug: r.slug,
+          title: r.title,
+          domain: r.domain,
+          bodyLength: r.bodyLength,
+          hitCount: r.hit_count,
+        })),
+        coldPages: coldRows.map((r) => ({
+          slug: r.slug,
+          title: r.title,
+          domain: r.domain,
+          lastAccessed: r.last_accessed,
+          hitCount: r.hit_count,
+        })),
+        misfileAudit: misfileRows.map((r) => ({
+          slug: r.slug,
+          title: r.title,
+          domain: r.domain,
+          reason: 'all citations are conversation-sourced — likely a memory, not knowledge',
+        })),
+      });
     } catch (e) {
       return Promise.reject(e);
     }

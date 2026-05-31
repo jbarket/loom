@@ -21,6 +21,7 @@ export const TOOLS = [
   'identity', 'remember', 'recall', 'update', 'forget',
   'memory_list', 'memory_prune', 'find_similar', 'memory_audit',
   'memory_archive', 'memory_restore',
+  'knowledge_write', 'knowledge_recall', 'knowledge_maintain',
   'update_identity', 'bootstrap', 'harness_init',
 ];
 

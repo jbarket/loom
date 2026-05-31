@@ -25,6 +25,9 @@ import { restore } from './tools/restore.js';
 import { updateIdentity } from './tools/update-identity.js';
 import { bootstrap } from './tools/bootstrap.js';
 import { harnessInit } from './tools/harness.js';
+import { knowledgeWrite } from './tools/knowledge-write.js';
+import { knowledgeRecall } from './tools/knowledge-recall.js';
+import { knowledgeMaintain } from './tools/knowledge-maintain.js';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -319,6 +322,104 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     },
     async ({ name, overwrite }) => {
       const text = await harnessInit(contextDir, { name, overwrite });
+      return { content: [{ type: 'text' as const, text }] };
+    },
+  );
+
+  // ─── Knowledge ──────────────────────────────────────────────────────────────
+
+  server.tool(
+    'knowledge_write',
+    'Upsert a knowledge entity page by slug (create or revise body in place). ' +
+    'Knowledge is facts true independent of Jonathan — validated, citation-backed, ' +
+    'maintained. Use memory tools for events, preferences, and observations about ' +
+    'Jonathan or our work. ' +
+    'Epistemic gate: if ALL citations are conversation-sourced, the page is stored ' +
+    'provisional instead of sourced — it is likely a memory, not knowledge.',
+    {
+      slug: z.string().optional().describe(
+        'Entity key for upsert (URL-safe, derived from title if omitted)',
+      ),
+      title: z.string().describe('Entity title'),
+      domain: z.string().describe(
+        'Hierarchical domain tag, e.g. "music/eurorack". Re-cuttable views via LIKE prefix.',
+      ),
+      body: z.string().describe('Synthesized markdown body. Hard cap: 64 KB.'),
+      sourcing: z.enum(['sourced', 'provisional']).optional().describe(
+        '"sourced" (default) = externally verified; "provisional" = imported/unverified. ' +
+        'Overridden to "provisional" if all citations are conversation-sourced.',
+      ),
+      provenance: z.string().optional().describe(
+        'Page-level origin note for imported/migrated content, e.g. "eurorack@abc123 (imported)".',
+      ),
+      citations: z.array(z.object({
+        claim: z.string().describe('The assertion this citation backs'),
+        source_kind: z.enum(['web', 'loom_memory', 'conversation']).describe(
+          '"web" = URL source; "loom_memory" = opaque memory ref (never resolved cross-store); ' +
+          '"conversation" = distilled from session. Conversation-only pages → provisional.',
+        ),
+        source_locator: z.string().optional().describe(
+          'URL, memory ref string, or session id. Never resolved by loom — opaque provenance.',
+        ),
+        excerpt: z.string().describe(
+          'Inline supporting quote — link-rot insurance. Hard cap: 4 KB.',
+        ),
+      })).optional().describe('Supporting citations. Provide at least one for sourced pages.'),
+    },
+    async ({ slug, title, domain, body, sourcing, provenance, citations }) => {
+      const text = await knowledgeWrite(contextDir, {
+        slug, title, domain, body, sourcing, provenance, citations,
+      });
+      return { content: [{ type: 'text' as const, text }] };
+    },
+  );
+
+  server.tool(
+    'knowledge_recall',
+    'Search the knowledge store with LIKE matching over title, body, and domain. ' +
+    'Stamps last_accessed and increments hit_count on every hit — the usage signal ' +
+    'that drives expansion recommendations. Never returns archived pages. ' +
+    'Returns whole entity pages (the synthesis unit), not chunks.',
+    {
+      query: z.string().optional().describe(
+        'Search text (LIKE over title, body, domain). Omit to browse all.',
+      ),
+      domain: z.string().optional().describe(
+        'Filter by domain prefix (e.g. "music" matches "music" and "music/eurorack").',
+      ),
+      limit: z.number().optional().describe('Maximum pages to return (default: 10)'),
+    },
+    async ({ query, domain, limit }) => {
+      const text = await knowledgeRecall(contextDir, { query, domain, limit });
+      return { content: [{ type: 'text' as const, text }] };
+    },
+  );
+
+  server.tool(
+    'knowledge_maintain',
+    'Read-only maintenance report for the knowledge store. Never mutates. ' +
+    'Three branches: expansion candidates (thin body + high hit_count — go deepen these), ' +
+    'cold pages (no recent access — candidate for archival review), ' +
+    'misfile audit (pages whose only citation support is conversation-sourced — ' +
+    'likely memories misfiled as knowledge; move them to the memory store). ' +
+    'Act on findings via knowledge_write (to deepen) or remember (to migrate misfiled pages).',
+    {
+      thin_body_threshold: z.number().optional().describe(
+        'Body length (chars) below which a page is thin (default: 1000)',
+      ),
+      expansion_min_hits: z.number().optional().describe(
+        'Minimum hit_count to surface a thin page as an expansion candidate (default: 3)',
+      ),
+      cold_days: z.number().optional().describe(
+        'Days since last_accessed before a page is considered cold (default: 30)',
+      ),
+    },
+    async ({ thin_body_threshold, expansion_min_hits, cold_days }) => {
+      const text = await knowledgeMaintain(contextDir, {
+        thinBodyThreshold: thin_body_threshold,
+        expansionMinHits: expansion_min_hits,
+        coldDays: cold_days,
+      });
       return { content: [{ type: 'text' as const, text }] };
     },
   );

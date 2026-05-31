@@ -281,6 +281,50 @@ export interface KnowledgePageRef {
 
 export interface KnowledgeWriteResult extends KnowledgePageRef {
   citationsAdded: number;
+  sourcing: string;
+}
+
+// ─── Knowledge Maintain Types ─────────────────────────────────────────────────
+
+export interface KnowledgeMaintainOptions {
+  /** Body length below which a page is considered thin (default: 1000 chars) */
+  thinBodyThreshold?: number;
+  /** Minimum hit_count to surface a thin page as expansion candidate (default: 3) */
+  expansionMinHits?: number;
+  /** Days since last_accessed before a page is considered cold (default: 30) */
+  coldDays?: number;
+}
+
+export interface KnowledgeExpansionCandidate {
+  slug: string;
+  title: string;
+  domain: string;
+  bodyLength: number;
+  hitCount: number;
+}
+
+export interface KnowledgeColdPage {
+  slug: string;
+  title: string;
+  domain: string;
+  lastAccessed: string | null;
+  hitCount: number;
+}
+
+export interface KnowledgeMisfilePage {
+  slug: string;
+  title: string;
+  domain: string;
+  reason: string;
+}
+
+export interface KnowledgeMaintainReport {
+  /** Pages with thin bodies that are frequently accessed — candidates for deepening */
+  expansionCandidates: KnowledgeExpansionCandidate[];
+  /** Pages with no recent access — candidate for archival review */
+  coldPages: KnowledgeColdPage[];
+  /** Pages whose only citation support is conversation/self — candidate memories */
+  misfileAudit: KnowledgeMisfilePage[];
 }
 
 // ─── Knowledge Backend Interface ─────────────────────────────────────────────
@@ -292,10 +336,15 @@ export interface KnowledgeBackend {
   getPage(slug: string): Promise<KnowledgePageWithCitations | null>;
   /** List pages with optional filters. */
   listPages(input?: KnowledgeQueryInput): Promise<KnowledgePageWithCitations[]>;
-  /** LIKE search over title, body, and domain. */
+  /**
+   * LIKE search over title, body, and domain.
+   * Stamps last_accessed and increments hit_count in a transaction on every hit.
+   */
   queryPages(input: KnowledgeQueryInput): Promise<KnowledgePageWithCitations[]>;
   /** Add citations to an existing page by slug. */
   addCitations(slug: string, citations: KnowledgeCitationInput[]): Promise<number>;
+  /** Read-only maintenance report: expansion candidates, cold pages, misfile audit. */
+  maintain(options?: KnowledgeMaintainOptions): Promise<KnowledgeMaintainReport>;
   /** Close the underlying SQLite connection. */
   close(): void;
 }
