@@ -7,9 +7,18 @@
  * string. Drop knowledge.db and re-run to regenerate (no idempotent-keying column).
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative, extname, basename } from 'node:path';
+import { join, relative, extname, basename, resolve } from 'node:path';
+import { homedir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { createKnowledgeBackend } from '../backends/index.js';
+
+// ─── Context dir resolution ───────────────────────────────────────────────────
+
+export function resolveContextDir(explicit?: string): string {
+  if (explicit) return resolve(explicit);
+  if (process.env.LOOM_CONTEXT_DIR) return resolve(process.env.LOOM_CONTEXT_DIR);
+  return resolve(homedir(), '.config', 'loom', 'default');
+}
 
 // ─── Domain mapping ───────────────────────────────────────────────────────────
 

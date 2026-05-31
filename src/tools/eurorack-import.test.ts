@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -10,6 +10,7 @@ import {
   discoverFiles,
   importEurorack,
   renderImportReport,
+  resolveContextDir,
 } from './eurorack-import.js';
 import { createKnowledgeBackend } from '../backends/index.js';
 import evalSet from './__fixtures__/eurorack-eval-set.json' with { type: 'json' };
@@ -312,4 +313,42 @@ describe('eval-set recall (§A4 falsifiable trigger)', () => {
       }
     });
   }
+});
+
+// ─── Unit: resolveContextDir ──────────────────────────────────────────────────
+
+describe('resolveContextDir', () => {
+  const originalEnv = process.env.LOOM_CONTEXT_DIR;
+
+  afterAll(() => {
+    if (originalEnv === undefined) {
+      delete process.env.LOOM_CONTEXT_DIR;
+    } else {
+      process.env.LOOM_CONTEXT_DIR = originalEnv;
+    }
+  });
+
+  it('returns resolved explicit path when provided', () => {
+    const result = resolveContextDir('/some/explicit/dir');
+    expect(result).toBe('/some/explicit/dir');
+  });
+
+  it('returns resolved LOOM_CONTEXT_DIR when set and no explicit path', () => {
+    process.env.LOOM_CONTEXT_DIR = '/env/context/dir';
+    const result = resolveContextDir(undefined);
+    expect(result).toBe('/env/context/dir');
+  });
+
+  it('falls back to ~/.config/loom/default when LOOM_CONTEXT_DIR is unset', () => {
+    delete process.env.LOOM_CONTEXT_DIR;
+    const result = resolveContextDir(undefined);
+    expect(result).toMatch(/[/\\]\.config[/\\]loom[/\\]default$/);
+    expect(result).not.toBe(process.cwd());
+  });
+
+  it('explicit path takes precedence over LOOM_CONTEXT_DIR', () => {
+    process.env.LOOM_CONTEXT_DIR = '/env/context/dir';
+    const result = resolveContextDir('/explicit/wins');
+    expect(result).toBe('/explicit/wins');
+  });
 });

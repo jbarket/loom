@@ -10,8 +10,7 @@
  */
 import { parseArgs } from 'node:util';
 import { resolve } from 'node:path';
-import { homedir } from 'node:os';
-import { importEurorack, renderImportReport } from '../src/tools/eurorack-import.js';
+import { importEurorack, renderImportReport, resolveContextDir } from '../src/tools/eurorack-import.js';
 
 const { values, positionals } = parseArgs({
   args: process.argv.slice(2),
@@ -36,10 +35,7 @@ if (values.help || positionals.length === 0) {
 }
 
 const repoPath = resolve(positionals[0]);
-const contextDir = values['context-dir']
-  ? resolve(values['context-dir'])
-  : resolve(process.env.LOOM_CONTEXT_DIR ?? '', '')
-    || resolve(homedir(), '.config', 'loom', 'default');
+const contextDir = resolveContextDir(values['context-dir']);
 
 const report = await importEurorack({
   repoPath,
