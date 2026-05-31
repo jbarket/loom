@@ -13,12 +13,15 @@
  */
 import {
   resolveSqliteDbPath,
+  resolveKnowledgeDbPath,
+  assertKnowledgePathsNotCoLocated,
   resolveFastEmbedModel,
   resolveFastEmbedCacheDir,
 } from '../config.js';
 import { SqliteVecBackend } from './sqlite-vec.js';
+import { SqliteKnowledgeBackend } from './sqlite-knowledge.js';
 import { FastEmbedProvider } from './fastembed.js';
-import type { MemoryBackend, EmbeddingProvider } from './types.js';
+import type { MemoryBackend, EmbeddingProvider, KnowledgeBackend } from './types.js';
 
 export function createEmbeddingProvider(): EmbeddingProvider {
   return new FastEmbedProvider({
@@ -32,4 +35,11 @@ export function createBackend(contextDir: string): MemoryBackend {
     { dbPath: resolveSqliteDbPath(contextDir) },
     createEmbeddingProvider(),
   );
+}
+
+export function createKnowledgeBackend(contextDir: string): KnowledgeBackend {
+  assertKnowledgePathsNotCoLocated(contextDir);
+  return new SqliteKnowledgeBackend({
+    dbPath: resolveKnowledgeDbPath(contextDir),
+  });
 }
