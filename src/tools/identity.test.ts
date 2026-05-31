@@ -15,7 +15,7 @@ describe('loadIdentity', () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
-  it('returns graceful fallback when IDENTITY.md is missing', async () => {
+  it('returns graceful placeholder when IDENTITY.md is missing (non-default path)', async () => {
     const result = await loadIdentity(tempDir);
     expect(result).toContain('# Identity');
     expect(result).toContain('No IDENTITY.md found');
@@ -94,11 +94,24 @@ describe('loadIdentity', () => {
     expect(result).toContain('---');
   });
 
-  it('works with a completely empty context directory', async () => {
+  it('works with a completely empty context directory (non-default path)', async () => {
     const result = await loadIdentity(tempDir);
-    // Should still return something valid -- just the fallback identity
+    // Non-default path → graceful placeholder, not an error
     expect(result).toContain('# Identity');
     expect(result).toBeTruthy();
+  });
+
+  it('throws when contextDir equals the default path and IDENTITY.md is missing', async () => {
+    // tempDir has no IDENTITY.md; pass tempDir as the default path override
+    await expect(
+      loadIdentity(tempDir, undefined, undefined, undefined, tempDir),
+    ).rejects.toThrow(/no loom context configured/);
+  });
+
+  it('does not throw when contextDir equals the default path but IDENTITY.md exists', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), '# Art\n');
+    const result = await loadIdentity(tempDir, undefined, undefined, undefined, tempDir);
+    expect(result).toContain('# Art');
   });
 
   it('appends client adapter for gemini-cli', async () => {

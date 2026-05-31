@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, access, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, access, writeFile, lstat, readlink, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCliCaptured } from './test-helpers.js';
@@ -93,5 +93,79 @@ describe('loom bootstrap', () => {
     ]);
     expect(code).toBe(2);
     expect(stderr).toMatch(/lowercase/);
+  });
+});
+
+describe('loom bootstrap — default symlink provisioning', () => {
+  let fakeHome: string;
+
+  beforeEach(async () => {
+    fakeHome = await mkdtemp(join(tmpdir(), 'loom-boot-home-'));
+  });
+
+  afterEach(async () => {
+    await rm(fakeHome, { recursive: true, force: true });
+  });
+
+  it('creates default symlink when bootstrapping under the loom config root', async () => {
+    const loomRoot = join(fakeHome, '.config', 'loom');
+    await mkdir(loomRoot, { recursive: true });
+    const agentDir = join(loomRoot, 'myagent');
+    await mkdir(agentDir, { recursive: true }); // must exist for assertStackVersionCompatible
+
+    const { code } = await runCliCaptured(
+      ['bootstrap', '--name', 'myagent', '--purpose', 'Test agent', '--voice', 'Terse',
+       '--context-dir', agentDir],
+      { env: { HOME: fakeHome } },
+    );
+
+    expect(code).toBe(0);
+    await access(join(agentDir, 'IDENTITY.md'));
+
+    const defaultLink = join(loomRoot, 'default');
+    const s = await lstat(defaultLink);
+    expect(s.isSymbolicLink()).toBe(true);
+    const target = await readlink(defaultLink);
+    expect(target).toBe(agentDir);
+  });
+
+  it('does not create default symlink when agent dir is outside the loom config root', async () => {
+    // outsideDir is under /tmp — not under fakeHome/.config/loom/
+    const outsideDir = await mkdtemp(join(tmpdir(), 'loom-outside-'));
+    try {
+      // outsideDir already exists (mkdtemp creates it) so assertStackVersionCompatible passes
+      await runCliCaptured(
+        ['bootstrap', '--name', 'art', '--purpose', 'p', '--voice', 'v',
+         '--context-dir', outsideDir],
+        { env: { HOME: fakeHome } },
+      );
+      // default symlink should NOT exist since outsideDir is not under loom root
+      const defaultLink = join(fakeHome, '.config', 'loom', 'default');
+      await expect(lstat(defaultLink)).rejects.toThrow();
+    } finally {
+      await rm(outsideDir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not overwrite an existing default symlink', async () => {
+    const loomRoot = join(fakeHome, '.config', 'loom');
+    await mkdir(loomRoot, { recursive: true });
+    const existingTarget = join(loomRoot, 'existing');
+    await mkdir(existingTarget, { recursive: true });
+    const defaultLink = join(loomRoot, 'default');
+    const { symlink } = await import('node:fs/promises');
+    await symlink(existingTarget, defaultLink);
+
+    const newAgent = join(loomRoot, 'newagent');
+    await mkdir(newAgent, { recursive: true }); // must exist for assertStackVersionCompatible
+    await runCliCaptured(
+      ['bootstrap', '--name', 'newagent', '--purpose', 'p', '--voice', 'v',
+       '--context-dir', newAgent],
+      { env: { HOME: fakeHome } },
+    );
+
+    // default symlink should still point to the original target
+    const target = await readlink(defaultLink);
+    expect(target).toBe(existingTarget);
   });
 });

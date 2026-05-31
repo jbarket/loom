@@ -4,7 +4,7 @@
  * via node:util parseArgs.
  */
 import { resolve } from 'node:path';
-import { homedir } from 'node:os';
+import { resolveDefaultContextPath } from '../config.js';
 
 export interface ResolvedEnv {
   contextDir: string;
@@ -27,7 +27,7 @@ export function resolveEnv(
   const contextDir =
     flags.contextDir ??
     processEnv.LOOM_CONTEXT_DIR ??
-    resolve(homedir(), '.config', 'loom', 'default');
+    resolveDefaultContextPath(processEnv.HOME);
   return {
     contextDir: resolve(contextDir),
     client: flags.client ?? processEnv.LOOM_CLIENT,

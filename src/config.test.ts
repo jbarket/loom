@@ -6,7 +6,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { resolveContextDir } from './config.js';
+import { resolveContextDir, resolveDefaultContextPath, assertContextBootable } from './config.js';
 import {
   CURRENT_STACK_VERSION,
   STACK_VERSION_FILE,
@@ -146,5 +146,62 @@ describe('assertStackVersionCompatible', () => {
   it('refuses a stamp ahead of CURRENT_STACK_VERSION', async () => {
     await writeFile(join(tempDir, STACK_VERSION_FILE), `${CURRENT_STACK_VERSION + 1}\n`);
     expect(() => assertStackVersionCompatible(tempDir)).toThrow(/Upgrade loom/);
+  });
+});
+
+describe('resolveDefaultContextPath', () => {
+  it('returns ~/.config/loom/default when no home is provided', () => {
+    const result = resolveDefaultContextPath();
+    expect(result).toBe(resolve(homedir(), '.config', 'loom', 'default'));
+  });
+
+  it('uses the provided home directory', () => {
+    const result = resolveDefaultContextPath('/custom/home');
+    expect(result).toBe(resolve('/custom/home', '.config', 'loom', 'default'));
+  });
+
+  it('resolves to an absolute path', () => {
+    const result = resolveDefaultContextPath('/tmp/test-home');
+    expect(result).toMatch(/^\//);
+    expect(result).toMatch(/default$/);
+  });
+});
+
+describe('assertContextBootable', () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'loom-bootable-'));
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('does not throw when contextDir is not the default path', () => {
+    // Non-default path — no enforcement regardless of IDENTITY.md presence
+    expect(() => assertContextBootable('/tmp/some-random-dir', '/tmp/some-other-default')).not.toThrow();
+  });
+
+  it('throws when contextDir equals the default path and IDENTITY.md is missing', () => {
+    // tempDir IS the "default" — no IDENTITY.md inside it
+    expect(() => assertContextBootable(tempDir, tempDir)).toThrow(/no loom context configured/);
+  });
+
+  it('throws with the correct message content', () => {
+    expect(() => assertContextBootable(tempDir, tempDir)).toThrow(
+      /refusing to serve a blank identity/,
+    );
+  });
+
+  it('does not throw when contextDir equals the default path and IDENTITY.md exists', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), '# Art\n');
+    expect(() => assertContextBootable(tempDir, tempDir)).not.toThrow();
+  });
+
+  it('throws when the default path does not exist at all', () => {
+    const missingPath = join(tempDir, 'nonexistent-subdir');
+    // Pass missingPath as both contextDir and defaultPath
+    expect(() => assertContextBootable(missingPath, missingPath)).toThrow(/no loom context configured/);
   });
 });

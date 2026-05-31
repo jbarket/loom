@@ -96,3 +96,28 @@ describe('createLoomServer — stack version', () => {
     expect(() => createLoomServer({ contextDir })).toThrow(/unparseable/i);
   });
 });
+
+describe('createLoomServer — blank identity guard', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'server-bootguard-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('boots normally for a non-default contextDir even with no IDENTITY.md', () => {
+    // All existing tests exercise this path — non-default dir, no enforcement
+    const contextDir = join(tmpDir, 'explicit-context');
+    mkdirSync(join(contextDir, 'memories'), { recursive: true });
+    expect(() => createLoomServer({ contextDir })).not.toThrow();
+  });
+
+  it('boots normally for a non-default contextDir that has IDENTITY.md', () => {
+    const contextDir = makeContextDir(tmpDir);
+    writeFileSync(join(contextDir, 'IDENTITY.md'), '# Test\n');
+    expect(() => createLoomServer({ contextDir })).not.toThrow();
+  });
+});

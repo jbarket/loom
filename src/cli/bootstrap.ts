@@ -7,10 +7,11 @@
  *   3. interactive readline prompts (only when stdin is a TTY)
  */
 import { parseArgs } from 'node:util';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { createInterface } from 'node:readline/promises';
+import { lstat, symlink } from 'node:fs/promises';
 import { bootstrap } from '../tools/bootstrap.js';
-import { assertStackVersionCompatible } from '../config.js';
+import { assertStackVersionCompatible, resolveDefaultContextPath } from '../config.js';
 import { extractGlobalFlags, resolveEnv } from './args.js';
 import { readStdin, renderJson, stderrWritable } from './io.js';
 import type { IOStreams } from './io.js';
@@ -159,6 +160,27 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
   try {
     // params is always set by this point — all null paths return early above.
     const text = await bootstrap(env.contextDir, params!);
+
+    // Provision the default symlink if the new agent dir is directly under
+    // the loom config root and no default pointer exists yet.
+    const home = io.env.HOME ?? process.env.HOME;
+    const defaultLink = resolveDefaultContextPath(home);
+    if (dirname(env.contextDir) === dirname(defaultLink) && env.contextDir !== defaultLink) {
+      try {
+        await lstat(defaultLink); // throws if default doesn't exist at all
+      } catch {
+        // default doesn't exist — create symlink
+        try {
+          await symlink(env.contextDir, defaultLink);
+          if (!env.json) {
+            io.stdout(`Created default pointer: ${defaultLink} -> ${env.contextDir}\n`);
+          }
+        } catch {
+          // Non-fatal: symlink creation may fail in sandboxed or read-only environments
+        }
+      }
+    }
+
     if (env.json) {
       renderJson(io, {
         contextDir: env.contextDir,
