@@ -39,6 +39,7 @@ export async function loadDossier(
   project?: string,
   client?: string,
   model?: string,
+  role?: string,
 ): Promise<string> {
   const parts: string[] = [PREAMBLE];
   const effectiveClient = client ?? process.env.LOOM_CLIENT;
@@ -54,6 +55,15 @@ export async function loadDossier(
   const selfModel = await readOptional(join(contextDir, 'self-model.md'));
   if (selfModel) {
     parts.push("# Art's Capabilities & Focus\n\n" + selfModel.trim());
+  }
+
+  // Role addendum — the specific job this worker body does for Art. Lives in
+  // roles/<role>.md; the SAME mechanism identity() uses for reflection modes.
+  if (role) {
+    const roleBrief = await readOptional(join(contextDir, 'roles', `${role}.md`));
+    if (roleBrief) {
+      parts.push(`# Your Role: ${role}\n\n` + roleBrief.trim());
+    }
   }
 
   // Project-specific context
