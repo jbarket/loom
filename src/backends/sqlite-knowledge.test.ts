@@ -126,6 +126,38 @@ describe('SqliteKnowledgeBackend', () => {
     expect(updated!.sourcing).toBe('sourced'); // preserved
   });
 
+  it('upsert updates sourcing column — provisional page promoted by passing sourced on second write', async () => {
+    // First write: provisional (conversation-only)
+    await backend.writePage({
+      slug: 'sourcing-transition',
+      title: 'Sourcing Transition',
+      domain: 'test',
+      body: 'Initial body.',
+      sourcing: 'provisional',
+      citations: [
+        { claim: 'session note', source_kind: 'conversation', excerpt: 'we talked' },
+      ],
+    });
+
+    const before = await backend.getPage('sourcing-transition');
+    expect(before!.sourcing).toBe('provisional');
+
+    // Second write: promoted with a web citation
+    await backend.writePage({
+      slug: 'sourcing-transition',
+      title: 'Sourcing Transition',
+      domain: 'test',
+      body: 'Updated body with independent source.',
+      sourcing: 'sourced',
+      citations: [
+        { claim: 'web fact', source_kind: 'web', source_locator: 'https://example.com', excerpt: 'the fact' },
+      ],
+    });
+
+    const after = await backend.getPage('sourcing-transition');
+    expect(after!.sourcing).toBe('sourced');
+  });
+
   it('returns null for unknown slug', async () => {
     const page = await backend.getPage('nonexistent');
     expect(page).toBeNull();

@@ -56,7 +56,8 @@ export async function knowledgeMaintain(
       (p) => isConversationOnly(p) && p.status === 'active',
     );
 
-    return formatMaintainReport(pages.length, expansionCandidates, coldPages, misfiled, {
+    const activeCount = pages.filter((p) => p.status === 'active').length;
+    return formatMaintainReport(activeCount, expansionCandidates, coldPages, misfiled, {
       hitThreshold,
       bodyThreshold,
       coldDays: options.coldDays ?? 30,

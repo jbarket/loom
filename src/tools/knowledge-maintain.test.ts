@@ -192,4 +192,37 @@ describe('knowledgeMaintain', () => {
 
     expect(result).not.toMatch(/archived-thin/);
   });
+
+  it('total count excludes archived pages', async () => {
+    const backend = createKnowledgeBackend(tempDir);
+    try {
+      await backend.writePage({
+        slug: 'active-page',
+        title: 'Active Page',
+        domain: 'test',
+        body: 'Active body.',
+        sourcing: 'sourced',
+        citations: [
+          { claim: 'fact', source_kind: 'web', source_locator: 'https://example.com', excerpt: 'the fact' },
+        ],
+      });
+      await backend.writePage({
+        slug: 'archived-page',
+        title: 'Archived Page',
+        domain: 'test',
+        body: 'Archived body.',
+        sourcing: 'sourced',
+      });
+      const db = (backend as unknown as { ensureOpen(): unknown })['ensureOpen']() as {
+        prepare(sql: string): { run(...args: unknown[]): unknown };
+      };
+      db.prepare("UPDATE pages SET status = 'archived' WHERE slug = ?").run('archived-page');
+    } finally {
+      backend.close();
+    }
+
+    const result = await knowledgeMaintain(tempDir);
+    expect(result).toMatch(/Total active pages:.*1/);
+    expect(result).not.toMatch(/Total active pages:.*2/);
+  });
 });

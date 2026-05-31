@@ -100,6 +100,48 @@ describe('loom knowledge', () => {
       expect(parsed).toHaveProperty('slug');
       expect(parsed).toHaveProperty('title');
     });
+
+    it('--json with conversation-only citation stores page as provisional (§E1 gate)', async () => {
+      const { code } = await runCliCaptured([
+        'knowledge', 'write',
+        '--title', 'Conversation JSON Note',
+        '--domain', 'test',
+        '--body', 'A distilled conversation insight.',
+        '--citation', JSON.stringify({
+          claim: 'session insight',
+          source_kind: 'conversation',
+          source_locator: 'session/abc',
+          excerpt: 'we discussed this',
+        }),
+        '--context-dir', tempDir,
+        '--json',
+      ]);
+      expect(code).toBe(0);
+
+      // Read the stored page back and verify sourcing = provisional
+      const { stdout: recallOut, code: recallCode } = await runCliCaptured([
+        'knowledge', 'recall', 'Conversation JSON Note',
+        '--context-dir', tempDir,
+        '--json',
+      ]);
+      expect(recallCode).toBe(0);
+      const pages = JSON.parse(recallOut);
+      expect(pages).toHaveLength(1);
+      expect(pages[0].sourcing).toBe('provisional');
+    });
+
+    it('--json with no citations returns exit 1', async () => {
+      const { stderr, code } = await runCliCaptured([
+        'knowledge', 'write',
+        '--title', 'No Citations JSON',
+        '--domain', 'test',
+        '--body', 'Body without citations.',
+        '--context-dir', tempDir,
+        '--json',
+      ]);
+      expect(code).toBe(1);
+      expect(stderr).toMatch(/citation/i);
+    });
   });
 
   describe('recall', () => {

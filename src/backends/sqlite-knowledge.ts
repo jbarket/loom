@@ -63,12 +63,12 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
       if (existing) {
         uuid = existing.uuid;
         title = existing.title;
-        sourcing = 'sourced';
+        sourcing = input.sourcing ?? 'sourced';
         pageId = existing.id;
 
         db.prepare(
-          `UPDATE pages SET body = ?, updated = ? WHERE id = ?`,
-        ).run(input.body, timestamp, pageId);
+          `UPDATE pages SET body = ?, sourcing = ?, updated = ? WHERE id = ?`,
+        ).run(input.body, sourcing, timestamp, pageId);
       } else {
         uuid = randomUUID();
         title = input.title;
