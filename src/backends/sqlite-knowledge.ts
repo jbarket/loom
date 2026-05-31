@@ -215,6 +215,19 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
         `SELECT * FROM pages ${where} ORDER BY hit_count DESC, updated DESC, created DESC LIMIT ?`,
       ).all(...params) as KnowledgePage[];
 
+      // Stamp last_accessed + increment hit_count in a single transaction for all hits.
+      // This is the usage signal the Phase-4 expansion engine depends on.
+      if (rows.length > 0) {
+        const now = new Date().toISOString();
+        const stamp = db.prepare(
+          'UPDATE pages SET last_accessed = ?, hit_count = hit_count + 1 WHERE id = ?',
+        );
+        const tx = db.transaction((ids: number[]) => {
+          for (const id of ids) stamp.run(now, id);
+        });
+        tx(rows.map((r) => r.id));
+      }
+
       return Promise.resolve(rows.map((page) => ({
         ...page,
         citations: this.fetchCitationsForPage(db, page.id),

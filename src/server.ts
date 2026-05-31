@@ -25,6 +25,9 @@ import { restore } from './tools/restore.js';
 import { updateIdentity } from './tools/update-identity.js';
 import { bootstrap } from './tools/bootstrap.js';
 import { harnessInit } from './tools/harness.js';
+import { knowledgeWrite } from './tools/knowledge-write.js';
+import { knowledgeRecall } from './tools/knowledge-recall.js';
+import { knowledgeMaintain } from './tools/knowledge-maintain.js';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -320,6 +323,94 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     async ({ name, overwrite }) => {
       const text = await harnessInit(contextDir, { name, overwrite });
       return { content: [{ type: 'text' as const, text }] };
+    },
+  );
+
+  // ─── Knowledge ──────────────────────────────────────────────────────────────
+
+  server.tool(
+    'knowledge_write',
+    'Upsert an entity page by slug/title (create, or append/revise body in place). ' +
+    'Knowledge is true independent of Jonathan — if it is about Jonathan or our work, ' +
+    'store it in memory instead. ' +
+    'Epistemic gate (§E1): a page whose ONLY citation support is source_kind="conversation" ' +
+    'is stored provisional, not sourced. Requires at least one citation.',
+    {
+      title: z.string().describe('Page title — the entity name (e.g. "Mutable Instruments Rings")'),
+      domain: z.string().describe(
+        'Domain tag, e.g. "music/eurorack", "programming/typescript". ' +
+        'Hierarchical string; sub-domains queryable via prefix filter.',
+      ),
+      body: z.string().describe('Synthesized markdown body for the entity page (max 64 KB)'),
+      slug: z.string().optional().describe(
+        'Entity key for upsert — stable URL-safe identifier. ' +
+        'Derived from title if omitted.',
+      ),
+      citations: z.array(z.object({
+        claim: z.string().describe('The assertion this citation supports'),
+        source_kind: z.enum(['web', 'loom_memory', 'conversation']).describe(
+          'web = external URL; loom_memory = opaque memory ref; conversation = session distillation',
+        ),
+        source_locator: z.string().optional().describe('URL, memory ref, or session ID'),
+        excerpt: z.string().describe('Inline supporting quote — link-rot insurance (max 4 KB)'),
+      })).describe(
+        'Support citations. At least one required. ' +
+        'All-conversation support → page stored provisional.',
+      ),
+    },
+    async ({ title, domain, body, slug, citations }) => {
+      const result = await knowledgeWrite(contextDir, { title, domain, body, slug, citations });
+      return { content: [{ type: 'text' as const, text: result }] };
+    },
+  );
+
+  server.tool(
+    'knowledge_recall',
+    'Search the knowledge store with LIKE matching over title, body, and domain. ' +
+    'Never surfaces archived pages. Stamps last_accessed and increments hit_count ' +
+    'in a transaction on every hit (usage signal for the expansion engine). ' +
+    'Returns whole entity pages (the synthesis unit).',
+    {
+      query: z.string().optional().describe(
+        'Search terms — matched against title, body, and domain. ' +
+        'Omit to browse (returns all non-archived pages up to limit).',
+      ),
+      domain: z.string().optional().describe(
+        'Filter by domain prefix (e.g. "music" matches "music/eurorack", "music/theory")',
+      ),
+      limit: z.number().optional().describe('Maximum results to return (default: 10)'),
+    },
+    async ({ query, domain, limit }) => {
+      const result = await knowledgeRecall(contextDir, { query, domain, limit });
+      return { content: [{ type: 'text' as const, text: result }] };
+    },
+  );
+
+  server.tool(
+    'knowledge_maintain',
+    'Read-only health report for the knowledge store. Three branches: ' +
+    '(1) expansion candidates — thin body + high hit_count (needs deepening); ' +
+    '(2) cold pages — not accessed recently (unused or undiscovered); ' +
+    '(3) misfile audit — provisional sourcing or conversation-only citations ' +
+    '(should be in the memory store instead). Pair with knowledge_write to act on findings.',
+    {
+      expansion_hit_threshold: z.number().optional().describe(
+        'hit_count floor for expansion candidates (default 3)',
+      ),
+      thin_body_threshold: z.number().optional().describe(
+        'body char ceiling to consider a page thin (default 500)',
+      ),
+      cold_days: z.number().optional().describe(
+        'Days without access before a page is cold (default 30)',
+      ),
+    },
+    async ({ expansion_hit_threshold, thin_body_threshold, cold_days }) => {
+      const result = await knowledgeMaintain(contextDir, {
+        expansionHitThreshold: expansion_hit_threshold,
+        thinBodyThreshold: thin_body_threshold,
+        coldDays: cold_days,
+      });
+      return { content: [{ type: 'text' as const, text: result }] };
     },
   );
 

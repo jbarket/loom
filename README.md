@@ -49,6 +49,16 @@ an agent's persistent state:
 - **`bootstrap`** — initialize a fresh agent from a short interview.
 - **`harness_init`** — scaffold a harness manifest (a harness is the
   MCP-capable runtime the agent runs in: Claude Code, Codex, Gemini CLI, etc.).
+- **`knowledge_write`** — upsert an entity page by slug/title into the knowledge
+  store (a separate `knowledge.db`). Enforces the epistemic gate: a page whose
+  only support is conversation citations is stored `provisional`. Knowledge is
+  truth independent of the user; memories are about the user or your work.
+- **`knowledge_recall`** — LIKE search over title, body, and domain in the
+  knowledge store. Stamps usage stats (`last_accessed`, `hit_count`) in a
+  transaction on every hit. Never surfaces archived pages.
+- **`knowledge_maintain`** — read-only health report for the knowledge store:
+  expansion candidates (thin body + high hit_count), cold pages (not recently
+  accessed), and misfile audit (pages that belong in memory instead).
 
 Everything lives on disk as plain markdown plus a single SQLite file.
 No daemon, no external service, no GPU.
