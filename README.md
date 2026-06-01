@@ -64,6 +64,16 @@ an agent's persistent state:
 - **`knowledge_maintain`** — read-only health report for the knowledge store:
   expansion candidates (thin body + high hit_count), cold pages (not recently
   accessed), and misfile audit (pages that belong in memory instead).
+- **`knowledge_archive`** — soft-retire a knowledge page (sets `status='archived'`
+  with an optional tombstone note). Archived pages are excluded from recall and
+  maintain but remain recoverable via `knowledge_restore`.
+- **`knowledge_restore`** — return a previously archived knowledge page to active
+  status. Clears the archive flag and tombstone note.
+- **`knowledge_supersede`** — mark one page as superseded by another: archives
+  the old slug with a tombstone referencing the canonical slug, and records the
+  relationship in the `supersessions` table. The dedup-merge primitive: write the
+  canonical page with `knowledge_write`, then call `knowledge_supersede(loser →
+  canonical)`.
 
 Everything lives on disk as plain markdown plus a single SQLite file.
 No daemon, no external service, no GPU.

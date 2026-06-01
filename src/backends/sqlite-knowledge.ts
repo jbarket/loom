@@ -19,6 +19,12 @@ import type {
   KnowledgePageWithCitations,
   KnowledgeQueryInput,
   KnowledgeWriteResult,
+  KnowledgeArchiveInput,
+  KnowledgeArchiveResult,
+  KnowledgeRestoreInput,
+  KnowledgeRestoreResult,
+  KnowledgeSupersededInput,
+  KnowledgeSupersededResult,
 } from './types.js';
 
 /** Hard size caps — enforced at write boundary (design §A3). */
@@ -239,6 +245,104 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
     }
   }
 
+  archivePage(input: KnowledgeArchiveInput): Promise<KnowledgeArchiveResult> {
+    try {
+      const db = this.ensureOpen();
+      const timestamp = new Date().toISOString();
+
+      const page = db.prepare(
+        "SELECT id, status FROM pages WHERE slug = ?",
+      ).get(input.slug) as { id: number; status: string } | undefined;
+
+      if (!page || page.status === 'archived') {
+        return Promise.resolve({ slug: input.slug, archived: false });
+      }
+
+      db.prepare(
+        "UPDATE pages SET status = 'archived', tombstone_note = ?, updated = ? WHERE slug = ?",
+      ).run(input.note ?? null, timestamp, input.slug);
+
+      return Promise.resolve({ slug: input.slug, archived: true });
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  }
+
+  restorePage(input: KnowledgeRestoreInput): Promise<KnowledgeRestoreResult> {
+    try {
+      const db = this.ensureOpen();
+      const timestamp = new Date().toISOString();
+
+      const page = db.prepare(
+        "SELECT id, status FROM pages WHERE slug = ?",
+      ).get(input.slug) as { id: number; status: string } | undefined;
+
+      if (!page || page.status !== 'archived') {
+        return Promise.resolve({ slug: input.slug, restored: false });
+      }
+
+      db.prepare(
+        "UPDATE pages SET status = 'active', tombstone_note = NULL, updated = ? WHERE slug = ?",
+      ).run(timestamp, input.slug);
+
+      return Promise.resolve({ slug: input.slug, restored: true });
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  }
+
+  supersedePage(input: KnowledgeSupersededInput): Promise<KnowledgeSupersededResult> {
+    try {
+      const db = this.ensureOpen();
+
+      const oldPage = db.prepare(
+        "SELECT id, status FROM pages WHERE slug = ?",
+      ).get(input.old_slug) as { id: number; status: string } | undefined;
+
+      if (!oldPage) {
+        return Promise.reject(new Error(`supersedePage: old page not found: ${input.old_slug}`));
+      }
+
+      const newPage = db.prepare(
+        "SELECT id FROM pages WHERE slug = ?",
+      ).get(input.new_slug) as { id: number } | undefined;
+
+      if (!newPage) {
+        return Promise.reject(new Error(`supersedePage: new (canonical) page not found: ${input.new_slug}`));
+      }
+
+      if (oldPage.status === 'archived') {
+        return Promise.resolve({ old_slug: input.old_slug, new_slug: input.new_slug, archived: false });
+      }
+
+      const timestamp = new Date().toISOString();
+      const tombstoneNote = input.note
+        ? `Superseded by ${input.new_slug}. ${input.note}`
+        : `Superseded by ${input.new_slug}.`;
+
+      const tx = db.transaction(() => {
+        // Archive the old page with a tombstone.
+        db.prepare(
+          "UPDATE pages SET status = 'archived', tombstone_note = ?, updated = ? WHERE slug = ?",
+        ).run(tombstoneNote, timestamp, input.old_slug);
+
+        // Record the supersession.
+        db.prepare(
+          "INSERT INTO supersessions (old_slug, new_slug, note, created) VALUES (?, ?, ?, ?)",
+        ).run(input.old_slug, input.new_slug, input.note ?? null, timestamp);
+      });
+      tx();
+
+      return Promise.resolve({
+        old_slug: input.old_slug,
+        new_slug: input.new_slug,
+        archived: oldPage.status !== 'archived',
+      });
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  }
+
   addCitations(slug: string, citations: KnowledgeCitationInput[]): Promise<number> {
     try {
       const db = this.ensureOpen();
@@ -337,6 +441,15 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
         created        TEXT NOT NULL
       )`,
       `CREATE INDEX IF NOT EXISTS idx_citations_page ON citations(page_id)`,
+      `CREATE TABLE IF NOT EXISTS supersessions (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        old_slug  TEXT NOT NULL,
+        new_slug  TEXT NOT NULL,
+        note      TEXT,
+        created   TEXT NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_supersessions_old ON supersessions(old_slug)`,
+      `CREATE INDEX IF NOT EXISTS idx_supersessions_new ON supersessions(new_slug)`,
     ];
     for (const sql of statements) {
       this.db!.prepare(sql).run();
@@ -348,6 +461,9 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
     }
     if (!pageCols.includes('freshness_anchor')) {
       this.db!.prepare('ALTER TABLE pages ADD COLUMN freshness_anchor TEXT').run();
+    }
+    if (!pageCols.includes('tombstone_note')) {
+      this.db!.prepare('ALTER TABLE pages ADD COLUMN tombstone_note TEXT').run();
     }
   }
 }

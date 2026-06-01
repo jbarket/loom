@@ -249,6 +249,7 @@ export interface KnowledgePage {
   sourcing: string;
   provenance: string | null;
   status: string;
+  tombstone_note?: string | null;
   created: string;
   updated: string | null;
   last_accessed: string | null;
@@ -287,6 +288,52 @@ export interface KnowledgeWriteResult extends KnowledgePageRef {
   citationsAdded: number;
 }
 
+export interface KnowledgeArchiveInput {
+  slug: string;
+  /** Optional tombstone note explaining why the page was retired. */
+  note?: string;
+}
+
+export interface KnowledgeArchiveResult {
+  slug: string;
+  /** true if the page was found and archived; false if not found or already archived. */
+  archived: boolean;
+}
+
+export interface KnowledgeRestoreInput {
+  slug: string;
+}
+
+export interface KnowledgeRestoreResult {
+  slug: string;
+  /** true if the page was found in the archive and restored; false otherwise. */
+  restored: boolean;
+}
+
+export interface KnowledgeSupersededInput {
+  /** Slug of the page being retired (the duplicate / loser). */
+  old_slug: string;
+  /** Slug of the canonical replacement page (must already exist). */
+  new_slug: string;
+  /** Optional note explaining the merge/supersession decision. */
+  note?: string;
+}
+
+export interface KnowledgeSupersessionRecord {
+  id: number;
+  old_slug: string;
+  new_slug: string;
+  note: string | null;
+  created: string;
+}
+
+export interface KnowledgeSupersededResult {
+  old_slug: string;
+  new_slug: string;
+  /** true if the old page was archived as part of this operation. */
+  archived: boolean;
+}
+
 // ─── Knowledge Backend Interface ─────────────────────────────────────────────
 
 export interface KnowledgeBackend {
@@ -300,6 +347,12 @@ export interface KnowledgeBackend {
   queryPages(input: KnowledgeQueryInput): Promise<KnowledgePageWithCitations[]>;
   /** Add citations to an existing page by slug. */
   addCitations(slug: string, citations: KnowledgeCitationInput[]): Promise<number>;
+  /** Soft-retire a page: set status='archived' with an optional tombstone note. */
+  archivePage(input: KnowledgeArchiveInput): Promise<KnowledgeArchiveResult>;
+  /** Restore a previously archived page back to active. */
+  restorePage(input: KnowledgeRestoreInput): Promise<KnowledgeRestoreResult>;
+  /** Mark old_slug as superseded by new_slug, archive old_slug, and record the supersession. */
+  supersedePage(input: KnowledgeSupersededInput): Promise<KnowledgeSupersededResult>;
   /** Close the underlying SQLite connection. */
   close(): void;
 }
