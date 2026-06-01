@@ -92,4 +92,105 @@ describe('loom doctor', () => {
     expect(joined).toMatch(/myagent/);
     expect(joined).toMatch(/node/i);
   });
+
+  it('reports defaultStatus.exists=false when default does not exist', async () => {
+    const { io, out } = mkIo({ HOME: work });
+    const code = await run(['--json'], io);
+    expect(code).toBe(0);
+    const parsed = JSON.parse(out.join(''));
+    expect(parsed.defaultStatus).toBeDefined();
+    expect(parsed.defaultStatus.exists).toBe(false);
+    expect(parsed.defaultOk).toBe(false);
+  });
+
+  it('reports defaultOk=false when default is a real dir (not a symlink)', async () => {
+    const defaultDir = join(work, '.config', 'loom', 'default');
+    await mkdir(defaultDir, { recursive: true });
+    await writeFile(join(defaultDir, 'IDENTITY.md'), '# Default\n', 'utf-8');
+
+    const { io, out } = mkIo({ HOME: work });
+    const code = await run(['--json'], io);
+    expect(code).toBe(0);
+    const parsed = JSON.parse(out.join(''));
+    expect(parsed.defaultStatus.exists).toBe(true);
+    expect(parsed.defaultStatus.isSymlink).toBe(false);
+    expect(parsed.defaultOk).toBe(false);
+  });
+
+  it('reports defaultOk=true when default is a valid symlink with IDENTITY.md', async () => {
+    const agentDir = join(work, '.config', 'loom', 'art');
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(join(agentDir, 'IDENTITY.md'), '# Art\n', 'utf-8');
+    const defaultLink = join(work, '.config', 'loom', 'default');
+    const { symlink } = await import('node:fs/promises');
+    await symlink(agentDir, defaultLink);
+
+    const { io, out } = mkIo({ HOME: work });
+    const code = await run(['--json'], io);
+    expect(code).toBe(0);
+    const parsed = JSON.parse(out.join(''));
+    expect(parsed.defaultStatus.isSymlink).toBe(true);
+    expect(parsed.defaultStatus.target).toBe(agentDir);
+    expect(parsed.defaultStatus.dangling).toBe(false);
+    expect(parsed.defaultStatus.empty).toBe(false);
+    expect(parsed.defaultOk).toBe(true);
+  });
+
+  it('reports dangling=true when default symlink points to a nonexistent target', async () => {
+    const loomRoot = join(work, '.config', 'loom');
+    await mkdir(loomRoot, { recursive: true });
+    const defaultLink = join(loomRoot, 'default');
+    const { symlink } = await import('node:fs/promises');
+    await symlink('/nonexistent/path', defaultLink);
+
+    const { io, out } = mkIo({ HOME: work });
+    const code = await run(['--json'], io);
+    expect(code).toBe(0);
+    const parsed = JSON.parse(out.join(''));
+    expect(parsed.defaultStatus.isSymlink).toBe(true);
+    expect(parsed.defaultStatus.dangling).toBe(true);
+    expect(parsed.defaultOk).toBe(false);
+  });
+
+  it('reports empty=true when default symlink target has no IDENTITY.md', async () => {
+    const agentDir = join(work, '.config', 'loom', 'art');
+    await mkdir(agentDir, { recursive: true }); // no IDENTITY.md
+    const defaultLink = join(work, '.config', 'loom', 'default');
+    const { symlink } = await import('node:fs/promises');
+    await symlink(agentDir, defaultLink);
+
+    const { io, out } = mkIo({ HOME: work });
+    const code = await run(['--json'], io);
+    expect(code).toBe(0);
+    const parsed = JSON.parse(out.join(''));
+    expect(parsed.defaultStatus.isSymlink).toBe(true);
+    expect(parsed.defaultStatus.empty).toBe(true);
+    expect(parsed.defaultOk).toBe(false);
+  });
+
+  it('excludes the default symlink from existingAgents', async () => {
+    const agentDir = join(work, '.config', 'loom', 'art');
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(join(agentDir, 'IDENTITY.md'), '# Art\n', 'utf-8');
+    const defaultLink = join(work, '.config', 'loom', 'default');
+    const { symlink } = await import('node:fs/promises');
+    await symlink(agentDir, defaultLink);
+
+    const { io, out } = mkIo({ HOME: work });
+    const code = await run(['--json'], io);
+    expect(code).toBe(0);
+    const parsed = JSON.parse(out.join(''));
+    // 'default' should not appear in existingAgents — only 'art'
+    expect(parsed.existingAgents.map((a: { name: string }) => a.name)).not.toContain('default');
+    expect(parsed.existingAgents).toHaveLength(1);
+    expect(parsed.existingAgents[0].name).toBe('art');
+  });
+
+  it('human-readable output flags missing default', async () => {
+    const { io, out } = mkIo({ HOME: work });
+    const code = await run([], io);
+    expect(code).toBe(0);
+    const joined = out.join('');
+    expect(joined).toMatch(/default:.*FAIL/);
+  });
 });

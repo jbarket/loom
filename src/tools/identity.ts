@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import { loadClientAdapter } from '../clients.js';
 import * as harnessBlock from '../blocks/harness.js';
 import * as modelBlock from '../blocks/model.js';
+import { resolveDefaultContextPath } from '../config.js';
 
 async function readOptional(path: string): Promise<string | null> {
   try {
@@ -28,15 +29,27 @@ export async function loadIdentity(
   client?: string,
   model?: string,
   role?: string,
+  /** Override the default context path — used in unit tests only. */
+  _defaultPathForTest?: string,
 ): Promise<string> {
   const parts: string[] = [];
   const effectiveClient = client ?? process.env.LOOM_CLIENT;
   const effectiveModel = model ?? process.env.LOOM_MODEL;
 
+  const defaultPath = _defaultPathForTest ?? resolveDefaultContextPath();
+
   // Terminal creed — the immutable identity
   const creed = await readOptional(join(contextDir, 'IDENTITY.md'));
   if (creed) {
     parts.push('# Identity\n\n' + creed.trim());
+  } else if (contextDir === defaultPath) {
+    // Default fallback path with no creed: refuse to serve a blank identity.
+    // An explicit LOOM_CONTEXT_DIR pointing at an empty dir is allowed (opt-in);
+    // a silent default fallback is not.
+    throw new Error(
+      'no loom context configured — refusing to serve a blank identity. ' +
+      'Set LOOM_CONTEXT_DIR or run `loom bootstrap` to initialize an agent.',
+    );
   } else {
     parts.push(
       '# Identity\n\n' +

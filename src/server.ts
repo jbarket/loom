@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { assertStackVersionCompatible, resolveRepoRoot } from './config.js';
+import { assertStackVersionCompatible, assertContextBootable, resolveRepoRoot } from './config.js';
 import { loadIdentity } from './tools/identity.js';
 import { loadDossier } from './tools/dossier.js';
 import { remember } from './tools/remember.js';
@@ -47,6 +47,9 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
 
   // Refuse to boot against a stack this loom build doesn't understand.
   assertStackVersionCompatible(contextDir);
+
+  // Refuse to serve a blank identity from the default fallback path.
+  assertContextBootable(contextDir);
 
   const pkg = JSON.parse(readFileSync(join(resolveRepoRoot(), 'package.json'), 'utf-8')) as { version: string };
   const server = new McpServer({

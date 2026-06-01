@@ -19,6 +19,15 @@ import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 
+/**
+ * The single canonical helper for the default context path. Every call
+ * site that needs `~/.config/loom/default` must go through this —
+ * no more duplicated literals in config.ts / args.ts / doctor.ts.
+ */
+export function resolveDefaultContextPath(home?: string): string {
+  return resolve(home ?? homedir(), '.config', 'loom', 'default');
+}
+
 export function resolveContextDir(): string {
   if (process.env.LOOM_CONTEXT_DIR) {
     return resolve(process.env.LOOM_CONTEXT_DIR);
@@ -29,7 +38,32 @@ export function resolveContextDir(): string {
     return resolve(process.argv[argIdx + 1]);
   }
 
-  return resolve(homedir(), '.config', 'loom', 'default');
+  return resolveDefaultContextPath();
+}
+
+/**
+ * Throws if the context dir is the default fallback path AND it has no
+ * IDENTITY.md. This is the "fail loud instead of silent fallback" guard —
+ * a blank-identity boot is only permitted when the caller explicitly opted
+ * in via LOOM_CONTEXT_DIR or --context-dir pointing at a real (even empty)
+ * dir. A missing/dangling/empty default must never silently serve a fresh-
+ * agent skeleton.
+ *
+ * @param contextDir  The resolved context dir to validate.
+ * @param defaultPath Override the default path (used in unit tests to avoid
+ *                    depending on the real homedir).
+ */
+export function assertContextBootable(
+  contextDir: string,
+  defaultPath: string = resolveDefaultContextPath(),
+): void {
+  if (contextDir !== defaultPath) return;
+  if (!existsSync(resolve(contextDir, 'IDENTITY.md'))) {
+    throw new Error(
+      'no loom context configured — refusing to serve a blank identity. ' +
+      'Set LOOM_CONTEXT_DIR or run `loom bootstrap` to initialize an agent.',
+    );
+  }
 }
 
 /**
