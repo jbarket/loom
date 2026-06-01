@@ -39,6 +39,7 @@ import type {
 } from './types.js';
 import { computeExpiresAt, isExpired } from './ttl.js';
 import { globToMatcher } from './glob.js';
+import { runMigrations } from './migrations.js';
 
 function slugify(text: string): string {
   return text
@@ -621,7 +622,6 @@ export class SqliteVecBackend implements MemoryBackend {
       `CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category)`,
       `CREATE INDEX IF NOT EXISTS idx_memories_project  ON memories(project)`,
       `CREATE INDEX IF NOT EXISTS idx_memories_ref      ON memories(ref)`,
-      `CREATE INDEX IF NOT EXISTS idx_memories_archived ON memories(archived)`,
       `CREATE VIRTUAL TABLE IF NOT EXISTS vec_memories USING vec0(
         embedding float[${this.embedder.dimensions}] distance_metric=cosine
       )`,
@@ -629,17 +629,9 @@ export class SqliteVecBackend implements MemoryBackend {
     for (const sql of statements) {
       this.db.prepare(sql).run();
     }
-    // Migration: add archive columns to existing databases.
-    // SQLite doesn't support IF NOT EXISTS on ALTER TABLE; catch the duplicate-column error.
-    for (const migration of [
-      'ALTER TABLE memories ADD COLUMN archived INTEGER NOT NULL DEFAULT 0',
-      'ALTER TABLE memories ADD COLUMN archive_note TEXT',
-    ]) {
-      try { this.db.prepare(migration).run(); } catch { /* column already exists */ }
-    }
-    try {
-      this.db.prepare('CREATE INDEX IF NOT EXISTS idx_memories_archived ON memories(archived)').run();
-    } catch { /* index already exists */ }
+    // Apply pending schema migrations. Throws on failure so a bad migration
+    // aborts startup loudly rather than leaving memory half-broken.
+    runMigrations(this.db, { strict: true });
   }
 
   private deleteById(ids: number[]): void {

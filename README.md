@@ -274,6 +274,23 @@ loom inject --all >/dev/null 2>&1 || true
 
 Idempotent; cheap (no-op when already up to date); silent on success.
 
+### `loom migrate` — apply pending schema migrations
+
+`loom migrate` inspects `memories.db` for missing columns or indexes and
+applies any pending schema changes. It is idempotent — safe to run
+repeatedly and on already-up-to-date databases. Use `--dry-run` to see
+what would change without touching the file. Exits non-zero if any
+migration fails so the error surfaces immediately rather than leaving the
+database half-broken.
+
+Run this after deploying a new loom build that adds schema columns:
+
+```bash
+loom migrate
+loom migrate --dry-run   # check without applying
+loom migrate --json      # machine-readable output
+```
+
 ### `loom harness init` — scaffold a harness manifest
 
 `loom harness init <name>` writes `<context>/harnesses/<name>.md` from

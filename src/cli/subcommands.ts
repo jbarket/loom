@@ -7,7 +7,7 @@ export const SUBCOMMANDS = [
   'wake', 'recall', 'remember', 'forget', 'update',
   'memory', 'update-identity', 'bootstrap', 'serve',
   'inject', 'harness',
-  'install', 'doctor',
+  'install', 'doctor', 'migrate',
 ] as const;
 
 export type Subcommand = typeof SUBCOMMANDS[number];
