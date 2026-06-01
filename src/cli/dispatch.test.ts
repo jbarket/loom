@@ -32,6 +32,12 @@ describe('runCli top-level dispatch', () => {
     expect(code).toBe(0);
     expect(stdout).toMatch(/loom doctor/);
   });
+
+  it('routes `migrate` to migrate.run', async () => {
+    const { stdout, code } = await runCliCaptured(['migrate', '--help']);
+    expect(code).toBe(0);
+    expect(stdout).toMatch(/loom migrate/);
+  });
 });
 
 import { isCliInvocation } from '../index.js';
