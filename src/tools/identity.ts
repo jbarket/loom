@@ -27,6 +27,7 @@ export async function loadIdentity(
   project?: string,
   client?: string,
   model?: string,
+  role?: string,
 ): Promise<string> {
   const parts: string[] = [];
   const effectiveClient = client ?? process.env.LOOM_CLIENT;
@@ -53,6 +54,16 @@ export async function loadIdentity(
   const selfModel = await readOptional(join(contextDir, 'self-model.md'));
   if (selfModel) {
     parts.push('# Self-Model\n\n' + selfModel.trim());
+  }
+
+  // Mode addendum — when Art is dispatched into a reflection mode (wonder,
+  // tend, retro, consolidate, identity), append that mode's playbook. The SAME
+  // mechanism dossier() uses for worker roles; lives in roles/<role>.md.
+  if (role) {
+    const modeBrief = await readOptional(join(contextDir, 'roles', `${role}.md`));
+    if (modeBrief) {
+      parts.push(`# Mode: ${role}\n\n` + modeBrief.trim());
+    }
   }
 
   // Project-specific context

@@ -27,13 +27,18 @@ To play locally: `asciinema play assets/demo.cast`
 
 ## What it is
 
-A Model Context Protocol server exposing twelve tools that read and write
+A Model Context Protocol server exposing thirteen tools that read and write
 an agent's persistent state:
 
 - **`identity`** — loads the terminal creed — the free-form markdown document
   that defines who the agent is (values, voice, purpose) — along with
   preferences, self-model (running self-knowledge), and a client-specific
   adapter on session start. Call this first.
+- **`dossier`** — loads Art's operating brief for a **worker body** — a body
+  that executes tasks on Art's behalf but is NOT Art. Returns preferences and
+  self-model reframed in the third person, plus an explicit push-back mandate:
+  workers are expected to refuse bad work and say why, including requests from
+  Art or Jonathan. Does not include the terminal creed (`IDENTITY.md`).
 - **`remember` / `recall` / `update` / `forget`** — episodic memory with
   semantic (vector) recall, optional TTL, and category filtering.
 - **`memory_list` / `memory_prune`** — browse and maintain the store.
