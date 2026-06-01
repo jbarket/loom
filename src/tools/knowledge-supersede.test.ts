@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { knowledgeSupersede } from './knowledge-supersede.js';
 import { knowledgeWrite } from './knowledge-write.js';
+import { knowledgeArchive } from './knowledge-archive.js';
 import { createKnowledgeBackend } from '../backends/index.js';
 
 describe('knowledgeSupersede', () => {
@@ -84,7 +85,7 @@ describe('knowledgeSupersede', () => {
     const backend = createKnowledgeBackend(tempDir);
     try {
       const page = await backend.getPage('old-slug');
-      const note = (page as unknown as { tombstone_note: string }).tombstone_note;
+      const note = page!.tombstone_note;
       expect(note).toMatch(/new-slug/);
       expect(note).toMatch(/merged during triage/);
     } finally {
@@ -100,7 +101,7 @@ describe('knowledgeSupersede', () => {
     const backend = createKnowledgeBackend(tempDir);
     try {
       const page = await backend.getPage('dup-a');
-      const note = (page as unknown as { tombstone_note: string }).tombstone_note;
+      const note = page!.tombstone_note;
       expect(note).toMatch(/dup-canonical/);
     } finally {
       backend.close();
@@ -135,6 +136,30 @@ describe('knowledgeSupersede', () => {
     });
     expect(result).toMatch(/Error/i);
     expect(result).toMatch(/different/i);
+  });
+
+  it('returns already-archived message and does not overwrite tombstone when old_slug is already archived', async () => {
+    await seedPage('pre-archived');
+    await seedPage('canonical-already');
+    // Archive first with a known note so we can detect if supersede overwrites it.
+    await knowledgeArchive(tempDir, { slug: 'pre-archived', note: 'original archive note' });
+
+    const result = await knowledgeSupersede(tempDir, {
+      old_slug: 'pre-archived',
+      new_slug: 'canonical-already',
+    });
+
+    expect(result).toMatch(/already archived/i);
+
+    // Tombstone note must not have been overwritten by the supersede call.
+    const backend = createKnowledgeBackend(tempDir);
+    try {
+      const page = await backend.getPage('pre-archived');
+      expect(page!.tombstone_note).toMatch(/original archive note/);
+      expect(page!.tombstone_note).not.toMatch(/canonical-already/);
+    } finally {
+      backend.close();
+    }
   });
 
   it('old_slug is excluded from recall after supersession', async () => {

@@ -73,7 +73,7 @@ describe('knowledgeArchive', () => {
     const backend = createKnowledgeBackend(tempDir);
     try {
       const page = await backend.getPage('tides');
-      expect((page as unknown as { tombstone_note: string }).tombstone_note).toBe('superseded by tides-v2');
+      expect(page!.tombstone_note).toBe('superseded by tides-v2');
     } finally {
       backend.close();
     }

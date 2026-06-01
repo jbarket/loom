@@ -249,6 +249,7 @@ export interface KnowledgePage {
   sourcing: string;
   provenance: string | null;
   status: string;
+  tombstone_note?: string | null;
   created: string;
   updated: string | null;
   last_accessed: string | null;

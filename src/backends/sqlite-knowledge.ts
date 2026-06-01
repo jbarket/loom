@@ -311,6 +311,10 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
         return Promise.reject(new Error(`supersedePage: new (canonical) page not found: ${input.new_slug}`));
       }
 
+      if (oldPage.status === 'archived') {
+        return Promise.resolve({ old_slug: input.old_slug, new_slug: input.new_slug, archived: false });
+      }
+
       const timestamp = new Date().toISOString();
       const tombstoneNote = input.note
         ? `Superseded by ${input.new_slug}. ${input.note}`
