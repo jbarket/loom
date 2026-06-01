@@ -213,8 +213,12 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
       const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
       params.push(limit);
 
+      const orderBy = input.sortByVerified
+        ? 'ORDER BY verified_at ASC NULLS FIRST'
+        : 'ORDER BY hit_count DESC, updated DESC, created DESC';
+
       const rows = db.prepare(
-        `SELECT * FROM pages ${where} ORDER BY hit_count DESC, updated DESC, created DESC LIMIT ?`,
+        `SELECT * FROM pages ${where} ${orderBy} LIMIT ?`,
       ).all(...params) as KnowledgePage[];
 
       // Stamp last_accessed + increment hit_count in a single transaction for all hits.

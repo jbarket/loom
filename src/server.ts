@@ -422,9 +422,13 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
         'Filter by domain prefix (e.g. "music" matches "music/eurorack", "music/theory")',
       ),
       limit: z.number().optional().describe('Maximum results to return (default: 10)'),
+      sort_by_verified: z.boolean().optional().describe(
+        'When true, sort by verified_at ASC NULLS FIRST (never-verified pages first, then oldest-verified). ' +
+        'Use with limit to pull the stalest N pages for freshness-SLA verification.',
+      ),
     },
-    async ({ query, domain, limit }) => {
-      const result = await knowledgeRecall(contextDir, { query, domain, limit });
+    async ({ query, domain, limit, sort_by_verified }) => {
+      const result = await knowledgeRecall(contextDir, { query, domain, limit, sortByVerified: sort_by_verified });
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );

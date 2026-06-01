@@ -253,6 +253,8 @@ export interface KnowledgePage {
   updated: string | null;
   last_accessed: string | null;
   hit_count: number;
+  verified_at: string | null;
+  freshness_anchor: string | null;
 }
 
 export interface KnowledgeCitation {
@@ -275,6 +277,7 @@ export interface KnowledgeQueryInput {
   domain?: string;
   excludeStatus?: string;
   limit?: number;
+  sortByVerified?: boolean;
 }
 
 export interface KnowledgePageRef {

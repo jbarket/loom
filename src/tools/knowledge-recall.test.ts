@@ -130,4 +130,45 @@ describe('knowledgeRecall', () => {
     expect(result).toMatch(/Alpha/);
     expect(result).toMatch(/Beta/);
   });
+
+  it('sort_by_verified: true returns never-verified pages first, then oldest-verified first', async () => {
+    await seedPage('page-never', 'test', 'Never Verified', 'Never been verified.');
+    await seedPage('page-old', 'test', 'Old Verified', 'Verified a long time ago.');
+    await seedPage('page-recent', 'test', 'Recent Verified', 'Verified recently.');
+
+    // knowledgeWrite stamps verified_at = NOW() on every write, so manually set the test values.
+    const backend = createKnowledgeBackend(tempDir);
+    try {
+      const db = (backend as unknown as { ensureOpen(): unknown })['ensureOpen']() as {
+        prepare(sql: string): { run(...args: unknown[]): unknown };
+      };
+      db.prepare("UPDATE pages SET verified_at = NULL WHERE slug = ?").run('page-never');
+      db.prepare("UPDATE pages SET verified_at = '2026-01-01T00:00:00Z' WHERE slug = ?").run('page-old');
+      db.prepare("UPDATE pages SET verified_at = '2026-06-01T00:00:00Z' WHERE slug = ?").run('page-recent');
+    } finally {
+      backend.close();
+    }
+
+    const result = await knowledgeRecall(tempDir, { sortByVerified: true, limit: 3 });
+
+    const neverPos = result.indexOf('Never Verified');
+    const oldPos = result.indexOf('Old Verified');
+    const recentPos = result.indexOf('Recent Verified');
+
+    // NULL verified_at sorts first (NULLS FIRST), then oldest timestamp, then newest
+    expect(neverPos).toBeLessThan(oldPos);
+    expect(oldPos).toBeLessThan(recentPos);
+  });
+
+  it('sort_by_verified: true respects the limit ceiling', async () => {
+    for (let i = 0; i < 5; i++) {
+      await seedPage(`page-${i}`, 'test', `Page ${i}`, `Content ${i}.`);
+    }
+
+    const result = await knowledgeRecall(tempDir, { sortByVerified: true, limit: 2 });
+
+    // Only 2 pages should appear (the limit is enforced at query layer)
+    const matches = result.match(/^## /gm);
+    expect(matches).toHaveLength(2);
+  });
 });

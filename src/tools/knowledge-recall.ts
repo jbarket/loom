@@ -12,12 +12,14 @@ export interface KnowledgeRecallInput {
   query?: string;
   domain?: string;
   limit?: number;
+  sortByVerified?: boolean;
 }
 
 function formatPage(page: KnowledgePageWithCitations): string {
   const lines: string[] = [];
   lines.push(`## ${page.title}`);
   lines.push(`**Slug:** \`${page.slug}\` | **Domain:** ${page.domain} | **Sourcing:** ${page.sourcing}`);
+  lines.push(`**Verified:** ${page.verified_at ?? 'never'} | **Freshness anchor:** ${page.freshness_anchor ?? 'none'}`);
   if (page.sourcing === 'provisional') {
     lines.push('> ⚠️ Provisional — needs independent citation to be sourced.');
   }
@@ -48,6 +50,7 @@ export async function knowledgeRecall(
       domain: input.domain,
       excludeStatus: 'archived',
       limit: input.limit ?? 10,
+      sortByVerified: input.sortByVerified,
     });
 
     if (pages.length === 0) {
