@@ -29,6 +29,9 @@ import { harnessInit } from './tools/harness.js';
 import { knowledgeWrite } from './tools/knowledge-write.js';
 import { knowledgeRecall } from './tools/knowledge-recall.js';
 import { knowledgeMaintain } from './tools/knowledge-maintain.js';
+import { knowledgeArchive } from './tools/knowledge-archive.js';
+import { knowledgeRestore } from './tools/knowledge-restore.js';
+import { knowledgeSupersede } from './tools/knowledge-supersede.js';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -453,6 +456,55 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
         thinBodyThreshold: thin_body_threshold,
         coldDays: cold_days,
       });
+      return { content: [{ type: 'text' as const, text: result }] };
+    },
+  );
+
+  server.tool(
+    'knowledge_archive',
+    'Soft-retire a knowledge page: set its status to archived with an optional tombstone note. ' +
+    'Archived pages are excluded from knowledge_recall and knowledge_maintain but remain ' +
+    'in the database and are fully recoverable via knowledge_restore. ' +
+    'Use this instead of deletion when the page may need to be audited or recovered. ' +
+    'For deduplication merges, prefer knowledge_supersede which archives and records the relationship.',
+    {
+      slug: z.string().describe('Slug of the knowledge page to archive'),
+      note: z.string().optional().describe('Tombstone note: why this page is being retired'),
+    },
+    async ({ slug, note }) => {
+      const result = await knowledgeArchive(contextDir, { slug, note });
+      return { content: [{ type: 'text' as const, text: result }] };
+    },
+  );
+
+  server.tool(
+    'knowledge_restore',
+    'Restore a previously archived knowledge page back to active status. ' +
+    'Clears the archive flag and tombstone note. The page becomes visible ' +
+    'to knowledge_recall and knowledge_maintain again.',
+    {
+      slug: z.string().describe('Slug of the archived knowledge page to restore'),
+    },
+    async ({ slug }) => {
+      const result = await knowledgeRestore(contextDir, { slug });
+      return { content: [{ type: 'text' as const, text: result }] };
+    },
+  );
+
+  server.tool(
+    'knowledge_supersede',
+    'Mark one knowledge page as superseded by another, then archive the old page. ' +
+    'Records the supersession relationship in the supersessions table. ' +
+    'This is the dedup-merge primitive: write the canonical page with knowledge_write, ' +
+    'then call knowledge_supersede(old_slug=loser, new_slug=canonical). ' +
+    'Both pages must already exist. old_slug is archived with a tombstone pointing to new_slug.',
+    {
+      old_slug: z.string().describe('Slug of the page being retired (the duplicate or loser)'),
+      new_slug: z.string().describe('Slug of the canonical replacement page (must already exist)'),
+      note: z.string().optional().describe('Optional note explaining the merge or supersession decision'),
+    },
+    async ({ old_slug, new_slug, note }) => {
+      const result = await knowledgeSupersede(contextDir, { old_slug, new_slug, note });
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );
