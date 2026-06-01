@@ -384,6 +384,11 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
         'Entity key for upsert — stable URL-safe identifier. ' +
         'Derived from title if omitted.',
       ),
+      freshness_anchor: z.string().optional().describe(
+        'The version/date the page\'s claims are valid as-of — e.g. "Syntakt OS 1.21" for a ' +
+        'device, or "as of 2026-05" for a topic. Drives the verification engine: a page is ' +
+        're-verified when this anchor moves or the freshness SLA elapses.',
+      ),
       citations: z.array(z.object({
         claim: z.string().describe('The assertion this citation supports'),
         source_kind: z.enum(['web', 'loom_memory', 'conversation']).describe(
@@ -396,8 +401,8 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
         'All-conversation support → page stored provisional.',
       ),
     },
-    async ({ title, domain, body, slug, citations }) => {
-      const result = await knowledgeWrite(contextDir, { title, domain, body, slug, citations });
+    async ({ title, domain, body, slug, freshness_anchor, citations }) => {
+      const result = await knowledgeWrite(contextDir, { title, domain, body, slug, freshness_anchor, citations });
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );

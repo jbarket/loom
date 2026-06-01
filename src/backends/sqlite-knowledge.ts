@@ -67,15 +67,15 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
         pageId = existing.id;
 
         db.prepare(
-          `UPDATE pages SET body = ?, sourcing = ?, updated = ? WHERE id = ?`,
-        ).run(input.body, sourcing, timestamp, pageId);
+          `UPDATE pages SET body = ?, sourcing = ?, verified_at = ?, freshness_anchor = COALESCE(?, freshness_anchor), updated = ? WHERE id = ?`,
+        ).run(input.body, sourcing, input.verified_at ?? timestamp, input.freshness_anchor ?? null, timestamp, pageId);
       } else {
         uuid = randomUUID();
         title = input.title;
         sourcing = input.sourcing ?? 'sourced';
         const result = db.prepare(
-          `INSERT INTO pages (uuid, slug, title, domain, body, sourcing, provenance, created, updated)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO pages (uuid, slug, title, domain, body, sourcing, provenance, verified_at, freshness_anchor, created, updated)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(
           uuid,
           input.slug,
@@ -84,6 +84,8 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
           input.body,
           sourcing,
           input.provenance ?? null,
+          input.verified_at ?? timestamp,
+          input.freshness_anchor ?? null,
           timestamp,
           timestamp,
         );
@@ -317,7 +319,9 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
         created       TEXT NOT NULL,
         updated       TEXT,
         last_accessed TEXT,
-        hit_count     INTEGER NOT NULL DEFAULT 0
+        hit_count     INTEGER NOT NULL DEFAULT 0,
+        verified_at   TEXT,
+        freshness_anchor TEXT
       )`,
       `CREATE INDEX IF NOT EXISTS idx_pages_domain ON pages(domain)`,
       `CREATE INDEX IF NOT EXISTS idx_pages_slug ON pages(slug)`,
@@ -336,6 +340,14 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
     ];
     for (const sql of statements) {
       this.db!.prepare(sql).run();
+    }
+    // Idempotent migrations for existing DBs (ALTER ADD COLUMN has no IF NOT EXISTS).
+    const pageCols = (this.db!.prepare('PRAGMA table_info(pages)').all() as Array<{ name: string }>).map((c) => c.name);
+    if (!pageCols.includes('verified_at')) {
+      this.db!.prepare('ALTER TABLE pages ADD COLUMN verified_at TEXT').run();
+    }
+    if (!pageCols.includes('freshness_anchor')) {
+      this.db!.prepare('ALTER TABLE pages ADD COLUMN freshness_anchor TEXT').run();
     }
   }
 }

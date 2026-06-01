@@ -225,6 +225,10 @@ export interface KnowledgePageInput {
   body: string;
   sourcing?: 'sourced' | 'provisional';
   provenance?: string;
+  /** ISO timestamp the page's claims were last verified as true. Defaults to write time. */
+  verified_at?: string;
+  /** The version/date the claims are valid as-of, e.g. "Syntakt OS 1.21" or "as of 2026-05". */
+  freshness_anchor?: string;
   citations?: KnowledgeCitationInput[];
 }
 

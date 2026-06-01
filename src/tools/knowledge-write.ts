@@ -13,6 +13,7 @@ export interface KnowledgeWriteInput {
   title: string;
   body: string;
   slug?: string;
+  freshness_anchor?: string;
   citations: Array<{
     claim: string;
     source_kind: 'web' | 'loom_memory' | 'conversation';
@@ -63,6 +64,7 @@ export async function knowledgeWrite(
       domain: input.domain,
       body: input.body,
       sourcing,
+      freshness_anchor: input.freshness_anchor,
       citations: input.citations,
     });
 
