@@ -365,6 +365,33 @@ export interface KnowledgeMoveResult {
   pointers_written: number;
 }
 
+export interface KnowledgeMergeInput {
+  /** Slugs of the pages to merge into the target (all must exist and differ from target_slug). */
+  source_slugs: string[];
+  /** Slug of the canonical target page that survives (must already exist). */
+  target_slug: string;
+  /** Optional note about this merge, stored in supersession tombstones on the losers. */
+  note?: string;
+  /** Phase 3 stub — not yet available. Pass true to opt into hard deletion of losers once Phase 3 ships. */
+  hard_delete_losers?: boolean;
+  /** Append loser bodies to the target body under section markers. Default false. */
+  append_loser_bodies?: boolean;
+}
+
+export interface KnowledgeMergeLoserRecord {
+  slug: string;
+  body: string;
+}
+
+export interface KnowledgeMergeResult {
+  target_slug: string;
+  sources_merged: number;
+  citations_moved: number;
+  citations_deduped: number;
+  verified_at: string;
+  losers: KnowledgeMergeLoserRecord[];
+}
+
 // ─── Knowledge Backend Interface ─────────────────────────────────────────────
 
 export interface KnowledgeBackend {
@@ -386,6 +413,8 @@ export interface KnowledgeBackend {
   supersedePage(input: KnowledgeSupersededInput): Promise<KnowledgeSupersededResult>;
   /** Re-key or re-domain a page in place: change slug and/or domain atomically without creating a new row. */
   movePage(input: KnowledgeMoveInput): Promise<KnowledgeMoveResult>;
+  /** Consolidate N source pages into one canonical target: re-parent citations (dedup), take MAX(verified_at), supersede losers. */
+  mergePages(input: KnowledgeMergeInput): Promise<KnowledgeMergeResult>;
   /** Close the underlying SQLite connection. */
   close(): void;
 }

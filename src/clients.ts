@@ -23,7 +23,7 @@ export const TOOLS = [
   'memory_archive', 'memory_restore',
   'update_identity', 'bootstrap', 'harness_init',
   'knowledge_write', 'knowledge_recall', 'knowledge_maintain',
-  'knowledge_archive', 'knowledge_restore', 'knowledge_supersede', 'knowledge_move',
+  'knowledge_archive', 'knowledge_restore', 'knowledge_supersede', 'knowledge_move', 'knowledge_merge',
 ];
 
 function toolList(prefix: string): string {

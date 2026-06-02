@@ -28,6 +28,8 @@ import type {
   KnowledgeMoveInput,
   KnowledgeMoveResult,
   KnowledgeMovedPageRecord,
+  KnowledgeMergeInput,
+  KnowledgeMergeResult,
 } from './types.js';
 
 /** Hard size caps — enforced at write boundary (design §A3). */
@@ -475,6 +477,150 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
           new_domain: input.new_domain ?? oldDomain,
         }],
         pointers_written: pointersWritten,
+      });
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  }
+
+  mergePages(input: KnowledgeMergeInput): Promise<KnowledgeMergeResult> {
+    try {
+      const db = this.ensureOpen();
+
+      if (!input.source_slugs || input.source_slugs.length === 0) {
+        return Promise.reject(new Error('mergePages: source_slugs must not be empty'));
+      }
+
+      if (input.hard_delete_losers) {
+        return Promise.reject(new Error(
+          'mergePages: hard_delete_losers is not yet available — stub reserved for Phase 3',
+        ));
+      }
+
+      type PageRow = { id: number; body: string; verified_at: string | null; freshness_anchor: string | null };
+      type SourceRow = PageRow & { slug: string };
+
+      const targetRow = db.prepare(
+        'SELECT id, body, verified_at, freshness_anchor FROM pages WHERE slug = ?',
+      ).get(input.target_slug) as PageRow | undefined;
+
+      if (!targetRow) {
+        return Promise.reject(new Error(`mergePages: target page not found: ${input.target_slug}`));
+      }
+
+      const sourceRows: SourceRow[] = [];
+      for (const slug of input.source_slugs) {
+        if (slug === input.target_slug) {
+          return Promise.reject(new Error(
+            `mergePages: source_slug '${slug}' is the same as target_slug — cannot merge a page into itself`,
+          ));
+        }
+        const row = db.prepare(
+          'SELECT id, slug, body, verified_at, freshness_anchor FROM pages WHERE slug = ?',
+        ).get(slug) as SourceRow | undefined;
+        if (!row) {
+          return Promise.reject(new Error(`mergePages: source page not found: ${slug}`));
+        }
+        sourceRows.push(row);
+      }
+
+      const timestamp = new Date().toISOString();
+
+      // MAX(verified_at) across all pages; treat null as the epoch minimum.
+      const allVerifiedAts = [targetRow.verified_at, ...sourceRows.map((r) => r.verified_at)]
+        .filter((v): v is string => v != null);
+      const maxVerifiedAt = allVerifiedAts.length > 0
+        ? allVerifiedAts.reduce((max, v) => (v > max ? v : max))
+        : timestamp;
+
+      // freshness_anchor: keep target's; fall back to first non-null source's.
+      let freshnessAnchor = targetRow.freshness_anchor;
+      if (!freshnessAnchor) {
+        for (const row of sourceRows) {
+          if (row.freshness_anchor) {
+            freshnessAnchor = row.freshness_anchor;
+            break;
+          }
+        }
+      }
+
+      // Capture loser bodies before the transaction (returned in result).
+      const losers = sourceRows.map((r) => ({ slug: r.slug, body: r.body }));
+
+      let citationsMoved = 0;
+      let citationsDeduped = 0;
+
+      const tx = db.transaction(() => {
+        for (const source of sourceRows) {
+          // Count total source citations before dedup.
+          const before = (db.prepare(
+            'SELECT COUNT(*) as count FROM citations WHERE page_id = ?',
+          ).get(source.id) as { count: number }).count;
+
+          // Delete source citations that are identical to existing target citations.
+          db.prepare(`
+            DELETE FROM citations
+            WHERE page_id = ?
+              AND EXISTS (
+                SELECT 1 FROM citations c2
+                WHERE c2.page_id = ?
+                  AND c2.claim = citations.claim
+                  AND c2.source_kind = citations.source_kind
+                  AND COALESCE(c2.source_locator, '') = COALESCE(citations.source_locator, '')
+                  AND c2.excerpt = citations.excerpt
+              )
+          `).run(source.id, targetRow.id);
+
+          const after = (db.prepare(
+            'SELECT COUNT(*) as count FROM citations WHERE page_id = ?',
+          ).get(source.id) as { count: number }).count;
+
+          citationsDeduped += before - after;
+
+          // Re-parent remaining source citations to target.
+          db.prepare('UPDATE citations SET page_id = ? WHERE page_id = ?').run(targetRow.id, source.id);
+          citationsMoved += after;
+        }
+
+        // Update target: verified_at, freshness_anchor, updated.
+        db.prepare(
+          'UPDATE pages SET verified_at = ?, freshness_anchor = ?, updated = ? WHERE id = ?',
+        ).run(maxVerifiedAt, freshnessAnchor ?? null, timestamp, targetRow.id);
+
+        // Optionally append loser bodies to target body.
+        if (input.append_loser_bodies) {
+          let appendedBody = targetRow.body;
+          for (const loser of losers) {
+            appendedBody += `\n\n--- merged from ${loser.slug} ---\n\n${loser.body}`;
+          }
+          enforcePageBodyCap(appendedBody);
+          db.prepare('UPDATE pages SET body = ? WHERE id = ?').run(appendedBody, targetRow.id);
+        }
+
+        // Archive each source and record the supersession.
+        for (const source of sourceRows) {
+          const tombstoneNote = input.note
+            ? `Merged into ${input.target_slug}. ${input.note}`
+            : `Merged into ${input.target_slug}.`;
+
+          db.prepare(
+            "UPDATE pages SET status = 'archived', tombstone_note = ?, updated = ? WHERE id = ?",
+          ).run(tombstoneNote, timestamp, source.id);
+
+          db.prepare(
+            'INSERT INTO supersessions (old_slug, new_slug, note, created) VALUES (?, ?, ?, ?)',
+          ).run(source.slug, input.target_slug, input.note ?? null, timestamp);
+        }
+      });
+      tx();
+
+      return Promise.resolve({
+        target_slug: input.target_slug,
+        sources_merged: sourceRows.length,
+        citations_moved: citationsMoved,
+        citations_deduped: citationsDeduped,
+        verified_at: maxVerifiedAt,
+        losers,
       });
     } catch (e) {
       return Promise.reject(e);

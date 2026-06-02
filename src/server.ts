@@ -33,6 +33,7 @@ import { knowledgeArchive } from './tools/knowledge-archive.js';
 import { knowledgeRestore } from './tools/knowledge-restore.js';
 import { knowledgeSupersede } from './tools/knowledge-supersede.js';
 import { knowledgeMove } from './tools/knowledge-move.js';
+import { knowledgeMerge } from './tools/knowledge-merge.js';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -526,6 +527,41 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     async ({ slug, new_slug, new_domain, leave_pointer, slugs, from_domain_prefix, to_domain_prefix }) => {
       const result = await knowledgeMove(contextDir, {
         slug, new_slug, new_domain, leave_pointer, slugs, from_domain_prefix, to_domain_prefix,
+      });
+      return { content: [{ type: 'text' as const, text: result }] };
+    },
+  );
+
+  server.tool(
+    'knowledge_merge',
+    'Consolidate 2+ knowledge pages into one canonical page. ' +
+    'Re-parents all citations from source pages to the target, deduplicating by (claim, source_kind, source_locator, excerpt). ' +
+    'Takes MAX(verified_at) across all pages. ' +
+    'Losers are superseded: archived with a tombstone and a supersessions pointer to the target. ' +
+    'Loser bodies are returned in the result for curator review; set append_loser_bodies=true to concatenate them. ' +
+    'Use knowledge_write first if the target body needs updating before merging. ' +
+    'Distinct from knowledge_supersede (1:1 pointer, no citation consolidation) — ' +
+    'use merge when consolidating data from multiple pages into one.',
+    {
+      source_slugs: z.array(z.string()).describe(
+        'Slugs of the pages to merge into the target (all must exist)',
+      ),
+      target_slug: z.string().describe(
+        'Slug of the canonical target page that survives the merge (must already exist)',
+      ),
+      note: z.string().optional().describe(
+        'Optional note about this merge, stored in supersession tombstones on the losers',
+      ),
+      hard_delete_losers: z.boolean().optional().describe(
+        'Phase 3 stub — not yet available. Pass true to opt into hard deletion of losers once Phase 3 ships.',
+      ),
+      append_loser_bodies: z.boolean().optional().describe(
+        'Append loser page bodies to the target body under section markers (default false). Off by default — curator normally hand-merges body content.',
+      ),
+    },
+    async ({ source_slugs, target_slug, note, hard_delete_losers, append_loser_bodies }) => {
+      const result = await knowledgeMerge(contextDir, {
+        source_slugs, target_slug, note, hard_delete_losers, append_loser_bodies,
       });
       return { content: [{ type: 'text' as const, text: result }] };
     },
