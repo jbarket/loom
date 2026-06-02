@@ -388,7 +388,7 @@ export interface KnowledgeMergeResult {
   sources_merged: number;
   citations_moved: number;
   citations_deduped: number;
-  verified_at: string;
+  verified_at: string | null;
   losers: KnowledgeMergeLoserRecord[];
 }
 

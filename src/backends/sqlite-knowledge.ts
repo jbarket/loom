@@ -526,12 +526,12 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
 
       const timestamp = new Date().toISOString();
 
-      // MAX(verified_at) across all pages; treat null as the epoch minimum.
+      // MAX(verified_at) across all pages; null when all are unverified.
       const allVerifiedAts = [targetRow.verified_at, ...sourceRows.map((r) => r.verified_at)]
         .filter((v): v is string => v != null);
-      const maxVerifiedAt = allVerifiedAts.length > 0
+      const maxVerifiedAt: string | null = allVerifiedAts.length > 0
         ? allVerifiedAts.reduce((max, v) => (v > max ? v : max))
-        : timestamp;
+        : null;
 
       // freshness_anchor: keep target's; fall back to first non-null source's.
       let freshnessAnchor = targetRow.freshness_anchor;

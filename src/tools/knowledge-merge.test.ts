@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import BetterSqlite3 from 'better-sqlite3';
 import { knowledgeMerge } from './knowledge-merge.js';
 import { knowledgeWrite } from './knowledge-write.js';
 import { createKnowledgeBackend } from '../backends/index.js';
@@ -244,6 +245,23 @@ describe('knowledgeMerge', () => {
     try {
       const page = await b.getPage('target');
       expect(page!.verified_at).toBe('2026-12-01T00:00:00.000Z');
+    } finally {
+      b.close();
+    }
+  });
+
+  it('verified_at stays null when all pages have no verified_at', async () => {
+    await seedPage('target');
+    await seedPage('source');
+    // Null out verified_at directly — writePage always stamps a timestamp,
+    // but migrated/legacy rows may have null verified_at in practice.
+    const rawDb = new BetterSqlite3(join(tempDir, 'knowledge.db'));
+    rawDb.prepare('UPDATE pages SET verified_at = NULL WHERE slug IN (?, ?)').run('target', 'source');
+    rawDb.close();
+    await knowledgeMerge(tempDir, { source_slugs: ['source'], target_slug: 'target' });
+    const b = createKnowledgeBackend(tempDir);
+    try {
+      expect((await b.getPage('target'))!.verified_at).toBeNull();
     } finally {
       b.close();
     }
