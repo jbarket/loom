@@ -25,6 +25,9 @@ import type {
   KnowledgeRestoreResult,
   KnowledgeSupersededInput,
   KnowledgeSupersededResult,
+  KnowledgeMoveInput,
+  KnowledgeMoveResult,
+  KnowledgeMovedPageRecord,
 } from './types.js';
 
 /** Hard size caps — enforced at write boundary (design §A3). */
@@ -337,6 +340,141 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
         old_slug: input.old_slug,
         new_slug: input.new_slug,
         archived: oldPage.status !== 'archived',
+      });
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  }
+
+  movePage(input: KnowledgeMoveInput): Promise<KnowledgeMoveResult> {
+    try {
+      const db = this.ensureOpen();
+      const timestamp = new Date().toISOString();
+
+      // ── Batch by domain prefix substitution ──────────────────────────────────
+      if (input.from_domain_prefix !== undefined) {
+        if (!input.to_domain_prefix) {
+          return Promise.reject(new Error('movePage: to_domain_prefix is required when from_domain_prefix is set'));
+        }
+        if (input.from_domain_prefix === input.to_domain_prefix) {
+          return Promise.reject(new Error('movePage: from_domain_prefix and to_domain_prefix must differ'));
+        }
+
+        const affected = db.prepare(
+          `SELECT slug, domain FROM pages WHERE domain = ? OR domain LIKE ?`,
+        ).all(input.from_domain_prefix, `${input.from_domain_prefix}/%`) as Array<{ slug: string; domain: string }>;
+
+        const pages: KnowledgeMovedPageRecord[] = [];
+
+        const tx = db.transaction(() => {
+          for (const p of affected) {
+            const newDomain = input.to_domain_prefix! + p.domain.slice(input.from_domain_prefix!.length);
+            db.prepare('UPDATE pages SET domain = ?, updated = ? WHERE slug = ?').run(newDomain, timestamp, p.slug);
+            pages.push({ slug: p.slug, old_domain: p.domain, new_domain: newDomain });
+          }
+        });
+        tx();
+
+        return Promise.resolve({ moved: pages.length, pages, pointers_written: 0 });
+      }
+
+      // ── Batch by explicit slug list (re-domain only) ──────────────────────────
+      if (input.slugs && input.slugs.length > 0) {
+        if (!input.new_domain) {
+          return Promise.reject(new Error('movePage: new_domain is required when slugs list is provided'));
+        }
+
+        const pages: KnowledgeMovedPageRecord[] = [];
+
+        const tx = db.transaction(() => {
+          for (const slug of input.slugs!) {
+            const page = db.prepare(
+              'SELECT domain FROM pages WHERE slug = ?',
+            ).get(slug) as { domain: string } | undefined;
+
+            if (!page) {
+              throw new Error(`movePage: page not found: ${slug}`);
+            }
+
+            db.prepare('UPDATE pages SET domain = ?, updated = ? WHERE slug = ?').run(
+              input.new_domain!, timestamp, slug,
+            );
+            pages.push({ slug, old_domain: page.domain, new_domain: input.new_domain! });
+          }
+        });
+        tx();
+
+        return Promise.resolve({ moved: pages.length, pages, pointers_written: 0 });
+      }
+
+      // ── Single-page mode ──────────────────────────────────────────────────────
+      if (!input.slug) {
+        return Promise.reject(new Error('movePage: slug is required for single-page mode'));
+      }
+      if (!input.new_slug && !input.new_domain) {
+        return Promise.reject(new Error('movePage: at least one of new_slug or new_domain is required'));
+      }
+      if (input.new_slug && input.new_slug === input.slug) {
+        return Promise.reject(new Error('movePage: new_slug must differ from the current slug'));
+      }
+
+      const page = db.prepare(
+        'SELECT domain FROM pages WHERE slug = ?',
+      ).get(input.slug) as { domain: string } | undefined;
+
+      if (!page) {
+        return Promise.reject(new Error(`movePage: page not found: ${input.slug}`));
+      }
+
+      // Slug-collision check — must happen before the transaction.
+      if (input.new_slug) {
+        const collision = db.prepare(
+          'SELECT id FROM pages WHERE slug = ?',
+        ).get(input.new_slug) as { id: number } | undefined;
+
+        if (collision) {
+          return Promise.reject(new Error(
+            `movePage: slug '${input.new_slug}' already exists — use knowledge_merge instead of knowledge_move to consolidate pages.`,
+          ));
+        }
+      }
+
+      const oldSlug = input.slug;
+      const oldDomain = page.domain;
+      const leavePointer = input.leave_pointer !== false; // default true
+      let pointersWritten = 0;
+
+      const tx = db.transaction(() => {
+        if (input.new_slug) {
+          db.prepare('UPDATE pages SET slug = ?, updated = ? WHERE slug = ?').run(
+            input.new_slug, timestamp, oldSlug,
+          );
+          if (leavePointer) {
+            db.prepare(
+              'INSERT INTO supersessions (old_slug, new_slug, note, created) VALUES (?, ?, ?, ?)',
+            ).run(oldSlug, input.new_slug, 'slug rename via knowledge_move', timestamp);
+            pointersWritten = 1;
+          }
+        }
+        if (input.new_domain) {
+          // Address the row by its current slug after the possible rename.
+          const currentSlug = input.new_slug ?? oldSlug;
+          db.prepare('UPDATE pages SET domain = ?, updated = ? WHERE slug = ?').run(
+            input.new_domain, timestamp, currentSlug,
+          );
+        }
+      });
+      tx();
+
+      return Promise.resolve({
+        moved: 1,
+        pages: [{
+          slug: input.new_slug ?? oldSlug,
+          old_slug: input.new_slug ? oldSlug : undefined,
+          old_domain: oldDomain,
+          new_domain: input.new_domain ?? oldDomain,
+        }],
+        pointers_written: pointersWritten,
       });
     } catch (e) {
       return Promise.reject(e);

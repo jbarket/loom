@@ -32,6 +32,7 @@ import { knowledgeMaintain } from './tools/knowledge-maintain.js';
 import { knowledgeArchive } from './tools/knowledge-archive.js';
 import { knowledgeRestore } from './tools/knowledge-restore.js';
 import { knowledgeSupersede } from './tools/knowledge-supersede.js';
+import { knowledgeMove } from './tools/knowledge-move.js';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -487,6 +488,45 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     },
     async ({ slug }) => {
       const result = await knowledgeRestore(contextDir, { slug });
+      return { content: [{ type: 'text' as const, text: result }] };
+    },
+  );
+
+  server.tool(
+    'knowledge_move',
+    'Re-key or re-domain a knowledge page in place — same row, same uuid, citations and verification history preserved. ' +
+    'Three modes: (1) Single-page: provide slug + new_slug and/or new_domain. ' +
+    'Slug rename writes a supersessions pointer (old→new) unless leave_pointer=false. ' +
+    'If new_slug already exists, the call is rejected — use knowledge_merge instead. ' +
+    '(2) Batch by slug list: provide slugs array + new_domain to re-home multiple pages atomically. ' +
+    '(3) Batch by domain prefix: provide from_domain_prefix + to_domain_prefix to re-home a whole subtree in one transaction.',
+    {
+      slug: z.string().optional().describe(
+        'Current slug of the page to move (single-page mode)',
+      ),
+      new_slug: z.string().optional().describe(
+        'New slug (re-slug). Collision with an existing page is rejected — use knowledge_merge instead.',
+      ),
+      new_domain: z.string().optional().describe(
+        'New domain for the page (single-page re-domain or shared target for batch-by-slugs mode)',
+      ),
+      leave_pointer: z.boolean().optional().describe(
+        'Write a supersessions pointer old_slug→new_slug when the slug changes. Default true.',
+      ),
+      slugs: z.array(z.string()).optional().describe(
+        'Batch mode: list of slugs to re-domain. Requires new_domain. Atomic — rolls back on any missing slug.',
+      ),
+      from_domain_prefix: z.string().optional().describe(
+        'Batch prefix mode: domain prefix to replace (e.g. "gear/elektron"). Requires to_domain_prefix.',
+      ),
+      to_domain_prefix: z.string().optional().describe(
+        'Batch prefix mode: replacement domain prefix (e.g. "instruments/elektron").',
+      ),
+    },
+    async ({ slug, new_slug, new_domain, leave_pointer, slugs, from_domain_prefix, to_domain_prefix }) => {
+      const result = await knowledgeMove(contextDir, {
+        slug, new_slug, new_domain, leave_pointer, slugs, from_domain_prefix, to_domain_prefix,
+      });
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );
