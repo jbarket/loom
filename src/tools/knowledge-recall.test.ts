@@ -130,4 +130,34 @@ describe('knowledgeRecall', () => {
     expect(result).toMatch(/Alpha/);
     expect(result).toMatch(/Beta/);
   });
+
+  // ── Regression: single-letter / roman-numeral tokens must never be dropped ──
+  // Searching for "Digitakt I" must surface "Elektron Digitakt I" even though 'I'
+  // is a single-letter token. A query builder that stopwords or min-length-filters
+  // short tokens would silently turn "Digitakt I" into "Digitakt", causing
+  // "Elektron Digitakt I" to appear absent when drowned out by higher-hit-count pages.
+
+  it('bare "I" token query returns pages titled with that roman numeral', async () => {
+    await seedPage('digitakt-i', 'music/gear', 'Elektron Digitakt I', 'The original Digitakt drum computer.');
+    await seedPage('unrelated', 'other', 'Unrelated', 'No roman numerals here.');
+
+    const result = await knowledgeRecall(tempDir, { query: 'I' });
+    expect(result).toMatch(/Elektron Digitakt I/);
+  });
+
+  it('"Digitakt I" query includes the "Elektron Digitakt I" page — I token not dropped', async () => {
+    await seedPage('digitakt-i', 'music/gear', 'Elektron Digitakt I', 'The original Digitakt drum computer.');
+    await seedPage('digitakt-ii', 'music/gear', 'Elektron Digitakt II', 'The second-generation Digitakt.');
+
+    const result = await knowledgeRecall(tempDir, { query: 'Digitakt I' });
+    expect(result).toMatch(/Elektron Digitakt I/);
+  });
+
+  it('"Digitakt II" query includes the "Elektron Digitakt II" page — II token not dropped', async () => {
+    await seedPage('digitakt-i', 'music/gear', 'Elektron Digitakt I', 'The original Digitakt drum computer.');
+    await seedPage('digitakt-ii', 'music/gear', 'Elektron Digitakt II', 'The second-generation Digitakt.');
+
+    const result = await knowledgeRecall(tempDir, { query: 'Digitakt II' });
+    expect(result).toMatch(/Elektron Digitakt II/);
+  });
 });

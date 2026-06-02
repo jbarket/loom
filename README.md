@@ -74,6 +74,11 @@ an agent's persistent state:
   relationship in the `supersessions` table. The dedup-merge primitive: write the
   canonical page with `knowledge_write`, then call `knowledge_supersede(loser →
   canonical)`.
+- **`knowledge_move`** — re-key or re-domain a page in place (same row, same
+  uuid, citations and verification history preserved). Three modes: single-page
+  re-slug and/or re-domain; batch re-domain by explicit slug list; batch
+  re-domain by domain-prefix substitution (moves an entire subtree atomically).
+  Slug collisions are rejected — use `knowledge_merge` instead.
 
 Everything lives on disk as plain markdown plus a single SQLite file.
 No daemon, no external service, no GPU.

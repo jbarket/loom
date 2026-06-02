@@ -334,6 +334,64 @@ export interface KnowledgeSupersededResult {
   archived: boolean;
 }
 
+export interface KnowledgeMoveInput {
+  // ── Single-page mode (requires slug + at least one of new_slug/new_domain) ──
+  slug?: string;
+  new_slug?: string;
+  new_domain?: string;
+  /** Write a supersessions pointer when the slug changes. Default true. */
+  leave_pointer?: boolean;
+
+  // ── Batch re-domain by explicit slug list (requires new_domain) ──
+  slugs?: string[];
+
+  // ── Batch re-domain by domain prefix substitution ──
+  from_domain_prefix?: string;
+  to_domain_prefix?: string;
+}
+
+export interface KnowledgeMovedPageRecord {
+  /** Slug after the move (= new_slug when slug changed, else original slug). */
+  slug: string;
+  /** Set only when the slug was renamed. */
+  old_slug?: string;
+  old_domain: string;
+  new_domain: string;
+}
+
+export interface KnowledgeMoveResult {
+  moved: number;
+  pages: KnowledgeMovedPageRecord[];
+  pointers_written: number;
+}
+
+export interface KnowledgeMergeInput {
+  /** Slugs of the pages to merge into the target (all must exist and differ from target_slug). */
+  source_slugs: string[];
+  /** Slug of the canonical target page that survives (must already exist). */
+  target_slug: string;
+  /** Optional note about this merge, stored in supersession tombstones on the losers. */
+  note?: string;
+  /** Phase 3 stub — not yet available. Pass true to opt into hard deletion of losers once Phase 3 ships. */
+  hard_delete_losers?: boolean;
+  /** Append loser bodies to the target body under section markers. Default false. */
+  append_loser_bodies?: boolean;
+}
+
+export interface KnowledgeMergeLoserRecord {
+  slug: string;
+  body: string;
+}
+
+export interface KnowledgeMergeResult {
+  target_slug: string;
+  sources_merged: number;
+  citations_moved: number;
+  citations_deduped: number;
+  verified_at: string | null;
+  losers: KnowledgeMergeLoserRecord[];
+}
+
 // ─── Knowledge Backend Interface ─────────────────────────────────────────────
 
 export interface KnowledgeBackend {
@@ -353,6 +411,10 @@ export interface KnowledgeBackend {
   restorePage(input: KnowledgeRestoreInput): Promise<KnowledgeRestoreResult>;
   /** Mark old_slug as superseded by new_slug, archive old_slug, and record the supersession. */
   supersedePage(input: KnowledgeSupersededInput): Promise<KnowledgeSupersededResult>;
+  /** Re-key or re-domain a page in place: change slug and/or domain atomically without creating a new row. */
+  movePage(input: KnowledgeMoveInput): Promise<KnowledgeMoveResult>;
+  /** Consolidate N source pages into one canonical target: re-parent citations (dedup), take MAX(verified_at), supersede losers. */
+  mergePages(input: KnowledgeMergeInput): Promise<KnowledgeMergeResult>;
   /** Close the underlying SQLite connection. */
   close(): void;
 }
