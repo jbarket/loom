@@ -295,6 +295,92 @@ describe('SqliteKnowledgeBackend', () => {
     expect(results[0].slug).toBe('page-identity');
   });
 
+  // ── Regression: single-letter and roman-numeral token preservation ─────────
+  // The query builder must never drop tokens based on length. Tokens like 'I'
+  // (roman numeral / single letter) are semantically meaningful and must be
+  // preserved in multi-word AND queries.
+
+  it('bare single-letter query "I" returns pages whose title contains "I"', async () => {
+    await backend.writePage({
+      slug: 'digitakt-i',
+      title: 'Elektron Digitakt I',
+      domain: 'music/gear/elektron',
+      body: 'The original Digitakt drum computer.',
+    });
+    await backend.writePage({
+      slug: 'unrelated',
+      title: 'Unrelated Page',
+      domain: 'other',
+      body: 'Nothing about the roman numeral here.',
+    });
+
+    const results = await backend.queryPages({ query: 'I', excludeStatus: 'archived', limit: 10 });
+    const slugs = results.map((r) => r.slug);
+    expect(slugs).toContain('digitakt-i');
+  });
+
+  it('multi-word query "Digitakt I" includes the page titled "Elektron Digitakt I"', async () => {
+    await backend.writePage({
+      slug: 'digitakt-i',
+      title: 'Elektron Digitakt I',
+      domain: 'music/gear/elektron',
+      body: 'The original Digitakt drum computer.',
+    });
+    await backend.writePage({
+      slug: 'digitakt-ii',
+      title: 'Elektron Digitakt II',
+      domain: 'music/gear/elektron',
+      body: 'The second-generation Digitakt.',
+    });
+
+    const results = await backend.queryPages({ query: 'Digitakt I', excludeStatus: 'archived', limit: 10 });
+    const slugs = results.map((r) => r.slug);
+    // "Elektron Digitakt I" must appear — the 'I' token must not be dropped.
+    expect(slugs).toContain('digitakt-i');
+  });
+
+  it('roman numeral "II" token is preserved and differentiates from "I"', async () => {
+    await backend.writePage({
+      slug: 'digitakt-i',
+      title: 'Elektron Digitakt I',
+      domain: 'music/gear/elektron',
+      body: 'The original Digitakt drum computer.',
+    });
+    await backend.writePage({
+      slug: 'digitakt-ii',
+      title: 'Elektron Digitakt II',
+      domain: 'music/gear/elektron',
+      body: 'The second-generation Digitakt.',
+    });
+
+    // Query for "II" should include "Elektron Digitakt II"; "I" is a substring of "II"
+    // so this also tests that the "II" token itself is not dropped.
+    const results = await backend.queryPages({ query: 'II', excludeStatus: 'archived', limit: 10 });
+    const slugs = results.map((r) => r.slug);
+    expect(slugs).toContain('digitakt-ii');
+  });
+
+  it('multi-word query AND-joins tokens — all tokens must match', async () => {
+    await backend.writePage({
+      slug: 'analog-rytm',
+      title: 'Elektron Analog Rytm',
+      domain: 'music/gear/elektron',
+      body: 'Analog drum machine with sample playback.',
+    });
+    await backend.writePage({
+      slug: 'digitakt-i',
+      title: 'Elektron Digitakt I',
+      domain: 'music/gear/elektron',
+      body: 'Digital drum computer from Elektron.',
+    });
+
+    // "Analog Rytm" — both tokens must be present; "Digitakt I" has neither.
+    const results = await backend.queryPages({ query: 'Analog Rytm', excludeStatus: 'archived', limit: 10 });
+    const slugs = results.map((r) => r.slug);
+    expect(slugs).toContain('analog-rytm');
+    expect(slugs).not.toContain('digitakt-i');
+  });
+
   it('adds citations to existing page', async () => {
     await backend.writePage({
       slug: 'citation-test',

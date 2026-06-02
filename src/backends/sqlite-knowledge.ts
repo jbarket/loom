@@ -204,11 +204,16 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
       const params: unknown[] = [];
 
       if (input.query) {
-        const likePattern = `%${input.query}%`;
-        clauses.push(
-          '(title LIKE ? OR body LIKE ? OR domain LIKE ?)',
-        );
-        params.push(likePattern, likePattern, likePattern);
+        // Split into tokens on whitespace. Never filter by token length —
+        // single-letter tokens like 'I' and roman numerals like 'II' are
+        // semantically meaningful (e.g. "Digitakt I" vs "Digitakt II") and
+        // must never be stopworded or dropped.
+        const tokens = input.query.trim().split(/\s+/).filter((t) => t.length > 0);
+        for (const token of tokens) {
+          const likePattern = `%${token}%`;
+          clauses.push('(title LIKE ? OR body LIKE ? OR domain LIKE ?)');
+          params.push(likePattern, likePattern, likePattern);
+        }
       }
 
       if (input.domain) {
