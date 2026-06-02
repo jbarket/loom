@@ -429,7 +429,7 @@ describe('knowledgeMerge', () => {
     expect(result).toMatch(/Error/i);
   });
 
-  it('rejects hard_delete_losers with Phase 3 stub message', async () => {
+  it('hard_delete_losers: true hard-removes losers after consolidation', async () => {
     await seedPage('target');
     await seedPage('source');
     const result = await knowledgeMerge(tempDir, {
@@ -437,7 +437,13 @@ describe('knowledgeMerge', () => {
       target_slug: 'target',
       hard_delete_losers: true,
     });
-    expect(result).toMatch(/Error/i);
-    expect(result).toMatch(/Phase 3/i);
+    expect(result).not.toMatch(/Error/i);
+    const b = createKnowledgeBackend(tempDir);
+    try {
+      expect(await b.getPage('source')).toBeNull();
+      expect((await b.getPage('target'))!.status).toBe('active');
+    } finally {
+      b.close();
+    }
   });
 });

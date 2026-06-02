@@ -34,6 +34,7 @@ import { knowledgeRestore } from './tools/knowledge-restore.js';
 import { knowledgeSupersede } from './tools/knowledge-supersede.js';
 import { knowledgeMove } from './tools/knowledge-move.js';
 import { knowledgeMerge } from './tools/knowledge-merge.js';
+import { knowledgePurge } from './tools/knowledge-purge.js';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -553,7 +554,7 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
         'Optional note about this merge, stored in supersession tombstones on the losers',
       ),
       hard_delete_losers: z.boolean().optional().describe(
-        'Phase 3 stub — not yet available. Pass true to opt into hard deletion of losers once Phase 3 ships.',
+        'Hard-delete losers after archiving them. Losers are archived (supersession pointer written) then DELETEd from the database, cascading their citations.',
       ),
       append_loser_bodies: z.boolean().optional().describe(
         'Append loser page bodies to the target body under section markers (default false). Off by default — curator normally hand-merges body content.',
@@ -581,6 +582,28 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     },
     async ({ old_slug, new_slug, note }) => {
       const result = await knowledgeSupersede(contextDir, { old_slug, new_slug, note });
+      return { content: [{ type: 'text' as const, text: result }] };
+    },
+  );
+
+  server.tool(
+    'knowledge_purge',
+    'Hard-delete one or more archived knowledge pages and cascade their citations. ' +
+    'Archive-first guard: rejects any page that is not already archived — call knowledge_archive first. ' +
+    'All slugs must be archived; a mixed list (any active) rejects the entire batch with no mutation. ' +
+    'confirm: true is required explicitly to prevent accidental irreversible deletes. ' +
+    'Supersession pointers in the supersessions table are NOT removed (historical record preserved). ' +
+    'Use this to clean up tombstoned cruft after merge/supersede workflows — not for retiring active pages.',
+    {
+      slugs: z.array(z.string()).describe(
+        'Slugs of archived pages to hard-delete. All must have status=archived.',
+      ),
+      confirm: z.literal(true).describe(
+        'Must be explicitly true — required safety gate for an irreversible operation.',
+      ),
+    },
+    async ({ slugs, confirm }) => {
+      const result = await knowledgePurge(contextDir, { slugs, confirm });
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );
