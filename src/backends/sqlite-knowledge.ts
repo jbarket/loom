@@ -30,6 +30,8 @@ import type {
   KnowledgeMovedPageRecord,
   KnowledgeMergeInput,
   KnowledgeMergeResult,
+  KnowledgePurgeInput,
+  KnowledgePurgeResult,
 } from './types.js';
 
 /** Hard size caps — enforced at write boundary (design §A3). */
@@ -496,12 +498,6 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
         return Promise.reject(new Error('mergePages: source_slugs must not be empty'));
       }
 
-      if (input.hard_delete_losers) {
-        return Promise.reject(new Error(
-          'mergePages: hard_delete_losers is not yet available — stub reserved for Phase 3',
-        ));
-      }
-
       type PageRow = { id: number; body: string; verified_at: string | null; freshness_anchor: string | null };
       type SourceRow = PageRow & { slug: string };
 
@@ -616,6 +612,14 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
             'INSERT INTO supersessions (old_slug, new_slug, note, created) VALUES (?, ?, ?, ?)',
           ).run(source.slug, input.target_slug, input.note ?? null, timestamp);
         }
+
+        // hard_delete_losers: archive first (supersession pointer written above), then DELETE.
+        // Citations cascade via FK ON DELETE CASCADE; supersession rows survive (plain TEXT refs, no FK).
+        if (input.hard_delete_losers) {
+          for (const source of sourceRows) {
+            db.prepare('DELETE FROM pages WHERE id = ?').run(source.id);
+          }
+        }
       });
       tx();
 
@@ -627,6 +631,53 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
         verified_at: maxVerifiedAt,
         losers,
       });
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  }
+
+  purgePages(input: KnowledgePurgeInput): Promise<KnowledgePurgeResult> {
+    try {
+      const db = this.ensureOpen();
+
+      if (!input.slugs || input.slugs.length === 0) {
+        return Promise.reject(new Error('purgePages: slugs must not be empty'));
+      }
+
+      if (input.confirm !== true) {
+        return Promise.reject(new Error('purgePages: confirm must be explicitly true'));
+      }
+
+      // Validate all slugs before touching the database.
+      type PageRow = { id: number; status: string };
+      const rows: Array<{ id: number; slug: string }> = [];
+      for (const slug of input.slugs) {
+        const page = db.prepare(
+          'SELECT id, status FROM pages WHERE slug = ?',
+        ).get(slug) as PageRow | undefined;
+
+        if (!page) {
+          return Promise.reject(new Error(`purgePages: page not found: ${slug}`));
+        }
+        if (page.status !== 'archived') {
+          return Promise.reject(new Error(
+            `purgePages: page '${slug}' is not archived — archive it first before purging`,
+          ));
+        }
+        rows.push({ id: page.id, slug });
+      }
+
+      // All checks passed — delete in a single transaction.
+      // Citations cascade via FK ON DELETE CASCADE.
+      // Supersession rows survive (plain TEXT refs, no FK).
+      const tx = db.transaction(() => {
+        for (const row of rows) {
+          db.prepare('DELETE FROM pages WHERE id = ?').run(row.id);
+        }
+      });
+      tx();
+
+      return Promise.resolve({ purged: input.slugs.length, slugs: input.slugs });
     } catch (e) {
       return Promise.reject(e);
     }

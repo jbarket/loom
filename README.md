@@ -79,6 +79,18 @@ an agent's persistent state:
   re-slug and/or re-domain; batch re-domain by explicit slug list; batch
   re-domain by domain-prefix substitution (moves an entire subtree atomically).
   Slug collisions are rejected — use `knowledge_merge` instead.
+- **`knowledge_merge`** — consolidate 2+ knowledge pages into one canonical
+  page. Re-parents all citations (deduplicating by claim+source), takes
+  MAX(verified_at), and supersedes losers (archives with a tombstone pointer to
+  the target). Pass `hard_delete_losers=true` to DELETE losers after archiving
+  (citations cascade, supersession pointers survive).
+- **`knowledge_purge`** — hard-delete one or more archived knowledge pages and
+  cascade their citations. Archive-first guard: rejects any page not already
+  archived (call `knowledge_archive` first). All slugs in a batch must be
+  archived; any active slug rejects the entire batch with no mutation.
+  `confirm: true` is required as an explicit safety gate. Supersession pointers
+  are preserved (historical record). Use after merge/supersede to clean up
+  tombstoned cruft.
 
 Everything lives on disk as plain markdown plus a single SQLite file.
 No daemon, no external service, no GPU.

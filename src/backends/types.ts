@@ -372,7 +372,7 @@ export interface KnowledgeMergeInput {
   target_slug: string;
   /** Optional note about this merge, stored in supersession tombstones on the losers. */
   note?: string;
-  /** Phase 3 stub — not yet available. Pass true to opt into hard deletion of losers once Phase 3 ships. */
+  /** Hard-delete losers after archiving them. Losers are archived (supersession pointer written) then DELETEd from the database, cascading their citations. */
   hard_delete_losers?: boolean;
   /** Append loser bodies to the target body under section markers. Default false. */
   append_loser_bodies?: boolean;
@@ -390,6 +390,18 @@ export interface KnowledgeMergeResult {
   citations_deduped: number;
   verified_at: string | null;
   losers: KnowledgeMergeLoserRecord[];
+}
+
+export interface KnowledgePurgeInput {
+  /** Explicit list of slugs to hard-delete. All must have status='archived' (archive-first guard). */
+  slugs: string[];
+  /** Must be explicitly true — required to execute an irreversible hard delete. */
+  confirm: true;
+}
+
+export interface KnowledgePurgeResult {
+  purged: number;
+  slugs: string[];
 }
 
 // ─── Knowledge Backend Interface ─────────────────────────────────────────────
@@ -415,6 +427,8 @@ export interface KnowledgeBackend {
   movePage(input: KnowledgeMoveInput): Promise<KnowledgeMoveResult>;
   /** Consolidate N source pages into one canonical target: re-parent citations (dedup), take MAX(verified_at), supersede losers. */
   mergePages(input: KnowledgeMergeInput): Promise<KnowledgeMergeResult>;
+  /** Hard-delete archived pages and cascade their citations. Archive-first guard: rejects any non-archived slug. */
+  purgePages(input: KnowledgePurgeInput): Promise<KnowledgePurgeResult>;
   /** Close the underlying SQLite connection. */
   close(): void;
 }
