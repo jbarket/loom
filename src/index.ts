@@ -110,7 +110,11 @@ export async function ensureFreshDist(repoRoot: string): Promise<void> {
     env: process.env,
     cwd: process.cwd(),
   });
-  child.on('close', (code) => process.exit(code ?? 0));
+  // Never resolve — parent blocks here until the child exits via process.exit().
+  // This prevents main() from being called in the parent while the child runs.
+  await new Promise<never>(() => {
+    child.on('close', (code) => process.exit(code ?? 0));
+  });
 }
 
 function isCliInvocation(argv: string[]): boolean {

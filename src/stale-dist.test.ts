@@ -179,7 +179,12 @@ describe('stale-dist guard', () => {
     expect(newestDist).not.toBeNull();
     expect(statSync(newestSrc!).mtimeMs).toBeGreaterThan(statSync(newestDist!).mtimeMs);
 
-    // ensureFreshDist should attempt a rebuild (will throw because tsc fails in temp dir)
+    // ensureFreshDist should attempt a rebuild; tsc fails in the temp dir and calls
+    // process.exit(1) before reaching the re-exec spawn, so the build-failure path
+    // is what's exercised here (not the build-success-then-reexec path). The
+    // Promise<never> fix that blocks the parent after a successful spawn does not
+    // affect this test path, but it guarantees main() is never called in the parent
+    // when the re-exec branch is actually reached in production.
     delete process.env.LOOM_SKIP_STALE_CHECK;
     const { ensureFreshDist } = await import('./index.js');
     await expect(ensureFreshDist(tempDir)).rejects.toThrow('process.exit called');
