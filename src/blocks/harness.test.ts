@@ -26,6 +26,14 @@ describe('blocks/harness', () => {
       expect(await harness.read(dir, 'claude-code')).toBeNull();
     });
 
+    it('rejects keys with path traversal', async () => {
+      await writeFile(join(dir, 'secret.md'), 'TOP-SECRET');
+      await expect(harness.read(dir, '../secret')).rejects.toThrow(/harness name/);
+      await expect(harness.read(dir, '..\\secret')).rejects.toThrow(/harness name/);
+      await expect(harness.read(dir, '..')).rejects.toThrow(/harness name/);
+      await expect(harness.read(dir, '')).rejects.toThrow(/harness name/);
+    });
+
     it('returns null when the manifest file is empty', async () => {
       await mkdir(join(dir, 'harnesses'), { recursive: true });
       await writeFile(join(dir, 'harnesses', 'claude-code.md'), '');

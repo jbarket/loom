@@ -13,6 +13,7 @@
  */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { assertSafePathSegment } from './path-safety.js';
 
 // ─── Tool list ────────────────────────────────────────────────────────────────
 
@@ -57,6 +58,7 @@ export function getBuiltInAdapter(client: string): string | null {
  * then falls back to the built-in adapter.
  */
 export async function loadClientAdapter(contextDir: string, client: string): Promise<string | null> {
+  assertSafePathSegment(client, 'client name');
   const overridePath = join(contextDir, 'clients', `${client}.md`);
   try {
     const content = await readFile(overridePath, 'utf-8');

@@ -8,8 +8,9 @@
  *
  * IDENTITY.md is immutable — only self-model.md and preferences.md are editable.
  */
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { atomicWriteWithBackup } from '../path-safety.js';
 
 /** Files that can be edited via this tool. IDENTITY.md is explicitly excluded. */
 const EDITABLE_FILES: Record<string, string> = {
@@ -27,6 +28,10 @@ export interface IdentitySection {
 /**
  * Parse a markdown file into H2 sections.
  * Content before the first H2 is captured as a preamble (header: '').
+ *
+ * Fence-aware: a `## ` line inside a ``` or ~~~ code fence is body content,
+ * not a section boundary. Closing fences must use the same character and be
+ * at least as long as the opener (CommonMark-style).
  */
 export function parseSections(text: string): IdentitySection[] {
   const lines = text.split('\n');
@@ -34,10 +39,22 @@ export function parseSections(text: string): IdentitySection[] {
   let currentHeader = '';
   let currentLines: string[] = [];
   let startLine = 0;
+  let fence: string | null = null; // opening fence marker while inside a fenced block
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (line.startsWith('## ')) {
+    const fenceMatch = line.match(/^\s{0,3}(`{3,}|~{3,})/);
+    if (fenceMatch) {
+      const marker = fenceMatch[1];
+      if (fence === null) {
+        fence = marker;
+      } else if (marker[0] === fence[0] && marker.length >= fence.length) {
+        fence = null;
+      }
+      currentLines.push(line);
+      continue;
+    }
+    if (fence === null && line.startsWith('## ')) {
       // Close previous section
       sections.push({
         header: currentHeader,
@@ -82,6 +99,39 @@ export function rebuildMarkdown(sections: IdentitySection[]): string {
   }
 
   return parts.join('\n\n') + '\n';
+}
+
+/**
+ * Replace a single section's body in place, leaving every other line of the
+ * file byte-identical. The header line itself is preserved as-is; only the
+ * lines between it and the next section (or EOF) are swapped for `content`,
+ * followed by one blank separator line when another section follows.
+ */
+function spliceSection(text: string, section: IdentitySection, content: string): string {
+  const lines = text.split('\n');
+  const before = lines.slice(0, section.startLine + 1); // includes the header line
+  const after = lines.slice(section.endLine + 1); // first line of the next section, if any
+  const body = content.replace(/\n+$/, '').split('\n');
+
+  const next = [...before, ...body];
+  if (after.length > 0) {
+    next.push(''); // blank line before the untouched next section
+  } else if (text.endsWith('\n')) {
+    next.push(''); // preserve the file's trailing newline
+  }
+  return [...next, ...after].join('\n');
+}
+
+/**
+ * Append a new section at the end of the file, leaving existing content
+ * byte-identical apart from ensuring a trailing newline.
+ */
+function appendSection(text: string, header: string, content: string): string {
+  const block = `## ${header}\n${content.replace(/\n+$/, '')}\n`;
+  if (text.trim() === '') return block;
+  let base = text.endsWith('\n') ? text : text + '\n';
+  if (!base.endsWith('\n\n')) base += '\n';
+  return base + block;
 }
 
 export type UpdateMode = 'replace' | 'append';
@@ -153,9 +203,9 @@ export async function updateIdentity(
   try {
     text = await readFile(filepath, 'utf-8');
   } catch {
-    // File doesn't exist — create it with the new section
+    // File doesn't exist — create it with the new section (atomic, no .bak)
     const newContent = `## ${section}\n${content}\n`;
-    await writeFile(filepath, newContent, 'utf-8');
+    await atomicWriteWithBackup(filepath, newContent);
     return `Created ${filename} with section "${section}".`;
   }
 
@@ -168,13 +218,7 @@ export async function updateIdentity(
     if (existing) {
       return `Section "${section}" already exists in ${filename}. Use mode "replace" to update it.`;
     }
-    sections.push({
-      header: section,
-      content,
-      startLine: 0,
-      endLine: 0,
-    });
-    await writeFile(filepath, rebuildMarkdown(sections), 'utf-8');
+    await atomicWriteWithBackup(filepath, appendSection(text, section, content));
     return `Appended new section "${section}" to ${filename}.`;
   }
 
@@ -183,7 +227,6 @@ export async function updateIdentity(
     return `Section "${section}" not found in ${filename}. Available sections: ${sections.filter(s => s.header !== '').map(s => s.header).join(', ')}. Use mode "append" to add a new section.`;
   }
 
-  existing.content = content;
-  await writeFile(filepath, rebuildMarkdown(sections), 'utf-8');
+  await atomicWriteWithBackup(filepath, spliceSection(text, existing, content));
   return `Updated section "${section}" in ${filename}.`;
 }

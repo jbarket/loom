@@ -12,10 +12,12 @@ import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseFrontmatter, type Block } from './types.js';
+import { assertSafePathSegment } from '../path-safety.js';
 
 const DIR = 'harnesses';
 
 export async function read(contextDir: string, key: string): Promise<Block | null> {
+  assertSafePathSegment(key, 'harness name');
   const path = resolve(contextDir, DIR, `${key}.md`);
   if (!existsSync(path)) return null;
   const raw = await readFile(path, 'utf-8');
@@ -70,11 +72,7 @@ export async function initHarness(
   name: string,
   opts: { overwrite?: boolean } = {},
 ): Promise<InitResult> {
-  if (!name || name.includes('/') || name.includes('\\')) {
-    throw new Error(
-      `Invalid harness name '${name}': must be non-empty and contain no path separators.`,
-    );
-  }
+  assertSafePathSegment(name, 'harness name');
   const dir = resolve(contextDir, DIR);
   await mkdir(dir, { recursive: true });
   const path = resolve(dir, `${name}.md`);

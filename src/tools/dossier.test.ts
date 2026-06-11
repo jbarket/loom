@@ -132,3 +132,48 @@ describe('loadDossier', () => {
     expect(result).toBeTruthy();
   });
 });
+
+describe('loadDossier — path-segment validation', () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'loom-dossier-pathsafety-'));
+    // A file OUTSIDE the intended subdirectories that traversal would reach
+    await writeFile(join(tempDir, 'secret.md'), 'TOP-SECRET-CONTENT');
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('rejects a role with path traversal and does not read the target', async () => {
+    const result = await loadDossier(tempDir, undefined, undefined, undefined, '../secret');
+    expect(result).toContain('Invalid role');
+    expect(result).not.toContain('TOP-SECRET-CONTENT');
+  });
+
+  it('rejects a project with path traversal and does not read the target', async () => {
+    const result = await loadDossier(tempDir, '../secret');
+    expect(result).toContain('Invalid project');
+    expect(result).not.toContain('TOP-SECRET-CONTENT');
+  });
+
+  it('rejects a client with path traversal', async () => {
+    const result = await loadDossier(tempDir, undefined, '../../etc/passwd');
+    expect(result).toContain('Invalid client');
+  });
+
+  it('rejects a model with path traversal and does not read the target', async () => {
+    const result = await loadDossier(tempDir, undefined, undefined, '../secret');
+    expect(result).toContain('Invalid model');
+    expect(result).not.toContain('TOP-SECRET-CONTENT');
+  });
+
+  it('still loads a legitimate role brief', async () => {
+    await mkdir(join(tempDir, 'roles'), { recursive: true });
+    await writeFile(join(tempDir, 'roles', 'code.md'), 'Code worker brief');
+    const result = await loadDossier(tempDir, undefined, undefined, undefined, 'code');
+    expect(result).toContain('# Your Role: code');
+    expect(result).toContain('Code worker brief');
+  });
+});

@@ -338,6 +338,145 @@ describe('SqliteVecBackend', () => {
     });
   });
 
+  describe('growing-k recall', () => {
+    /** Archive via raw SQL so the vector row survives — simulates legacy
+     *  rows archived before delete-on-archive landed. */
+    const rawArchive = (ref: string) => {
+      backend
+        .getDatabase()
+        .prepare('UPDATE memories SET archived = 1 WHERE ref = ?')
+        .run(ref);
+    };
+
+    it('finds live memories buried behind many legacy-archived vectors', async () => {
+      // 10 exact-match memories (distance 0) that get archived with their
+      // vectors left in place, plus 2 live partial matches ranked deeper.
+      for (let i = 0; i < 10; i++) {
+        const { ref } = await backend.remember({
+          category: 'project',
+          title: `Dead ${i}`,
+          content: 'loom',
+        });
+        rawArchive(ref);
+      }
+      await backend.remember({
+        category: 'project',
+        title: 'Live A',
+        content: 'loom alpha',
+      });
+      await backend.remember({
+        category: 'project',
+        title: 'Live B',
+        content: 'loom alpha',
+      });
+
+      // limit 2 → first round fetches k=8, all archived. The loop must
+      // grow k until the live rows surface.
+      const hits = await backend.recall({ query: 'loom', limit: 2 });
+      expect(hits.map((h) => h.title).sort()).toEqual(['Live A', 'Live B']);
+    });
+
+    it('finds narrow-category memories ranked below a wall of other-category rows', async () => {
+      for (let i = 0; i < 20; i++) {
+        await backend.remember({
+          category: 'reference',
+          title: `Ref ${i}`,
+          content: 'loom',
+        });
+      }
+      await backend.remember({
+        category: 'project',
+        title: 'Proj A',
+        content: 'loom alpha',
+      });
+      await backend.remember({
+        category: 'project',
+        title: 'Proj B',
+        content: 'loom alpha',
+      });
+
+      const hits = await backend.recall({
+        query: 'loom',
+        category: 'project',
+        limit: 2,
+      });
+      expect(hits.map((h) => h.title).sort()).toEqual(['Proj A', 'Proj B']);
+    });
+
+    it('returns fewer than limit without looping forever when matches are exhausted', async () => {
+      for (let i = 0; i < 5; i++) {
+        const { ref } = await backend.remember({
+          category: 'project',
+          title: `Gone ${i}`,
+          content: 'loom',
+        });
+        rawArchive(ref);
+      }
+      await backend.remember({
+        category: 'project',
+        title: 'Only one',
+        content: 'loom alpha',
+      });
+
+      const hits = await backend.recall({ query: 'loom', limit: 3 });
+      expect(hits).toHaveLength(1);
+      expect(hits[0].title).toBe('Only one');
+    });
+
+    it('findSimilar grows k past filtered-out candidates', async () => {
+      for (let i = 0; i < 20; i++) {
+        await backend.remember({
+          category: 'reference',
+          title: `Ref ${i}`,
+          content: 'loom',
+        });
+      }
+      await backend.remember({
+        category: 'project',
+        title: 'Proj A',
+        content: 'loom alpha',
+      });
+      await backend.remember({
+        category: 'project',
+        title: 'Proj B',
+        content: 'loom alpha',
+      });
+
+      // startK = max((2+1)*4, 16) = 16 < 20 reference rows: pre-fix this
+      // returned nothing for the project category.
+      const hits = await backend.findSimilar({
+        text: 'loom',
+        category: 'project',
+        limit: 2,
+      });
+      expect(hits.map((h) => h.title).sort()).toEqual(['Proj A', 'Proj B']);
+    });
+
+    it('findSimilar by ref grows k past legacy-archived vectors', async () => {
+      const { ref: anchor } = await backend.remember({
+        category: 'project',
+        title: 'Anchor',
+        content: 'loom',
+      });
+      for (let i = 0; i < 16; i++) {
+        const { ref } = await backend.remember({
+          category: 'project',
+          title: `Dead ${i}`,
+          content: 'loom',
+        });
+        rawArchive(ref);
+      }
+      await backend.remember({
+        category: 'project',
+        title: 'Live sibling',
+        content: 'loom alpha',
+      });
+
+      const hits = await backend.findSimilar({ ref: anchor, limit: 2 });
+      expect(hits.map((h) => h.title)).toEqual(['Live sibling']);
+    });
+  });
+
   describe('audit', () => {
     it('reports counts, category breakdown, stale, duplicates, and expired', async () => {
       const { ref: anchorRef } = await backend.remember({
@@ -563,6 +702,70 @@ describe('SqliteVecBackend', () => {
         .get(ref) as { archived: number; archive_note: string | null };
       expect(row.archived).toBe(0);
       expect(row.archive_note).toBeNull();
+    });
+
+    const vecCount = () =>
+      (
+        backend
+          .getDatabase()
+          .prepare('SELECT COUNT(*) AS c FROM vec_memories')
+          .get() as { c: number }
+      ).c;
+
+    it('archive deletes the vector row but keeps the memory content', async () => {
+      const { ref } = await backend.remember({
+        category: 'project',
+        title: 'Vector hygiene',
+        content: 'loom content survives',
+      });
+      expect(vecCount()).toBe(1);
+
+      await backend.archive({ ref });
+
+      expect(vecCount()).toBe(0);
+      const row = backend
+        .getDatabase()
+        .prepare('SELECT content, archived FROM memories WHERE ref = ?')
+        .get(ref) as { content: string; archived: number };
+      expect(row.archived).toBe(1);
+      expect(row.content).toBe('loom content survives');
+    });
+
+    it('restore re-embeds and brings the memory back into recall', async () => {
+      const { ref } = await backend.remember({
+        category: 'project',
+        title: 'Round trip',
+        content: 'loom round trip',
+      });
+      await backend.archive({ ref });
+      expect(vecCount()).toBe(0);
+
+      await backend.restore({ ref });
+
+      expect(vecCount()).toBe(1);
+      const hits = await backend.recall({ query: 'loom round trip' });
+      expect(hits.map((h) => h.path)).toContain(ref);
+    });
+
+    it('restore tolerates legacy rows whose vector was never deleted', async () => {
+      const { ref } = await backend.remember({
+        category: 'project',
+        title: 'Legacy archived',
+        content: 'loom legacy',
+      });
+      // Simulate a pre-delete-on-archive row: flag flipped, vector intact.
+      backend
+        .getDatabase()
+        .prepare('UPDATE memories SET archived = 1 WHERE ref = ?')
+        .run(ref);
+      expect(vecCount()).toBe(1);
+
+      const result = await backend.restore({ ref });
+      expect(result.restored).toEqual([ref]);
+      expect(vecCount()).toBe(1); // no duplicate rowid, no crash
+
+      const hits = await backend.recall({ query: 'loom legacy' });
+      expect(hits.map((h) => h.path)).toContain(ref);
     });
 
     it('returns empty restored when memory not in archive', async () => {

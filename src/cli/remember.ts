@@ -3,6 +3,7 @@
  */
 import { parseArgs } from 'node:util';
 import { remember } from '../tools/remember.js';
+import { MEMORY_CATEGORIES, isMemoryCategory } from '../categories.js';
 import { assertStackVersionCompatible } from '../config.js';
 import { extractGlobalFlags, resolveEnv } from './args.js';
 import { readBody, renderJson } from './io.js';
@@ -13,7 +14,7 @@ const USAGE = `Usage: loom remember <title> [options]
 Body is read from stdin (when piped) or $EDITOR (when interactive).
 
 Options:
-  --category <name>      Category (default: general)
+  --category <name>      Category: user|project|self|feedback|reference|pursuit (default: reference)
   --project <name>       Project tag
   --ttl <dur>            TTL like "7d", "30d", or "permanent"
   --refs <csv>           Comma-separated reference refs stored in metadata
@@ -47,6 +48,12 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
   const title = parsed.positionals[0];
   if (!title) { io.stderr(`Missing title.\n${USAGE}`); return 2; }
 
+  const category = parsed.values.category ?? 'reference';
+  if (!isMemoryCategory(category)) {
+    io.stderr(`Unknown category "${category}". Valid categories: ${MEMORY_CATEGORIES.join(', ')}.\n`);
+    return 2;
+  }
+
   const env = resolveEnv(global, io.env);
   try { assertStackVersionCompatible(env.contextDir); }
   catch (err) { io.stderr(`${(err as Error).message}\n`); return 1; }
@@ -65,7 +72,7 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
     : undefined;
 
   const ref = await remember(env.contextDir, {
-    category: parsed.values.category ?? 'general',
+    category,
     title,
     content: body,
     project:  parsed.values.project,

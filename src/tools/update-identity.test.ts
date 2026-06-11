@@ -267,3 +267,194 @@ describe('updateIdentity', () => {
     expect(written).toContain('- Direct');
   });
 });
+
+describe('parseSections — fence awareness', () => {
+  it('treats ## inside ``` fences as body content', () => {
+    const text = '## Real\nbefore\n```\n## Not A Section\n```\nafter\n';
+    const sections = parseSections(text);
+    const named = sections.filter(s => s.header !== '');
+    expect(named).toHaveLength(1);
+    expect(named[0].header).toBe('Real');
+    expect(named[0].content).toContain('## Not A Section');
+  });
+
+  it('treats ## inside ~~~ fences as body content', () => {
+    const text = '## Real\n~~~\n## Hidden\n~~~\n';
+    const sections = parseSections(text);
+    const named = sections.filter(s => s.header !== '');
+    expect(named).toHaveLength(1);
+    expect(named[0].header).toBe('Real');
+  });
+
+  it('resumes section parsing after the fence closes', () => {
+    const text = '## First\n```md\n## Fenced\n```\n\n## Second\nreal content\n';
+    const sections = parseSections(text);
+    const named = sections.filter(s => s.header !== '');
+    expect(named.map(s => s.header)).toEqual(['First', 'Second']);
+  });
+
+  it('does not close a ``` fence with ~~~', () => {
+    const text = '## Only\n```\n~~~\n## Still Fenced\n```\nend\n';
+    const sections = parseSections(text);
+    expect(sections.filter(s => s.header !== '')).toHaveLength(1);
+  });
+});
+
+describe('updateIdentity — minimal rewriting and fences', () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'loom-update-identity-test-'));
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('replacing section A leaves section B byte-identical (weird spacing preserved)', async () => {
+    const weirdB = '## Learning  \n\n\n   - indented oddly\t\n\n* trailing blank lines kept\n\n\n';
+    const original = '# Preamble   \n\nodd  spacing\n\n## Strengths\n- old\n\n' + weirdB;
+    await writeFile(join(tempDir, 'self-model.md'), original);
+
+    await updateIdentity(tempDir, {
+      file: 'self-model',
+      section: 'Strengths',
+      content: '- new',
+    });
+
+    const written = await readFile(join(tempDir, 'self-model.md'), 'utf-8');
+    // Everything from section B's header onward is untouched, byte for byte
+    expect(written.slice(written.indexOf('## Learning'))).toBe(weirdB);
+    // Preamble untouched, byte for byte
+    expect(written.startsWith('# Preamble   \n\nodd  spacing\n\n')).toBe(true);
+    expect(written).toContain('## Strengths\n- new\n');
+    expect(written).not.toContain('- old');
+  });
+
+  it('replacing a later section leaves earlier sections byte-identical', async () => {
+    const head = '## Strengths\n-  double  spaced\n\t- tabbed\n\n';
+    await writeFile(join(tempDir, 'self-model.md'), head + '## Learning\n- old\n');
+
+    await updateIdentity(tempDir, {
+      file: 'self-model',
+      section: 'Learning',
+      content: '- new learning',
+    });
+
+    const written = await readFile(join(tempDir, 'self-model.md'), 'utf-8');
+    expect(written.startsWith(head)).toBe(true);
+    expect(written).toContain('## Learning\n- new learning\n');
+  });
+
+  it('fenced content survives a round-trip edit of a sibling section', async () => {
+    const fenced = '## Snippets\n```ts\n## not a header\nconst x = 1;\n```\n';
+    await writeFile(join(tempDir, 'self-model.md'), fenced + '\n## Focus\n- old focus\n');
+
+    await updateIdentity(tempDir, {
+      file: 'self-model',
+      section: 'Focus',
+      content: '- new focus',
+    });
+
+    const written = await readFile(join(tempDir, 'self-model.md'), 'utf-8');
+    expect(written.startsWith(fenced)).toBe(true);
+    expect(written).toContain('- new focus');
+  });
+
+  it('replaces the correct section when a fenced ## fake header shadows it', async () => {
+    await writeFile(join(tempDir, 'self-model.md'),
+      '## Real\n```\n## Real\nfenced duplicate\n```\nbody tail\n\n## Other\n- keep\n');
+
+    await updateIdentity(tempDir, {
+      file: 'self-model',
+      section: 'Real',
+      content: 'replaced body',
+    });
+
+    const written = await readFile(join(tempDir, 'self-model.md'), 'utf-8');
+    expect(written).toContain('## Real\nreplaced body\n');
+    expect(written).not.toContain('fenced duplicate');
+    expect(written).toContain('## Other\n- keep\n');
+  });
+
+  it('appending leaves existing content byte-identical', async () => {
+    const original = '## Strengths\n-  weird   spacing\n';
+    await writeFile(join(tempDir, 'self-model.md'), original);
+
+    await updateIdentity(tempDir, {
+      file: 'self-model',
+      section: 'Weaknesses',
+      content: '- none',
+      mode: 'append',
+    });
+
+    const written = await readFile(join(tempDir, 'self-model.md'), 'utf-8');
+    expect(written.startsWith(original)).toBe(true);
+    expect(written).toContain('## Weaknesses\n- none\n');
+  });
+});
+
+describe('updateIdentity — atomic writes and .bak', () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'loom-update-identity-test-'));
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('writes a .bak with the prior content when replacing a section', async () => {
+    const original = '## Strengths\n- old\n';
+    await writeFile(join(tempDir, 'self-model.md'), original);
+
+    await updateIdentity(tempDir, {
+      file: 'self-model',
+      section: 'Strengths',
+      content: '- new',
+    });
+
+    const bak = await readFile(join(tempDir, 'self-model.md.bak'), 'utf-8');
+    expect(bak).toBe(original);
+    const written = await readFile(join(tempDir, 'self-model.md'), 'utf-8');
+    expect(written).toContain('- new');
+  });
+
+  it('writes a .bak with the prior content when appending a section', async () => {
+    const original = '## Strengths\n- X\n';
+    await writeFile(join(tempDir, 'preferences.md'), original);
+
+    await updateIdentity(tempDir, {
+      file: 'preferences',
+      section: 'New Section',
+      content: '- Y',
+      mode: 'append',
+    });
+
+    const bak = await readFile(join(tempDir, 'preferences.md.bak'), 'utf-8');
+    expect(bak).toBe(original);
+  });
+
+  it('does not create a .bak on first-ever write', async () => {
+    await updateIdentity(tempDir, {
+      file: 'self-model',
+      section: 'Strengths',
+      content: '- fresh',
+    });
+
+    await expect(readFile(join(tempDir, 'self-model.md.bak'), 'utf-8')).rejects.toThrow();
+    const written = await readFile(join(tempDir, 'self-model.md'), 'utf-8');
+    expect(written).toBe('## Strengths\n- fresh\n');
+  });
+
+  it('keeps only one .bak generation across successive edits', async () => {
+    await writeFile(join(tempDir, 'self-model.md'), '## Focus\n- v1\n');
+    await updateIdentity(tempDir, { file: 'self-model', section: 'Focus', content: '- v2' });
+    await updateIdentity(tempDir, { file: 'self-model', section: 'Focus', content: '- v3' });
+
+    const bak = await readFile(join(tempDir, 'self-model.md.bak'), 'utf-8');
+    expect(bak).toContain('- v2');
+    expect(bak).not.toContain('- v1');
+  });
+});

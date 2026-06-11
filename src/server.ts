@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { assertStackVersionCompatible, assertContextBootable, resolveRepoRoot } from './config.js';
+import { MEMORY_CATEGORIES } from './categories.js';
 import { loadIdentity } from './tools/identity.js';
 import { loadDossier } from './tools/dossier.js';
 import { remember } from './tools/remember.js';
@@ -130,7 +131,7 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     'learn something important about the user, a project, or yourself that ' +
     'should be available in future sessions.',
     {
-      category: z.enum(['user', 'project', 'self', 'feedback', 'reference', 'pursuit']).describe(
+      category: z.enum(MEMORY_CATEGORIES).describe(
         'Memory category: user (about the human), project (about work), self (capability/learning), feedback (corrections/confirmations), reference (external pointers), pursuit (active goal or ongoing creative thread)'
       ),
       title: z.string().describe('Short title for the memory'),
@@ -155,7 +156,7 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
       query: z.string().describe('What to search for — topic, keyword, or question'),
       category: z.string().optional().describe('Filter to a specific memory category, or omit for all'),
       project: z.string().optional().describe('Filter to a specific project'),
-      limit: z.number().optional().describe('Maximum results to return (default: 10)'),
+      limit: z.number().int().positive().optional().describe('Maximum results to return (default: 10)'),
     },
     async ({ query, category, project, limit }) => {
       const result = await recall(contextDir, { query, category, project, limit });
@@ -183,16 +184,22 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
   server.tool(
     'forget',
     'Remove memories. Single deletion by ref or category+title. ' +
-    'Bulk deletion by category and/or project scope.',
+    'Bulk deletion by category and/or project scope — requires confirm: true; ' +
+    'without it, returns a dry-run preview of what would be deleted.',
     {
       ref: z.string().optional().describe('Memory reference for single deletion'),
       category: z.string().optional().describe('Category (with title for single, alone for bulk)'),
       title: z.string().optional().describe('Title of specific memory to forget'),
       project: z.string().optional().describe('Delete all memories for this project (bulk)'),
       title_pattern: z.string().optional().describe('Glob pattern for bulk title matching. Requires category or project as scope guard.'),
+      confirm: z.boolean().optional().describe(
+        'Safety gate for scope deletions (category alone, project alone, or title_pattern). ' +
+        'Must be true to actually delete; omit for a free dry-run preview. ' +
+        'Single-target deletions (ref, or category+title) never need it.',
+      ),
     },
-    async ({ ref, category, title, project, title_pattern }) => {
-      const result = await forget(contextDir, { ref, category, title, project, title_pattern });
+    async ({ ref, category, title, project, title_pattern, confirm }) => {
+      const result = await forget(contextDir, { ref, category, title, project, title_pattern, confirm });
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );
@@ -202,7 +209,7 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     'Remove expired memories (TTL elapsed). Use dry_run to preview without deleting.',
     {
       dry_run: z.boolean().optional().describe('Preview only — show what would be pruned without deleting (default: false)'),
-      stale_days: z.number().optional().describe('Days since last access to consider a memory stale (default: 30)'),
+      stale_days: z.number().int().positive().optional().describe('Days since last access to consider a memory stale (default: 30)'),
     },
     async ({ dry_run, stale_days }) => {
       const result = await prune(contextDir, { dryRun: dry_run, staleDays: stale_days });
@@ -217,7 +224,7 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     {
       category: z.string().optional().describe('Filter to a specific category'),
       project: z.string().optional().describe('Filter to a specific project'),
-      limit: z.number().optional().describe('Maximum results (default: 50)'),
+      limit: z.number().int().positive().optional().describe('Maximum results (default: 50)'),
     },
     async ({ category, project, limit }) => {
       const result = await memoryList(contextDir, { category, project, limit });
@@ -234,10 +241,10 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     {
       ref: z.string().optional().describe('Anchor on an existing memory ref (excludes self from results)'),
       text: z.string().optional().describe('Or anchor on fresh text — embedded on the fly'),
-      limit: z.number().optional().describe('Max neighbours to return (default 10)'),
+      limit: z.number().int().positive().optional().describe('Max neighbours to return (default 10)'),
       category: z.string().optional().describe('Restrict candidates to a category'),
       project: z.string().optional().describe('Restrict candidates to a project'),
-      min_relevance: z.number().optional().describe('Drop matches below this cosine similarity (0..1)'),
+      min_relevance: z.number().min(0).max(1).optional().describe('Drop matches below this cosine similarity (0..1)'),
     },
     async ({ ref, text, limit, category, project, min_relevance }) => {
       const result = await findSimilar(contextDir, {
@@ -254,9 +261,9 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     'similarity threshold), and expired refs. Read-only — pair with `forget`/' +
     '`update` to act on findings.',
     {
-      stale_days: z.number().optional().describe('Stale threshold in days (default 30)'),
-      similarity_threshold: z.number().optional().describe('Cosine floor for duplicate pairs, 0..1 (default 0.85)'),
-      max_duplicates: z.number().optional().describe('Cap on duplicate pairs returned (default 20)'),
+      stale_days: z.number().int().positive().optional().describe('Stale threshold in days (default 30)'),
+      similarity_threshold: z.number().min(0).max(1).optional().describe('Cosine floor for duplicate pairs, 0..1 (default 0.85)'),
+      max_duplicates: z.number().int().positive().optional().describe('Cap on duplicate pairs returned (default 20)'),
     },
     async ({ stale_days, similarity_threshold, max_duplicates }) => {
       const result = await memoryAudit(contextDir, {
@@ -437,7 +444,7 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
         'Filter by domain prefix, inclusive of the exact domain ' +
         '(e.g. "music/gear" matches "music/gear" and "music/gear/elektron")',
       ),
-      limit: z.number().optional().describe('Maximum results to return (default: 10)'),
+      limit: z.number().int().positive().optional().describe('Maximum results to return (default: 10)'),
       detail: z.enum(['index', 'full']).optional().describe(
         'Output tier override. "index": compact listing, no body, no access stamping. ' +
         '"full": whole pages with citations. Default: full with a query, index without.',
@@ -457,13 +464,13 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     '(3) misfile audit — provisional sourcing or conversation-only citations ' +
     '(should be in the memory store instead). Pair with knowledge_write to act on findings.',
     {
-      expansion_hit_threshold: z.number().optional().describe(
-        'hit_count floor for expansion candidates (default 3)',
+      expansion_hit_threshold: z.number().int().nonnegative().optional().describe(
+        'hit_count floor for expansion candidates (default 3; 0 considers every page)',
       ),
-      thin_body_threshold: z.number().optional().describe(
+      thin_body_threshold: z.number().int().positive().optional().describe(
         'body char ceiling to consider a page thin (default 500)',
       ),
-      cold_days: z.number().optional().describe(
+      cold_days: z.number().int().positive().optional().describe(
         'Days without access before a page is cold (default 30)',
       ),
     },

@@ -101,3 +101,54 @@ describe('bootstrap', () => {
     expect(result).toContain('claude-code');
   });
 });
+
+describe('bootstrap — atomic writes and .bak', () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'loom-bootstrap-test-'));
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  const BASE = {
+    name: 'Test Agent',
+    purpose: 'Run tests reliably',
+    voice: 'Direct and concise',
+  };
+
+  it('creates no .bak files on a first-ever bootstrap', async () => {
+    await bootstrap(tempDir, BASE);
+
+    for (const file of ['IDENTITY.md', 'preferences.md', 'self-model.md']) {
+      await expect(readFile(join(tempDir, `${file}.bak`), 'utf-8')).rejects.toThrow();
+    }
+  });
+
+  it('preserves prior identity files as .bak when force-overwriting', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Old creed');
+    await writeFile(join(tempDir, 'preferences.md'), 'Old prefs');
+    await writeFile(join(tempDir, 'self-model.md'), 'Old self-model');
+
+    await bootstrap(tempDir, { ...BASE, force: true });
+
+    expect(await readFile(join(tempDir, 'IDENTITY.md.bak'), 'utf-8')).toBe('Old creed');
+    expect(await readFile(join(tempDir, 'preferences.md.bak'), 'utf-8')).toBe('Old prefs');
+    expect(await readFile(join(tempDir, 'self-model.md.bak'), 'utf-8')).toBe('Old self-model');
+
+    // New content actually landed
+    expect(await readFile(join(tempDir, 'IDENTITY.md'), 'utf-8')).toContain('# Test Agent');
+  });
+
+  it('only backs up files that existed before the force overwrite', async () => {
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Old creed');
+
+    await bootstrap(tempDir, { ...BASE, force: true });
+
+    expect(await readFile(join(tempDir, 'IDENTITY.md.bak'), 'utf-8')).toBe('Old creed');
+    await expect(readFile(join(tempDir, 'preferences.md.bak'), 'utf-8')).rejects.toThrow();
+    await expect(readFile(join(tempDir, 'self-model.md.bak'), 'utf-8')).rejects.toThrow();
+  });
+});

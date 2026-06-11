@@ -51,16 +51,34 @@ describe('loom remember', () => {
     expect(stderr).toMatch(/title/i);
   });
 
-  it('defaults category to "general" when omitted', async () => {
+  it('defaults category to "reference" when omitted', async () => {
     const { stdout, code } = await runCliCaptured(
       ['remember', 'def', '--context-dir', tempDir, '--json'],
       { stdin: 'body' },
     );
     expect(code).toBe(0);
     const parsed = JSON.parse(stdout);
-    expect(parsed.category).toBe('general');
+    expect(parsed.category).toBe('reference');
     // Context dir exists (readdir sanity) — backend stores in sqlite, not nested dirs.
     const entries = await readdir(tempDir);
     expect(entries.length).toBeGreaterThan(0);
+  });
+
+  it('rejects an unknown category with exit 2 and lists valid ones', async () => {
+    const { stderr, code } = await runCliCaptured(
+      ['remember', 'note', '--category', 'general', '--context-dir', tempDir],
+      { stdin: 'body' },
+    );
+    expect(code).toBe(2);
+    expect(stderr).toMatch(/Unknown category "general"/);
+    expect(stderr).toMatch(/user, project, self, feedback, reference, pursuit/);
+  });
+
+  it('accepts every category in the shared vocabulary', async () => {
+    const { code } = await runCliCaptured(
+      ['remember', 'pursuit note', '--category', 'pursuit', '--context-dir', tempDir],
+      { stdin: 'body' },
+    );
+    expect(code).toBe(0);
   });
 });

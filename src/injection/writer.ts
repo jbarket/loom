@@ -84,7 +84,7 @@ async function readIfExists(path: string): Promise<string | null> {
   }
 }
 
-async function atomicWrite(
+export async function atomicWrite(
   path: string,
   content: string,
   preserveModeFrom: string | null,

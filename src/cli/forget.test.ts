@@ -41,14 +41,36 @@ describe('loom forget', () => {
     expect(stderr).toMatch(/scope|category|project/i);
   });
 
-  it('accepts title-pattern with --category', async () => {
+  it('title-pattern with --category previews without --confirm (exit 2, deletes nothing)', async () => {
     await remember(tempDir, { category: 'reference', title: 'sweepA', content: 'a' });
     await remember(tempDir, { category: 'reference', title: 'sweepB', content: 'b' });
     const { stdout, code } = await runCliCaptured(
       ['forget', '--title-pattern', 'sweep*', '--category', 'reference', '--context-dir', tempDir],
     );
+    expect(code).toBe(2);
+    expect(stdout).toMatch(/confirm/i);
+    expect(stdout).toMatch(/sweepA/);
+  });
+
+  it('title-pattern with --category and --confirm deletes', async () => {
+    await remember(tempDir, { category: 'reference', title: 'sweepA', content: 'a' });
+    await remember(tempDir, { category: 'reference', title: 'sweepB', content: 'b' });
+    const { stdout, code } = await runCliCaptured(
+      ['forget', '--title-pattern', 'sweep*', '--category', 'reference', '--confirm', '--context-dir', tempDir],
+    );
     expect(code).toBe(0);
     expect(stdout).toMatch(/2/);
+  });
+
+  it('--json scope deletion without --confirm is gated too (no bypass)', async () => {
+    await remember(tempDir, { category: 'reference', title: 'sweepA', content: 'a' });
+    const { stdout, code } = await runCliCaptured(
+      ['forget', '--category', 'reference', '--json', '--context-dir', tempDir],
+    );
+    expect(code).toBe(2);
+    const parsed = JSON.parse(stdout);
+    expect(parsed.confirmRequired).toBe(true);
+    expect(parsed.deleted).toEqual([]);
   });
 
   it('exits 3 when ref not found', async () => {

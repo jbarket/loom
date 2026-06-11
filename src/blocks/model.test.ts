@@ -25,6 +25,14 @@ describe('blocks/model', () => {
       expect(await model.read(dir, 'claude-opus')).toBeNull();
     });
 
+    it('rejects keys with path traversal', async () => {
+      await writeFile(join(dir, 'secret.md'), 'TOP-SECRET');
+      await expect(model.read(dir, '../secret')).rejects.toThrow(/model name/);
+      await expect(model.read(dir, '..\\secret')).rejects.toThrow(/model name/);
+      await expect(model.read(dir, '..')).rejects.toThrow(/model name/);
+      await expect(model.read(dir, '')).rejects.toThrow(/model name/);
+    });
+
     it('returns null when the manifest file is empty', async () => {
       await mkdir(join(dir, 'models'), { recursive: true });
       await writeFile(join(dir, 'models', 'claude-opus.md'), '');

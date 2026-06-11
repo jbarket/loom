@@ -14,6 +14,7 @@ import { loadClientAdapter } from '../clients.js';
 import * as harnessBlock from '../blocks/harness.js';
 import * as modelBlock from '../blocks/model.js';
 import { resolveDefaultContextPath } from '../config.js';
+import { pathSegmentError } from '../path-safety.js';
 
 async function readOptional(path: string): Promise<string | null> {
   try {
@@ -35,6 +36,21 @@ export async function loadIdentity(
   const parts: string[] = [];
   const effectiveClient = client ?? process.env.LOOM_CLIENT;
   const effectiveModel = model ?? process.env.LOOM_MODEL;
+
+  // Boundary discipline: every param that becomes a path segment validates
+  // here, before any file read. Empty/unset values are simply "not provided"
+  // (all readers below are guarded), so only truthy values are checked.
+  for (const [name, value] of [
+    ['project', project],
+    ['client', effectiveClient],
+    ['model', effectiveModel],
+    ['role', role],
+  ] as const) {
+    if (value) {
+      const error = pathSegmentError(value, name);
+      if (error) return error;
+    }
+  }
 
   const defaultPath = _defaultPathForTest ?? resolveDefaultContextPath();
 

@@ -139,43 +139,22 @@ export class SqliteVecBackend implements MemoryBackend {
 
   async recall(input: RecallInput): Promise<MemoryMatch[]> {
     const limit = input.limit ?? 10;
-    const fetchK = limit * 4;
 
     const queryVector = await (this.embedder.embedQuery?.(input.query) ??
       this.embedder.embed(input.query));
 
-    const vecRows = this.db
-      .prepare(
-        `SELECT rowid, distance FROM vec_memories
-         WHERE embedding MATCH ? AND k = ?
-         ORDER BY distance`,
-      )
-      .all(toVecBuffer(queryVector), fetchK) as VecMatch[];
-
-    if (vecRows.length === 0) return [];
-
-    const placeholders = vecRows.map(() => '?').join(',');
-    const memRows = this.db
-      .prepare(`SELECT * FROM memories WHERE id IN (${placeholders}) AND archived = 0`)
-      .all(...vecRows.map((r) => r.rowid)) as MemoryRow[];
-
-    const byId = new Map(memRows.map((r) => [r.id, r]));
     const categoryFilter =
       input.category && input.category !== 'all' ? input.category : null;
     const projectFilter = input.project ?? null;
 
-    const results: MemoryMatch[] = [];
-    const hitIds: number[] = [];
-    for (const vr of vecRows) {
-      const mem = byId.get(vr.rowid);
-      if (!mem) continue;
-      if (categoryFilter && mem.category !== categoryFilter) continue;
-      if (projectFilter && mem.project !== projectFilter) continue;
+    const hits = this.searchVectors(queryVector, limit, limit * 4, (mem) => {
+      if (categoryFilter && mem.category !== categoryFilter) return false;
+      if (projectFilter && mem.project !== projectFilter) return false;
+      return true;
+    });
 
-      results.push(rowToMatch(mem, vr.distance));
-      hitIds.push(mem.id);
-      if (results.length >= limit) break;
-    }
+    const results = hits.map((h) => rowToMatch(h.mem, h.distance));
+    const hitIds = hits.map((h) => h.mem.id);
 
     if (hitIds.length > 0) {
       const now = new Date().toISOString();
@@ -401,43 +380,22 @@ export class SqliteVecBackend implements MemoryBackend {
     }
 
     const limit = input.limit ?? 10;
-    // Over-fetch so filters + self-exclusion don't starve the result set.
-    const fetchK = Math.max((limit + 1) * 4, 16);
-
-    const vecRows = this.db
-      .prepare(
-        `SELECT rowid, distance FROM vec_memories
-         WHERE embedding MATCH ? AND k = ?
-         ORDER BY distance`,
-      )
-      .all(toVecBuffer(queryVector), fetchK) as VecMatch[];
-
-    if (vecRows.length === 0) return [];
-
-    const ids = vecRows.map((r) => r.rowid);
-    const placeholders = ids.map(() => '?').join(',');
-    const memRows = this.db
-      .prepare(`SELECT * FROM memories WHERE id IN (${placeholders}) AND archived = 0`)
-      .all(...ids) as MemoryRow[];
-    const byId = new Map(memRows.map((r) => [r.id, r]));
-
     const minRelevance = input.minRelevance ?? 0;
     const categoryFilter = input.category ?? null;
     const projectFilter = input.project ?? null;
 
-    const results: MemoryMatch[] = [];
-    for (const vr of vecRows) {
-      if (anchorId !== null && vr.rowid === anchorId) continue;
-      const mem = byId.get(vr.rowid);
-      if (!mem) continue;
-      if (categoryFilter && mem.category !== categoryFilter) continue;
-      if (projectFilter && (mem.project ?? null) !== projectFilter) continue;
-      const match = rowToMatch(mem, vr.distance);
-      if (match.relevance < minRelevance) continue;
-      results.push(match);
-      if (results.length >= limit) break;
-    }
-    return results;
+    // Over-fetch so filters + self-exclusion don't starve the result set.
+    const startK = Math.max((limit + 1) * 4, 16);
+
+    const hits = this.searchVectors(queryVector, limit, startK, (mem, vr) => {
+      if (anchorId !== null && vr.rowid === anchorId) return false;
+      if (categoryFilter && mem.category !== categoryFilter) return false;
+      if (projectFilter && (mem.project ?? null) !== projectFilter) return false;
+      if (1 - vr.distance < minRelevance) return false;
+      return true;
+    });
+
+    return hits.map((h) => rowToMatch(h.mem, h.distance));
   }
 
   async audit(options?: AuditOptions): Promise<AuditReport> {
@@ -552,8 +510,14 @@ export class SqliteVecBackend implements MemoryBackend {
     const stmt = this.db.prepare(
       'UPDATE memories SET archived = 1, archive_note = ?, updated = ? WHERE id = ?',
     );
+    // Drop the embedding so archived rows stop occupying KNN slots.
+    // Content stays in `memories`; restore() re-embeds it.
+    const delVec = this.db.prepare('DELETE FROM vec_memories WHERE rowid = ?');
     const tx = this.db.transaction(() => {
-      for (const row of rows) stmt.run(tombstone, now, row.id);
+      for (const row of rows) {
+        stmt.run(tombstone, now, row.id);
+        delVec.run(BigInt(row.id));
+      }
     });
     tx();
 
@@ -561,29 +525,45 @@ export class SqliteVecBackend implements MemoryBackend {
   }
 
   async restore(input: RestoreInput): Promise<RestoreResult> {
-    let rows: { id: number; ref: string }[] = [];
+    type RestoreRow = { id: number; ref: string; title: string; content: string };
+    let rows: RestoreRow[] = [];
 
     if (input.ref) {
       const row = this.db
-        .prepare('SELECT id, ref FROM memories WHERE ref = ? AND archived = 1')
-        .get(input.ref) as { id: number; ref: string } | undefined;
+        .prepare('SELECT id, ref, title, content FROM memories WHERE ref = ? AND archived = 1')
+        .get(input.ref) as RestoreRow | undefined;
       if (row) rows = [row];
     } else if (input.category && input.title) {
       rows = this.db
-        .prepare('SELECT id, ref FROM memories WHERE category = ? AND title = ? AND archived = 1')
-        .all(input.category, input.title) as { id: number; ref: string }[];
+        .prepare('SELECT id, ref, title, content FROM memories WHERE category = ? AND title = ? AND archived = 1')
+        .all(input.category, input.title) as RestoreRow[];
     } else {
       return { restored: [] };
     }
 
     if (rows.length === 0) return { restored: [] };
 
+    // Archive dropped the embedding; rebuild it from the stored content.
+    const vectors = await this.embedder.embedBatch(
+      rows.map((r) => `${r.title}\n\n${r.content}`),
+    );
+
     const now = new Date().toISOString();
     const stmt = this.db.prepare(
       'UPDATE memories SET archived = 0, archive_note = NULL, updated = ? WHERE id = ?',
     );
+    // Delete-then-insert: legacy rows archived before delete-on-archive
+    // may still hold a vector, and vec0 rowids must stay unique.
+    const delVec = this.db.prepare('DELETE FROM vec_memories WHERE rowid = ?');
+    const insVec = this.db.prepare(
+      'INSERT INTO vec_memories(rowid, embedding) VALUES (?, ?)',
+    );
     const tx = this.db.transaction(() => {
-      for (const row of rows) stmt.run(now, row.id);
+      rows.forEach((row, i) => {
+        stmt.run(now, row.id);
+        delVec.run(BigInt(row.id));
+        insVec.run(BigInt(row.id), toVecBuffer(vectors[i]));
+      });
     });
     tx();
 
@@ -599,6 +579,76 @@ export class SqliteVecBackend implements MemoryBackend {
   }
 
   // ── Internals ──
+
+  /**
+   * KNN search with a growing-k loop.
+   *
+   * sqlite-vec's KNN returns the k nearest rows regardless of archived
+   * status or category/project filters (those live in `memories`, not in
+   * the vec table). A single over-fetch can therefore starve the result
+   * set when many near neighbours are filtered out — e.g. legacy archived
+   * rows whose vectors predate delete-on-archive, or a narrow category.
+   *
+   * Policy: start at `startK`, multiply by 4 each round, stop when
+   * `limit` accepted matches are collected, k has covered every vec row,
+   * or a round surfaces no new candidates. Candidates are deduped across
+   * rounds; because each round's KNN is distance-ordered and new
+   * candidates always rank deeper than already-seen ones, appending
+   * preserves global distance order.
+   */
+  private searchVectors(
+    queryVector: number[],
+    limit: number,
+    startK: number,
+    accept: (mem: MemoryRow, vr: VecMatch) => boolean,
+  ): { mem: MemoryRow; distance: number }[] {
+    const totalVecRows = (
+      this.db.prepare('SELECT COUNT(*) AS c FROM vec_memories').get() as {
+        c: number;
+      }
+    ).c;
+    if (totalVecRows === 0) return [];
+
+    const knnStmt = this.db.prepare(
+      `SELECT rowid, distance FROM vec_memories
+       WHERE embedding MATCH ? AND k = ?
+       ORDER BY distance`,
+    );
+    const queryBuf = toVecBuffer(queryVector);
+
+    const out: { mem: MemoryRow; distance: number }[] = [];
+    const seen = new Set<number>();
+    let k = Math.max(1, startK);
+
+    for (;;) {
+      const vecRows = knnStmt.all(queryBuf, k) as VecMatch[];
+      const fresh = vecRows.filter((vr) => !seen.has(vr.rowid));
+      if (fresh.length === 0) break;
+      for (const vr of fresh) seen.add(vr.rowid);
+
+      const placeholders = fresh.map(() => '?').join(',');
+      const memRows = this.db
+        .prepare(
+          `SELECT * FROM memories WHERE id IN (${placeholders}) AND archived = 0`,
+        )
+        .all(...fresh.map((vr) => vr.rowid)) as MemoryRow[];
+      const byId = new Map(memRows.map((r) => [r.id, r]));
+
+      for (const vr of fresh) {
+        const mem = byId.get(vr.rowid);
+        if (!mem) continue;
+        if (!accept(mem, vr)) continue;
+        out.push({ mem, distance: vr.distance });
+        if (out.length >= limit) break;
+      }
+
+      if (out.length >= limit) break;
+      if (k >= totalVecRows) break;
+      k = Math.min(k * 4, totalVecRows);
+    }
+
+    return out;
+  }
 
   private initSchema(): void {
     const statements = [
