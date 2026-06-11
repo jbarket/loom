@@ -431,13 +431,19 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
 
   server.tool(
     'knowledge_recall',
-    'Search the knowledge store with LIKE matching over title, body, and domain. ' +
-    'Never surfaces archived pages. Two detail tiers: "full" returns whole entity ' +
-    'pages (the synthesis unit) and stamps last_accessed/hit_count; "index" returns ' +
-    'compact slug/domain/snippet entries without stamping. Defaults: full when a ' +
-    'query is given, index when browsing without one. Full output is size-guarded — ' +
-    'overflow results degrade to index entries; recall by slug to read them.',
+    'Search the knowledge store with LIKE matching over title, body, and domain, ' +
+    'or fetch one page exactly by slug. Never surfaces archived pages. Two detail ' +
+    'tiers: "full" returns whole entity pages (the synthesis unit) and stamps ' +
+    'last_accessed/hit_count; "index" returns compact slug/domain/snippet entries ' +
+    'without stamping. Defaults: full when a query is given, index when browsing ' +
+    'without one. Full output is size-guarded — overflow results degrade to index ' +
+    'entries; recall by slug to read them. Prefer slug over query when you know ' +
+    'the page — token matching can hit cross-references in other pages\' bodies.',
     {
+      slug: z.string().optional().describe(
+        'Exact-slug lookup — returns that single page in full detail and stamps ' +
+        'access. Takes precedence over query/domain/limit.',
+      ),
       query: z.string().optional().describe(
         'Search terms — matched against title, body, and domain. ' +
         'Omit to browse (returns an index of non-archived pages up to limit).',
@@ -457,8 +463,8 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
         'SLA filter can run from the listing alone.',
       ),
     },
-    async ({ query, domain, limit, detail, sort_by_verified }) => {
-      const result = await knowledgeRecall(contextDir, { query, domain, limit, detail, sort_by_verified });
+    async ({ slug, query, domain, limit, detail, sort_by_verified }) => {
+      const result = await knowledgeRecall(contextDir, { slug, query, domain, limit, detail, sort_by_verified });
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );

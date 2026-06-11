@@ -200,6 +200,28 @@ describe('SqliteKnowledgeBackend — verify / freshness / revisions', () => {
     });
   });
 
+  // ─── getPage access stamping ────────────────────────────────────────────────
+
+  describe('getPage stampAccess', () => {
+    it('does not stamp access by default', async () => {
+      await seed('page');
+      await backend.getPage('page');
+
+      const page = await backend.getPage('page');
+      expect(page!.hit_count).toBe(0);
+      expect(page!.last_accessed).toBeNull();
+    });
+
+    it('stamps last_accessed and hit_count when stampAccess is true', async () => {
+      await seed('page');
+      await backend.getPage('page', { stampAccess: true });
+
+      const page = await backend.getPage('page');
+      expect(page!.hit_count).toBe(1);
+      expect(page!.last_accessed).not.toBeNull();
+    });
+  });
+
   // ─── queryPages sortByVerified ──────────────────────────────────────────────
 
   describe('queryPages sortByVerified', () => {

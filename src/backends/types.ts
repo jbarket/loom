@@ -489,8 +489,8 @@ export interface KnowledgePurgeResult {
 export interface KnowledgeBackend {
   /** Upsert an entity page by slug; create or append. */
   writePage(input: KnowledgePageInput): Promise<KnowledgeWriteResult>;
-  /** Get a single page by slug. */
-  getPage(slug: string): Promise<KnowledgePageWithCitations | null>;
+  /** Get a single page by slug. opts.stampAccess marks the fetch as a real read (last_accessed / hit_count). */
+  getPage(slug: string, opts?: { stampAccess?: boolean }): Promise<KnowledgePageWithCitations | null>;
   /** List pages with optional filters. */
   listPages(input?: KnowledgeQueryInput): Promise<KnowledgePageWithCitations[]>;
   /** LIKE search over title, body, and domain. */
