@@ -203,6 +203,8 @@ export interface MemoryBackend {
   archive(input: ArchiveInput): Promise<ArchiveResult>;
   /** Restore a previously archived memory to the active set. */
   restore(input: RestoreInput): Promise<RestoreResult>;
+  /** Release the underlying store handle. Cached backends evict on close. */
+  close(): void;
 }
 
 // ─── Embedding Interface (used by vector backends) ───────────────────────────

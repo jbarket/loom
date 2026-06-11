@@ -11,5 +11,11 @@ export async function run(_argv: string[], _io: IOStreams): Promise<number> {
   const { server } = createLoomServer({ contextDir });
   const transport = new StdioServerTransport();
   await server.connect(transport);
+  // connect() resolves when the stdio transport STARTS, not when it closes.
+  // Returning here would let the CLI dispatcher process.exit(0) and kill the
+  // server the instant it came up. Hold until the client hangs up.
+  await new Promise<void>((resolve) => {
+    transport.onclose = () => resolve();
+  });
   return 0;
 }
