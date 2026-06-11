@@ -251,4 +251,41 @@ describe('knowledgeRecall', () => {
     expect(result).toMatch(/`nested`/);
     expect(result).not.toMatch(/`other`/);
   });
+
+  describe('sort_by_verified', () => {
+    it('orders never-verified then stalest-first and shows verified stamps', async () => {
+      await seedPage('fresh', 'test', 'Fresh', 'Recently verified page.');
+      await seedPage('stale', 'test', 'Stale', 'Long-unverified page.');
+      await seedPage('never', 'test', 'Never', 'Never-verified page.');
+
+      const b = createKnowledgeBackend(tempDir);
+      try {
+        await b.verifyPages({ slug: 'fresh', verified_at: '2026-06-01T00:00:00.000Z' });
+        await b.verifyPages({ slug: 'stale', verified_at: '2025-01-01T00:00:00.000Z' });
+        const raw = (b as unknown as { ensureOpen(): { prepare(sql: string): { run(...args: unknown[]): unknown } } })['ensureOpen']();
+        raw.prepare('UPDATE pages SET verified_at = NULL WHERE slug = ?').run('never');
+      } finally {
+        b.close();
+      }
+
+      const result = await knowledgeRecall(tempDir, { sort_by_verified: true, detail: 'index' });
+      const neverPos = result.indexOf('`never`');
+      const stalePos = result.indexOf('`stale`');
+      const freshPos = result.indexOf('`fresh`');
+      expect(neverPos).toBeGreaterThan(-1);
+      expect(neverPos).toBeLessThan(stalePos);
+      expect(stalePos).toBeLessThan(freshPos);
+
+      // Index entries carry the verification stamp so the verifier can
+      // apply its SLA filter without reading whole pages.
+      expect(result).toContain('verified: never');
+      expect(result).toContain('verified: 2025-01-01');
+    });
+
+    it('does not show verified stamps on normal browsing', async () => {
+      await seedPage('page', 'test', 'Page', 'A page.');
+      const result = await knowledgeRecall(tempDir, { detail: 'index' });
+      expect(result).not.toContain('verified:');
+    });
+  });
 });

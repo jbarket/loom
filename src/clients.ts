@@ -25,7 +25,7 @@ export const TOOLS = [
   'update_identity', 'bootstrap', 'harness_init',
   'knowledge_write', 'knowledge_recall', 'knowledge_maintain',
   'knowledge_archive', 'knowledge_restore', 'knowledge_supersede', 'knowledge_move', 'knowledge_merge',
-  'knowledge_purge',
+  'knowledge_purge', 'knowledge_verify', 'knowledge_history',
 ];
 
 function toolList(prefix: string): string {

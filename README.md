@@ -96,6 +96,19 @@ an agent's persistent state:
   `confirm: true` is required as an explicit safety gate. Supersession pointers
   are preserved (historical record). Use after merge/supersede to clean up
   tombstoned cruft.
+- **`knowledge_verify`** — stamp a page as verified *without touching its body*:
+  sets `verified_at` and optionally `freshness_anchor`. The verification
+  engine's primitive — recording "claims still hold" must never go through
+  `knowledge_write` (a verify run once replaced 13 page bodies with its notes).
+  An optional `note` appends a dated `## Verification` section (append-only).
+  Batch mode (`slugs`) stamps many pages with one timestamp; archived pages and
+  unknown slugs reject the whole batch.
+- **`knowledge_history`** — body-revision history and recovery. Replace-writes
+  snapshot the displaced body into `page_revisions` (newest 10 kept per page).
+  List a page's snapshots, read one by `revision_id`, or `restore: true` to put
+  one back — the body it displaces is snapshotted first, so a restore is never
+  itself a destructive overwrite. Revisions follow the page across renames and
+  are purged with it.
 
 Everything lives on disk as plain markdown plus a single SQLite file.
 No daemon, no external service, no GPU.

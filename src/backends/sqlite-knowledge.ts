@@ -32,11 +32,20 @@ import type {
   KnowledgeMergeResult,
   KnowledgePurgeInput,
   KnowledgePurgeResult,
+  KnowledgeVerifyInput,
+  KnowledgeVerifyResult,
+  KnowledgeRevision,
+  KnowledgeRevisionMeta,
+  KnowledgeRevisionRestoreInput,
+  KnowledgeRevisionRestoreResult,
 } from './types.js';
 
 /** Hard size caps — enforced at write boundary (design §A3). */
 const MAX_PAGE_BODY_LENGTH = 64 * 1024; // 64 KB
 const MAX_CITATION_EXCERPT_LENGTH = 4096; // 4 KB
+
+/** Body snapshots retained per page; oldest pruned beyond this. */
+const MAX_REVISIONS_PER_PAGE = 10;
 
 export interface SqliteKnowledgeConfig {
   /** Absolute path to the knowledge SQLite database file */
@@ -88,9 +97,20 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
           : input.body;
         enforcePageBodyCap(newBody);
 
+        // Replace-writes destroy the stored body — snapshot it first so the
+        // page is recoverable (the 2026-06-01 verify run stomped 13 bodies
+        // with no recovery path other than transcript archaeology).
+        if (appliedMode === 'replace' && newBody !== existing.body) {
+          this.snapshotRevision(db, pageId, input.slug, existing.body, 'write-replace', timestamp);
+        }
+
+        // verified_at is a verification stamp, not a write stamp: an update
+        // only moves it when the writer explicitly claims verification.
+        // (Creation still stamps write time — the page was just synthesized
+        // against its sources.)
         db.prepare(
-          `UPDATE pages SET title = ?, domain = ?, body = ?, sourcing = ?, verified_at = ?, freshness_anchor = COALESCE(?, freshness_anchor), updated = ? WHERE id = ?`,
-        ).run(title, input.domain, newBody, sourcing, input.verified_at ?? timestamp, input.freshness_anchor ?? null, timestamp, pageId);
+          `UPDATE pages SET title = ?, domain = ?, body = ?, sourcing = ?, verified_at = COALESCE(?, verified_at), freshness_anchor = COALESCE(?, freshness_anchor), updated = ? WHERE id = ?`,
+        ).run(title, input.domain, newBody, sourcing, input.verified_at ?? null, input.freshness_anchor ?? null, timestamp, pageId);
       } else {
         uuid = randomUUID();
         title = input.title;
@@ -270,8 +290,14 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
       const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
       params.push(limit);
 
+      // Stale-first ordering for the verification engine: never-verified
+      // pages first (NULL sorts lowest in SQLite ASC), then oldest-verified.
+      const orderBy = input.sortByVerified
+        ? 'ORDER BY verified_at ASC NULLS FIRST, updated ASC'
+        : 'ORDER BY hit_count DESC, updated DESC, created DESC';
+
       const rows = db.prepare(
-        `SELECT * FROM pages ${where} ORDER BY hit_count DESC, updated DESC, created DESC LIMIT ?`,
+        `SELECT * FROM pages ${where} ${orderBy} LIMIT ?`,
       ).all(...params) as KnowledgePage[];
 
       // Stamp last_accessed + increment hit_count in a single transaction for all hits.
@@ -724,6 +750,182 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
     }
   }
 
+  verifyPages(input: KnowledgeVerifyInput): Promise<KnowledgeVerifyResult> {
+    try {
+      const db = this.ensureOpen();
+      const timestamp = new Date().toISOString();
+      const verifiedAt = input.verified_at ?? timestamp;
+
+      const single = input.slug !== undefined;
+      const batch = input.slugs !== undefined;
+      if (single === batch) {
+        return Promise.reject(new Error(
+          'verifyPages: provide exactly one of slug (single) or slugs (batch)',
+        ));
+      }
+      if (batch && (input.note !== undefined || input.freshness_anchor !== undefined)) {
+        return Promise.reject(new Error(
+          'verifyPages: note and freshness_anchor are single-page options — not allowed in batch mode',
+        ));
+      }
+
+      const slugs = single ? [input.slug!] : input.slugs!;
+      if (slugs.length === 0) {
+        return Promise.reject(new Error('verifyPages: slugs must not be empty'));
+      }
+
+      // Validate every slug before stamping anything — no partial batches.
+      type PageRow = { id: number; status: string; body: string };
+      const rows: Array<{ id: number; slug: string; body: string }> = [];
+      for (const slug of slugs) {
+        const page = db.prepare(
+          'SELECT id, status, body FROM pages WHERE slug = ?',
+        ).get(slug) as PageRow | undefined;
+
+        if (!page) {
+          return Promise.reject(new Error(`verifyPages: page not found: ${slug}`));
+        }
+        if (page.status === 'archived') {
+          return Promise.reject(new Error(
+            `verifyPages: page '${slug}' is archived — restore it before verifying`,
+          ));
+        }
+        rows.push({ id: page.id, slug, body: page.body });
+      }
+
+      let noted = false;
+      const tx = db.transaction(() => {
+        for (const row of rows) {
+          db.prepare(
+            'UPDATE pages SET verified_at = ?, freshness_anchor = COALESCE(?, freshness_anchor) WHERE id = ?',
+          ).run(verifiedAt, input.freshness_anchor ?? null, row.id);
+
+          if (input.note) {
+            const dateLabel = verifiedAt.slice(0, 10);
+            const newBody = `${row.body}\n\n## Verification — ${dateLabel}\n\n${input.note}`;
+            enforcePageBodyCap(newBody);
+            // A note changes the body, so it bumps `updated` — a pure stamp
+            // deliberately does not (updated means "content changed").
+            db.prepare(
+              'UPDATE pages SET body = ?, updated = ? WHERE id = ?',
+            ).run(newBody, timestamp, row.id);
+            noted = true;
+          }
+        }
+      });
+      tx();
+
+      return Promise.resolve({
+        verified: rows.length,
+        slugs: rows.map((r) => r.slug),
+        verified_at: verifiedAt,
+        noted,
+      });
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  }
+
+  listRevisions(slug: string): Promise<KnowledgeRevisionMeta[]> {
+    try {
+      const db = this.ensureOpen();
+
+      const page = db.prepare('SELECT id FROM pages WHERE slug = ?').get(slug) as
+        | { id: number }
+        | undefined;
+      if (!page) {
+        return Promise.reject(new Error(`listRevisions: page not found: ${slug}`));
+      }
+
+      const rows = db.prepare(
+        `SELECT id, page_id, slug, op, replaced_at, LENGTH(body) AS body_length
+         FROM page_revisions WHERE page_id = ? ORDER BY id DESC`,
+      ).all(page.id) as KnowledgeRevisionMeta[];
+
+      return Promise.resolve(rows);
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  }
+
+  getRevision(revisionId: number): Promise<KnowledgeRevision | null> {
+    try {
+      const db = this.ensureOpen();
+      const row = db.prepare(
+        'SELECT id, page_id, slug, op, replaced_at, body FROM page_revisions WHERE id = ?',
+      ).get(revisionId) as KnowledgeRevision | undefined;
+      return Promise.resolve(row ?? null);
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  }
+
+  restoreRevision(input: KnowledgeRevisionRestoreInput): Promise<KnowledgeRevisionRestoreResult> {
+    try {
+      const db = this.ensureOpen();
+      const timestamp = new Date().toISOString();
+
+      const page = db.prepare(
+        'SELECT id, body FROM pages WHERE slug = ?',
+      ).get(input.slug) as { id: number; body: string } | undefined;
+      if (!page) {
+        return Promise.reject(new Error(`restoreRevision: page not found: ${input.slug}`));
+      }
+
+      const revision = db.prepare(
+        'SELECT id, page_id, body FROM page_revisions WHERE id = ?',
+      ).get(input.revision_id) as { id: number; page_id: number; body: string } | undefined;
+      if (!revision) {
+        return Promise.reject(new Error(`restoreRevision: revision not found: ${input.revision_id}`));
+      }
+      if (revision.page_id !== page.id) {
+        return Promise.reject(new Error(
+          `restoreRevision: revision ${input.revision_id} belongs to a different page than '${input.slug}'`,
+        ));
+      }
+
+      let snapshotId = 0;
+      const tx = db.transaction(() => {
+        // The body being displaced is itself preserved — a restore must
+        // never be the second irreversible overwrite in the story.
+        snapshotId = this.snapshotRevision(db, page.id, input.slug, page.body, 'history-restore', timestamp);
+        db.prepare('UPDATE pages SET body = ?, updated = ? WHERE id = ?').run(
+          revision.body, timestamp, page.id,
+        );
+      });
+      tx();
+
+      return Promise.resolve({
+        slug: input.slug,
+        revision_id: input.revision_id,
+        restored: true,
+        snapshot_id: snapshotId,
+      });
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  }
+
+  /** Insert a body snapshot and prune beyond the per-page cap. Caller owns the transaction. */
+  private snapshotRevision(
+    db: Database,
+    pageId: number,
+    slug: string,
+    body: string,
+    op: string,
+    timestamp: string,
+  ): number {
+    const result = db.prepare(
+      'INSERT INTO page_revisions (page_id, slug, body, op, replaced_at) VALUES (?, ?, ?, ?, ?)',
+    ).run(pageId, slug, body, op, timestamp);
+    db.prepare(
+      `DELETE FROM page_revisions WHERE page_id = ? AND id NOT IN (
+         SELECT id FROM page_revisions WHERE page_id = ? ORDER BY id DESC LIMIT ?
+       )`,
+    ).run(pageId, pageId, MAX_REVISIONS_PER_PAGE);
+    return Number(result.lastInsertRowid);
+  }
+
   addCitations(slug: string, citations: KnowledgeCitationInput[]): Promise<number> {
     try {
       const db = this.ensureOpen();
@@ -831,6 +1033,15 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
       )`,
       `CREATE INDEX IF NOT EXISTS idx_supersessions_old ON supersessions(old_slug)`,
       `CREATE INDEX IF NOT EXISTS idx_supersessions_new ON supersessions(new_slug)`,
+      `CREATE TABLE IF NOT EXISTS page_revisions (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        page_id     INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+        slug        TEXT NOT NULL,
+        body        TEXT NOT NULL,
+        op          TEXT NOT NULL,
+        replaced_at TEXT NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_page_revisions_page ON page_revisions(page_id)`,
     ];
     for (const sql of statements) {
       this.db!.prepare(sql).run();

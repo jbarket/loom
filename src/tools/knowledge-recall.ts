@@ -22,6 +22,12 @@ export interface KnowledgeRecallInput {
   domain?: string;
   limit?: number;
   detail?: 'index' | 'full';
+  /**
+   * Stale-first ordering for the verification engine: verified_at ASC with
+   * never-verified pages first. Index entries gain a `verified:` stamp so
+   * the verifier can apply its SLA filter from the listing alone.
+   */
+  sort_by_verified?: boolean;
 }
 
 /**
@@ -66,12 +72,15 @@ function snippet(body: string): string {
   return '';
 }
 
-function formatIndexEntry(page: KnowledgePageWithCitations): string {
+function formatIndexEntry(page: KnowledgePageWithCitations, showVerified = false): string {
   const anchor = page.freshness_anchor ? ` | anchor: ${page.freshness_anchor}` : '';
   const provisional = page.sourcing === 'provisional' ? ' | ⚠️ provisional' : '';
+  const verified = showVerified
+    ? ` | verified: ${page.verified_at ? page.verified_at.slice(0, 10) : 'never'}`
+    : '';
   const lines = [
     `- **${page.title}** (\`${page.slug}\`)`,
-    `  ${page.domain}${anchor}${provisional} | ${page.citations.length} citation${page.citations.length === 1 ? '' : 's'} | hits: ${page.hit_count}`,
+    `  ${page.domain}${anchor}${verified}${provisional} | ${page.citations.length} citation${page.citations.length === 1 ? '' : 's'} | hits: ${page.hit_count}`,
   ];
   const snip = snippet(page.body);
   if (snip) lines.push(`  ${snip}`);
@@ -95,6 +104,7 @@ export async function knowledgeRecall(
       limit: input.limit ?? (detail === 'index' ? 50 : 10),
       // Index browsing must not inflate hit_count (expansion-engine signal).
       stampAccess: detail === 'full',
+      sortByVerified: input.sort_by_verified,
     });
 
     if (pages.length === 0) {
@@ -105,7 +115,7 @@ export async function knowledgeRecall(
     const plural = pages.length === 1 ? '' : 's';
 
     if (detail === 'index') {
-      const entries = pages.map(formatIndexEntry);
+      const entries = pages.map((p) => formatIndexEntry(p, input.sort_by_verified === true));
       return (
         `# Knowledge index — ${pages.length} page${plural}\n\n` +
         `${entries.join('\n')}\n\n` +
@@ -132,7 +142,7 @@ export async function knowledgeRecall(
 
     let out = `# Knowledge recall — ${pages.length} result${plural}\n\n${fullParts.join('\n\n---\n\n')}`;
     if (overflow.length > 0) {
-      const entries = overflow.map(formatIndexEntry);
+      const entries = overflow.map((p) => formatIndexEntry(p, input.sort_by_verified === true));
       out +=
         `\n\n---\n\n` +
         `**${overflow.length} more match${overflow.length === 1 ? '' : 'es'}** (output budget reached — shown as index; ` +

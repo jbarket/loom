@@ -36,6 +36,8 @@ import { knowledgeSupersede } from './tools/knowledge-supersede.js';
 import { knowledgeMove } from './tools/knowledge-move.js';
 import { knowledgeMerge } from './tools/knowledge-merge.js';
 import { knowledgePurge } from './tools/knowledge-purge.js';
+import { knowledgeVerify } from './tools/knowledge-verify.js';
+import { knowledgeHistory } from './tools/knowledge-history.js';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -449,9 +451,14 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
         'Output tier override. "index": compact listing, no body, no access stamping. ' +
         '"full": whole pages with citations. Default: full with a query, index without.',
       ),
+      sort_by_verified: z.boolean().optional().describe(
+        'Stale-first ordering for the verification engine: verified_at ASC with ' +
+        'never-verified pages first. Index entries gain a "verified:" stamp so the ' +
+        'SLA filter can run from the listing alone.',
+      ),
     },
-    async ({ query, domain, limit, detail }) => {
-      const result = await knowledgeRecall(contextDir, { query, domain, limit, detail });
+    async ({ query, domain, limit, detail, sort_by_verified }) => {
+      const result = await knowledgeRecall(contextDir, { query, domain, limit, detail, sort_by_verified });
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );
@@ -625,6 +632,61 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     },
     async ({ slugs, confirm }) => {
       const result = await knowledgePurge(contextDir, { slugs, confirm });
+      return { content: [{ type: 'text' as const, text: result }] };
+    },
+  );
+
+  server.tool(
+    'knowledge_verify',
+    'Stamp a knowledge page as verified WITHOUT touching its body — sets verified_at ' +
+    'and optionally freshness_anchor. This is the verification engine\'s primitive: ' +
+    'use it (never knowledge_write) to record "claims still hold". An optional note ' +
+    'appends a dated "## Verification" section to the body (append-only, single-page ' +
+    'mode). Batch mode (slugs) stamps many pages with a shared timestamp; archived ' +
+    'pages are rejected; a batch with any unknown slug is rejected whole.',
+    {
+      slug: z.string().optional().describe(
+        'Single-page mode: slug of the page to verify.',
+      ),
+      slugs: z.array(z.string()).optional().describe(
+        'Batch mode: stamp many pages at once. Mutually exclusive with slug; ' +
+        'note and freshness_anchor are not allowed in batch mode.',
+      ),
+      verified_at: z.string().optional().describe(
+        'ISO timestamp to stamp. Defaults to now.',
+      ),
+      freshness_anchor: z.string().optional().describe(
+        'New freshness anchor (e.g. "Syntakt OS 1.41"). Preserved when omitted. Single-page mode only.',
+      ),
+      note: z.string().optional().describe(
+        'Optional verification note — appended to the body as a "## Verification — <date>" ' +
+        'section. Never replaces the body. Single-page mode only.',
+      ),
+    },
+    async ({ slug, slugs, verified_at, freshness_anchor, note }) => {
+      const result = await knowledgeVerify(contextDir, { slug, slugs, verified_at, freshness_anchor, note });
+      return { content: [{ type: 'text' as const, text: result }] };
+    },
+  );
+
+  server.tool(
+    'knowledge_history',
+    'Body-revision history for a knowledge page. Replace-writes snapshot the displaced ' +
+    'body into page_revisions (newest kept, capped per page) — this tool is the recovery ' +
+    'surface. Three modes: slug alone lists snapshots (metadata only); slug + revision_id ' +
+    'reads one snapshot\'s full body; adding restore: true puts that body back on the page ' +
+    '(the displaced body is snapshotted first, so restore is never destructive).',
+    {
+      slug: z.string().describe('Slug of the knowledge page.'),
+      revision_id: z.number().int().positive().optional().describe(
+        'Revision to read (from the listing). Combine with restore: true to put it back.',
+      ),
+      restore: z.boolean().optional().describe(
+        'Restore the revision\'s body onto the page. Requires revision_id.',
+      ),
+    },
+    async ({ slug, revision_id, restore }) => {
+      const result = await knowledgeHistory(contextDir, { slug, revision_id, restore });
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );

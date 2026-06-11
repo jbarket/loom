@@ -295,6 +295,11 @@ export interface KnowledgeQueryInput {
    * was actually read", not "this page appeared in a listing".
    */
   stampAccess?: boolean;
+  /**
+   * Stale-first ordering for the verification engine: verified_at ASC with
+   * never-verified pages first. Overrides the default hit-count ordering.
+   */
+  sortByVerified?: boolean;
 }
 
 export interface KnowledgePageRef {
@@ -417,6 +422,56 @@ export interface KnowledgeMergeResult {
   losers: KnowledgeMergeLoserRecord[];
 }
 
+export interface KnowledgeVerifyInput {
+  /** Single-page mode: slug of the page to verify. */
+  slug?: string;
+  /** Batch mode: stamp many pages at once. Mutually exclusive with slug; no note/anchor allowed. */
+  slugs?: string[];
+  /** ISO timestamp to stamp. Defaults to now. */
+  verified_at?: string;
+  /** New freshness anchor (single-page mode only). Preserved when omitted. */
+  freshness_anchor?: string;
+  /** Optional note — appended to the body as a "## Verification — <date>" section (single-page mode only). */
+  note?: string;
+}
+
+export interface KnowledgeVerifyResult {
+  verified: number;
+  slugs: string[];
+  verified_at: string;
+  /** True when a note section was appended to the body. */
+  noted: boolean;
+}
+
+/** Revision listing entry — metadata only, no body payload. */
+export interface KnowledgeRevisionMeta {
+  id: number;
+  page_id: number;
+  /** Slug the page had when the snapshot was taken. */
+  slug: string;
+  /** What displaced this body: 'write-replace' or 'history-restore'. */
+  op: string;
+  replaced_at: string;
+  body_length: number;
+}
+
+export interface KnowledgeRevision extends Omit<KnowledgeRevisionMeta, 'body_length'> {
+  body: string;
+}
+
+export interface KnowledgeRevisionRestoreInput {
+  slug: string;
+  revision_id: number;
+}
+
+export interface KnowledgeRevisionRestoreResult {
+  slug: string;
+  revision_id: number;
+  restored: boolean;
+  /** Id of the snapshot taken of the body that was just displaced. */
+  snapshot_id: number;
+}
+
 export interface KnowledgePurgeInput {
   /** Explicit list of slugs to hard-delete. All must have status='archived' (archive-first guard). */
   slugs: string[];
@@ -454,6 +509,14 @@ export interface KnowledgeBackend {
   mergePages(input: KnowledgeMergeInput): Promise<KnowledgeMergeResult>;
   /** Hard-delete archived pages and cascade their citations. Archive-first guard: rejects any non-archived slug. */
   purgePages(input: KnowledgePurgeInput): Promise<KnowledgePurgeResult>;
+  /** Stamp verified_at / freshness_anchor without touching the body (optional appended note in single-page mode). */
+  verifyPages(input: KnowledgeVerifyInput): Promise<KnowledgeVerifyResult>;
+  /** List body snapshots for a page, newest first. Metadata only — no body payloads. */
+  listRevisions(slug: string): Promise<KnowledgeRevisionMeta[]>;
+  /** Fetch one revision including its full body. */
+  getRevision(revisionId: number): Promise<KnowledgeRevision | null>;
+  /** Restore a revision's body onto its page; the displaced body is snapshotted first. */
+  restoreRevision(input: KnowledgeRevisionRestoreInput): Promise<KnowledgeRevisionRestoreResult>;
   /** Close the underlying SQLite connection. */
   close(): void;
 }
