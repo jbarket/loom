@@ -230,6 +230,12 @@ export interface KnowledgePageInput {
   /** The version/date the claims are valid as-of, e.g. "Syntakt OS 1.21" or "as of 2026-05". */
   freshness_anchor?: string;
   citations?: KnowledgeCitationInput[];
+  /**
+   * How `body` combines with an existing page on upsert.
+   * 'replace' (default) overwrites the stored body; 'append' adds the new
+   * body after the existing one separated by a blank line. Ignored on create.
+   */
+  bodyMode?: 'replace' | 'append';
 }
 
 export interface KnowledgeCitationInput {
@@ -254,6 +260,10 @@ export interface KnowledgePage {
   updated: string | null;
   last_accessed: string | null;
   hit_count: number;
+  /** ISO timestamp the page's claims were last verified as true. */
+  verified_at?: string | null;
+  /** The version/date the claims are valid as-of, e.g. "Syntakt OS 1.21". */
+  freshness_anchor?: string | null;
 }
 
 export interface KnowledgeCitation {
@@ -276,6 +286,13 @@ export interface KnowledgeQueryInput {
   domain?: string;
   excludeStatus?: string;
   limit?: number;
+  /**
+   * When false, queryPages does NOT stamp last_accessed / increment
+   * hit_count on the returned pages. Index-style browsing must pass false —
+   * hit_count is the Phase-4 expansion-engine signal and means "this page
+   * was actually read", not "this page appeared in a listing".
+   */
+  stampAccess?: boolean;
 }
 
 export interface KnowledgePageRef {
@@ -286,6 +303,12 @@ export interface KnowledgePageRef {
 
 export interface KnowledgeWriteResult extends KnowledgePageRef {
   citationsAdded: number;
+  /** Exact-duplicate citations skipped at the write boundary. */
+  citationsDeduped: number;
+  /** True when the write created a new page rather than updating an existing one. */
+  created: boolean;
+  /** Body combine mode actually applied: 'create' for new pages, else the requested mode. */
+  bodyMode: 'create' | 'replace' | 'append';
 }
 
 export interface KnowledgeArchiveInput {

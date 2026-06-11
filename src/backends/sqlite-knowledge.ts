@@ -65,27 +65,37 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
       const timestamp = new Date().toISOString();
 
       const existing = db.prepare(
-        'SELECT id, uuid, title FROM pages WHERE slug = ?',
-      ).get(input.slug) as { id: number; uuid: string; title: string } | undefined;
+        'SELECT id, uuid, title, body FROM pages WHERE slug = ?',
+      ).get(input.slug) as { id: number; uuid: string; title: string; body: string } | undefined;
 
       let pageId: number;
       let uuid: string;
       let title: string;
       let sourcing: string;
+      let appliedMode: 'create' | 'replace' | 'append';
 
       if (existing) {
         uuid = existing.uuid;
-        title = existing.title;
+        // Title and domain follow the write — the page is addressed by slug,
+        // so a differing title/domain on upsert is an intentional revision.
+        title = input.title;
         sourcing = input.sourcing ?? 'sourced';
         pageId = existing.id;
+        appliedMode = input.bodyMode ?? 'replace';
+
+        const newBody = appliedMode === 'append'
+          ? `${existing.body}\n\n${input.body}`
+          : input.body;
+        enforcePageBodyCap(newBody);
 
         db.prepare(
-          `UPDATE pages SET body = ?, sourcing = ?, verified_at = ?, freshness_anchor = COALESCE(?, freshness_anchor), updated = ? WHERE id = ?`,
-        ).run(input.body, sourcing, input.verified_at ?? timestamp, input.freshness_anchor ?? null, timestamp, pageId);
+          `UPDATE pages SET title = ?, domain = ?, body = ?, sourcing = ?, verified_at = ?, freshness_anchor = COALESCE(?, freshness_anchor), updated = ? WHERE id = ?`,
+        ).run(title, input.domain, newBody, sourcing, input.verified_at ?? timestamp, input.freshness_anchor ?? null, timestamp, pageId);
       } else {
         uuid = randomUUID();
         title = input.title;
         sourcing = input.sourcing ?? 'sourced';
+        appliedMode = 'create';
         const result = db.prepare(
           `INSERT INTO pages (uuid, slug, title, domain, body, sourcing, provenance, verified_at, freshness_anchor, created, updated)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -106,17 +116,39 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
       }
 
       let citationsAdded = 0;
+      let citationsDeduped = 0;
       if (input.citations && input.citations.length > 0) {
         for (const cit of input.citations) {
           enforceExcerptCap(cit.excerpt);
         }
 
+        // Exact-duplicate guard: re-sending a page's citations on upsert must
+        // not multiply them. A citation is a duplicate when claim, kind,
+        // locator, and excerpt all match an existing row on the same page
+        // (same identity tuple mergePages dedupes on).
+        const dupCheck = db.prepare(
+          `SELECT 1 FROM citations
+           WHERE page_id = ? AND claim = ? AND source_kind = ?
+             AND COALESCE(source_locator, '') = COALESCE(?, '')
+             AND excerpt = ?`,
+        );
         const insertCit = db.prepare(
           `INSERT INTO citations (page_id, claim, source_kind, source_locator, excerpt, retrieved_at, created)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
         );
         const tx = db.transaction(() => {
           for (const cit of input.citations!) {
+            const dup = dupCheck.get(
+              pageId,
+              cit.claim,
+              cit.source_kind,
+              cit.source_locator ?? null,
+              cit.excerpt,
+            );
+            if (dup) {
+              citationsDeduped++;
+              continue;
+            }
             insertCit.run(
               pageId,
               cit.claim,
@@ -137,6 +169,9 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
         slug: input.slug,
         title,
         citationsAdded,
+        citationsDeduped,
+        created: appliedMode === 'create',
+        bodyMode: appliedMode,
       });
     } catch (e) {
       return Promise.reject(e);
@@ -177,8 +212,10 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
       }
 
       if (input?.domain) {
-        clauses.push("domain LIKE ?");
-        params.push(`${input.domain}/%`);
+        // Prefix filter INCLUDING the exact domain itself — 'music/gear'
+        // must match pages in 'music/gear' as well as 'music/gear/elektron'.
+        clauses.push('(domain = ? OR domain LIKE ?)');
+        params.push(input.domain, `${input.domain}/%`);
       }
 
       const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
@@ -219,8 +256,10 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
       }
 
       if (input.domain) {
-        clauses.push("domain LIKE ?");
-        params.push(`${input.domain}/%`);
+        // Prefix filter INCLUDING the exact domain itself — 'music/gear'
+        // must match pages in 'music/gear' as well as 'music/gear/elektron'.
+        clauses.push('(domain = ? OR domain LIKE ?)');
+        params.push(input.domain, `${input.domain}/%`);
       }
 
       if (input.excludeStatus) {
@@ -237,7 +276,9 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
 
       // Stamp last_accessed + increment hit_count in a single transaction for all hits.
       // This is the usage signal the Phase-4 expansion engine depends on.
-      if (rows.length > 0) {
+      // Callers doing index-style browsing pass stampAccess: false — a page
+      // appearing in a listing is not a read.
+      if (rows.length > 0 && input.stampAccess !== false) {
         const now = new Date().toISOString();
         const stamp = db.prepare(
           'UPDATE pages SET last_accessed = ?, hit_count = hit_count + 1 WHERE id = ?',

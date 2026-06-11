@@ -374,7 +374,9 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
 
   server.tool(
     'knowledge_write',
-    'Upsert an entity page by slug/title (create, or append/revise body in place). ' +
+    'Upsert an entity page by slug. On an existing slug: body REPLACES by default ' +
+    '(mode: "append" adds to it instead), title/domain follow the write, and citations ' +
+    'are always appended with exact-duplicate dedup — safe to re-send. ' +
     'Knowledge is true independent of Jonathan — if it is about Jonathan or our work, ' +
     'store it in memory instead. ' +
     'Epistemic gate (§E1): a page whose ONLY citation support is source_kind="conversation" ' +
@@ -395,6 +397,11 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
         'device, or "as of 2026-05" for a topic. Drives the verification engine: a page is ' +
         're-verified when this anchor moves or the freshness SLA elapses.',
       ),
+      mode: z.enum(['replace', 'append']).optional().describe(
+        'Body combine mode when the slug already exists: "replace" (default) overwrites the ' +
+        'stored body; "append" adds this body after the existing one. Citations are appended ' +
+        '(deduped) in both modes. Ignored when creating a new page.',
+      ),
       citations: z.array(z.object({
         claim: z.string().describe('The assertion this citation supports'),
         source_kind: z.enum(['web', 'loom_memory', 'conversation']).describe(
@@ -407,8 +414,8 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
         'All-conversation support → page stored provisional.',
       ),
     },
-    async ({ title, domain, body, slug, freshness_anchor, citations }) => {
-      const result = await knowledgeWrite(contextDir, { title, domain, body, slug, freshness_anchor, citations });
+    async ({ title, domain, body, slug, freshness_anchor, mode, citations }) => {
+      const result = await knowledgeWrite(contextDir, { title, domain, body, slug, freshness_anchor, mode, citations });
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );
@@ -416,21 +423,28 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
   server.tool(
     'knowledge_recall',
     'Search the knowledge store with LIKE matching over title, body, and domain. ' +
-    'Never surfaces archived pages. Stamps last_accessed and increments hit_count ' +
-    'in a transaction on every hit (usage signal for the expansion engine). ' +
-    'Returns whole entity pages (the synthesis unit).',
+    'Never surfaces archived pages. Two detail tiers: "full" returns whole entity ' +
+    'pages (the synthesis unit) and stamps last_accessed/hit_count; "index" returns ' +
+    'compact slug/domain/snippet entries without stamping. Defaults: full when a ' +
+    'query is given, index when browsing without one. Full output is size-guarded — ' +
+    'overflow results degrade to index entries; recall by slug to read them.',
     {
       query: z.string().optional().describe(
         'Search terms — matched against title, body, and domain. ' +
-        'Omit to browse (returns all non-archived pages up to limit).',
+        'Omit to browse (returns an index of non-archived pages up to limit).',
       ),
       domain: z.string().optional().describe(
-        'Filter by domain prefix (e.g. "music" matches "music/eurorack", "music/theory")',
+        'Filter by domain prefix, inclusive of the exact domain ' +
+        '(e.g. "music/gear" matches "music/gear" and "music/gear/elektron")',
       ),
       limit: z.number().optional().describe('Maximum results to return (default: 10)'),
+      detail: z.enum(['index', 'full']).optional().describe(
+        'Output tier override. "index": compact listing, no body, no access stamping. ' +
+        '"full": whole pages with citations. Default: full with a query, index without.',
+      ),
     },
-    async ({ query, domain, limit }) => {
-      const result = await knowledgeRecall(contextDir, { query, domain, limit });
+    async ({ query, domain, limit, detail }) => {
+      const result = await knowledgeRecall(contextDir, { query, domain, limit, detail });
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );

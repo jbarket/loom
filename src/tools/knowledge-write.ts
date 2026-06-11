@@ -14,6 +14,13 @@ export interface KnowledgeWriteInput {
   body: string;
   slug?: string;
   freshness_anchor?: string;
+  /**
+   * Body combine mode when the slug already exists: 'replace' (default)
+   * overwrites the stored body; 'append' adds this body after the existing
+   * one. Citations are always appended (with exact-duplicate dedup),
+   * regardless of mode.
+   */
+  mode?: 'replace' | 'append';
   citations: Array<{
     claim: string;
     source_kind: 'web' | 'loom_memory' | 'conversation';
@@ -65,6 +72,7 @@ export async function knowledgeWrite(
       body: input.body,
       sourcing,
       freshness_anchor: input.freshness_anchor,
+      bodyMode: input.mode,
       citations: input.citations,
     });
 
@@ -74,9 +82,17 @@ export async function knowledgeWrite(
           'Add a web or loom_memory citation to promote to sourced.'
         : '';
 
+    const action =
+      result.bodyMode === 'create' ? 'created'
+      : result.bodyMode === 'append' ? 'updated (body appended)'
+      : 'updated (body replaced)';
+    const dedupNote = result.citationsDeduped > 0
+      ? ` (${result.citationsDeduped} duplicate${result.citationsDeduped === 1 ? '' : 's'} skipped)`
+      : '';
+
     return (
-      `Knowledge page written: **${result.title}** (\`${result.slug}\`)\n` +
-      `Domain: ${input.domain} | Citations added: ${result.citationsAdded} | Sourcing: ${sourcing}` +
+      `Knowledge page ${action}: **${result.title}** (\`${result.slug}\`)\n` +
+      `Domain: ${input.domain} | Citations added: ${result.citationsAdded}${dedupNote} | Sourcing: ${sourcing}` +
       sourcingNote
     );
   } catch (e) {

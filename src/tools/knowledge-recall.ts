@@ -1,9 +1,18 @@
 /**
  * knowledge_recall tool — LIKE search over the knowledge store.
  *
- * Stamps last_accessed and increments hit_count in a transaction on every
- * hit (via queryPages — the usage signal the Phase-4 expansion engine depends
- * on). Never surfaces archived pages.
+ * Two detail tiers:
+ *   'full'  — whole entity pages with citations (the synthesis unit).
+ *             Stamps last_accessed / hit_count via queryPages — the usage
+ *             signal the Phase-4 expansion engine depends on.
+ *   'index' — one compact entry per page (slug, domain, sourcing, anchor,
+ *             snippet). Does NOT stamp access: appearing in a listing is
+ *             not a read.
+ *
+ * Default tier: 'full' when a query is given, 'index' when browsing
+ * (no query). Full output is size-guarded — once the budget is spent,
+ * remaining pages degrade to index entries instead of blowing the
+ * tool-result limit. Never surfaces archived pages.
  */
 import { createKnowledgeBackend } from '../backends/index.js';
 import type { KnowledgePageWithCitations } from '../backends/types.js';
@@ -12,7 +21,17 @@ export interface KnowledgeRecallInput {
   query?: string;
   domain?: string;
   limit?: number;
+  detail?: 'index' | 'full';
 }
+
+/**
+ * Character budget for full-page output. ~24k chars ≈ 6k tokens — well under
+ * typical MCP tool-result caps, with room for the citations and framing.
+ */
+const FULL_OUTPUT_CHAR_BUDGET = 24_000;
+
+/** Max characters of body shown per index entry snippet. */
+const SNIPPET_LENGTH = 200;
 
 function formatPage(page: KnowledgePageWithCitations): string {
   const lines: string[] = [];
@@ -37,17 +56,45 @@ function formatPage(page: KnowledgePageWithCitations): string {
   return lines.join('\n');
 }
 
+/** First non-heading, non-blank line of the body, truncated to SNIPPET_LENGTH. */
+function snippet(body: string): string {
+  for (const raw of body.split('\n')) {
+    const line = raw.trim();
+    if (line.length === 0 || line.startsWith('#')) continue;
+    return line.length > SNIPPET_LENGTH ? `${line.slice(0, SNIPPET_LENGTH - 1)}…` : line;
+  }
+  return '';
+}
+
+function formatIndexEntry(page: KnowledgePageWithCitations): string {
+  const anchor = page.freshness_anchor ? ` | anchor: ${page.freshness_anchor}` : '';
+  const provisional = page.sourcing === 'provisional' ? ' | ⚠️ provisional' : '';
+  const lines = [
+    `- **${page.title}** (\`${page.slug}\`)`,
+    `  ${page.domain}${anchor}${provisional} | ${page.citations.length} citation${page.citations.length === 1 ? '' : 's'} | hits: ${page.hit_count}`,
+  ];
+  const snip = snippet(page.body);
+  if (snip) lines.push(`  ${snip}`);
+  return lines.join('\n');
+}
+
 export async function knowledgeRecall(
   contextDir: string,
   input: KnowledgeRecallInput,
 ): Promise<string> {
+  const detail = input.detail ?? (input.query ? 'full' : 'index');
+
   const backend = createKnowledgeBackend(contextDir);
   try {
     const pages = await backend.queryPages({
       query: input.query,
       domain: input.domain,
       excludeStatus: 'archived',
-      limit: input.limit ?? 10,
+      // Index entries are cheap — browse wide by default. Full pages are
+      // expensive — keep the default narrow.
+      limit: input.limit ?? (detail === 'index' ? 50 : 10),
+      // Index browsing must not inflate hit_count (expansion-engine signal).
+      stampAccess: detail === 'full',
     });
 
     if (pages.length === 0) {
@@ -55,8 +102,43 @@ export async function knowledgeRecall(
       return `No knowledge pages found for ${q}.`;
     }
 
-    const parts = pages.map(formatPage);
-    return `# Knowledge recall — ${pages.length} result${pages.length === 1 ? '' : 's'}\n\n${parts.join('\n\n---\n\n')}`;
+    const plural = pages.length === 1 ? '' : 's';
+
+    if (detail === 'index') {
+      const entries = pages.map(formatIndexEntry);
+      return (
+        `# Knowledge index — ${pages.length} page${plural}\n\n` +
+        `${entries.join('\n')}\n\n` +
+        `_Recall a slug (or pass detail: "full") to read whole pages._`
+      );
+    }
+
+    // Full mode with a size guard: emit whole pages until the budget is
+    // spent, then degrade the remainder to index entries.
+    const fullParts: string[] = [];
+    const overflow: KnowledgePageWithCitations[] = [];
+    let spent = 0;
+    for (const page of pages) {
+      const formatted = formatPage(page);
+      // Always include at least one full page — the first result is what
+      // the caller asked for even if it alone exceeds the budget.
+      if (fullParts.length > 0 && spent + formatted.length > FULL_OUTPUT_CHAR_BUDGET) {
+        overflow.push(page);
+        continue;
+      }
+      fullParts.push(formatted);
+      spent += formatted.length;
+    }
+
+    let out = `# Knowledge recall — ${pages.length} result${plural}\n\n${fullParts.join('\n\n---\n\n')}`;
+    if (overflow.length > 0) {
+      const entries = overflow.map(formatIndexEntry);
+      out +=
+        `\n\n---\n\n` +
+        `**${overflow.length} more match${overflow.length === 1 ? '' : 'es'}** (output budget reached — shown as index; ` +
+        `recall by slug for full pages):\n\n${entries.join('\n')}`;
+    }
+    return out;
   } finally {
     backend.close();
   }
