@@ -245,3 +245,63 @@ describe('loadIdentity — harness manifest', () => {
   });
 });
 
+
+describe('loadIdentity — path-segment validation', () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'loom-identity-pathsafety-'));
+    await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
+    // A file OUTSIDE the intended subdirectories that traversal would reach
+    await writeFile(join(tempDir, 'secret.md'), 'TOP-SECRET-CONTENT');
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('rejects a role with path traversal and does not read the target', async () => {
+    const result = await loadIdentity(tempDir, undefined, undefined, undefined, '../secret');
+    expect(result).toContain('Invalid role');
+    expect(result).not.toContain('TOP-SECRET-CONTENT');
+  });
+
+  it('rejects a project with path traversal and does not read the target', async () => {
+    const result = await loadIdentity(tempDir, '../secret');
+    expect(result).toContain('Invalid project');
+    expect(result).not.toContain('TOP-SECRET-CONTENT');
+  });
+
+  it('rejects a client with path traversal and does not read the target', async () => {
+    const result = await loadIdentity(tempDir, undefined, '../../etc/passwd');
+    expect(result).toContain('Invalid client');
+    expect(result).not.toContain('# Harness:');
+  });
+
+  it('rejects a model with path traversal and does not read the target', async () => {
+    const result = await loadIdentity(tempDir, undefined, undefined, '../secret');
+    expect(result).toContain('Invalid model');
+    expect(result).not.toContain('TOP-SECRET-CONTENT');
+  });
+
+  it('rejects backslash separators too', async () => {
+    const result = await loadIdentity(tempDir, '..\\secret');
+    expect(result).toContain('Invalid project');
+  });
+
+  it('still loads a legitimate role addendum', async () => {
+    await mkdir(join(tempDir, 'roles'), { recursive: true });
+    await writeFile(join(tempDir, 'roles', 'wonder.md'), 'Wonder playbook');
+    const result = await loadIdentity(tempDir, undefined, undefined, undefined, 'wonder');
+    expect(result).toContain('# Mode: wonder');
+    expect(result).toContain('Wonder playbook');
+  });
+
+  it('still loads a legitimate project brief', async () => {
+    await mkdir(join(tempDir, 'projects'), { recursive: true });
+    await writeFile(join(tempDir, 'projects', 'loom.md'), 'Loom project brief');
+    const result = await loadIdentity(tempDir, 'loom');
+    expect(result).toContain('# Project: loom');
+    expect(result).toContain('Loom project brief');
+  });
+});

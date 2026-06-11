@@ -12,8 +12,9 @@
  *
  * Will not overwrite existing files unless force: true.
  */
-import { writeFile, readFile, mkdir } from 'node:fs/promises';
+import { readFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { atomicWriteWithBackup } from '../path-safety.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -155,10 +156,11 @@ export async function bootstrap(contextDir: string, params: BootstrapParams): Pr
   // Ensure context dir exists
   await mkdir(contextDir, { recursive: true });
 
-  // Write identity files
-  await writeFile(identityPath, buildIdentityMd(name, purpose, voice));
-  await writeFile(prefsPath, buildPreferencesMd(name, preferences));
-  await writeFile(selfModelPath, buildSelfModelMd());
+  // Write identity files — atomic, with a .bak of any prior version
+  // (only relevant under force: true, when existing files are overwritten)
+  await atomicWriteWithBackup(identityPath, buildIdentityMd(name, purpose, voice));
+  await atomicWriteWithBackup(prefsPath, buildPreferencesMd(name, preferences));
+  await atomicWriteWithBackup(selfModelPath, buildSelfModelMd());
 
   const parts: string[] = [
     `## Identity initialized for **${name}**`,

@@ -54,13 +54,18 @@ an agent's persistent state:
 - **`bootstrap`** — initialize a fresh agent from a short interview.
 - **`harness_init`** — scaffold a harness manifest (a harness is the
   MCP-capable runtime the agent runs in: Claude Code, Codex, Gemini CLI, etc.).
-- **`knowledge_write`** — upsert an entity page by slug/title into the knowledge
-  store (a separate `knowledge.db`). Enforces the epistemic gate: a page whose
-  only support is conversation citations is stored `provisional`. Knowledge is
-  truth independent of the user; memories are about the user or your work.
+- **`knowledge_write`** — upsert an entity page by slug into the knowledge
+  store (a separate `knowledge.db`). On an existing slug the body replaces by
+  default (`mode: "append"` adds instead), title/domain follow the write, and
+  citations append with exact-duplicate dedup. Enforces the epistemic gate: a
+  page whose only support is conversation citations is stored `provisional`.
+  Knowledge is truth independent of the user; memories are about the user or
+  your work.
 - **`knowledge_recall`** — LIKE search over title, body, and domain in the
-  knowledge store. Stamps usage stats (`last_accessed`, `hit_count`) in a
-  transaction on every hit. Never surfaces archived pages.
+  knowledge store. Two tiers: `full` (whole pages; stamps `last_accessed` /
+  `hit_count`) and `index` (compact slug/snippet listing; no stamping). Defaults
+  to full with a query, index when browsing. Full output is size-guarded —
+  overflow matches degrade to index entries. Never surfaces archived pages.
 - **`knowledge_maintain`** — read-only health report for the knowledge store:
   expansion candidates (thin body + high hit_count), cold pages (not recently
   accessed), and misfile audit (pages that belong in memory instead).
@@ -91,6 +96,19 @@ an agent's persistent state:
   `confirm: true` is required as an explicit safety gate. Supersession pointers
   are preserved (historical record). Use after merge/supersede to clean up
   tombstoned cruft.
+- **`knowledge_verify`** — stamp a page as verified *without touching its body*:
+  sets `verified_at` and optionally `freshness_anchor`. The verification
+  engine's primitive — recording "claims still hold" must never go through
+  `knowledge_write` (a verify run once replaced 13 page bodies with its notes).
+  An optional `note` appends a dated `## Verification` section (append-only).
+  Batch mode (`slugs`) stamps many pages with one timestamp; archived pages and
+  unknown slugs reject the whole batch.
+- **`knowledge_history`** — body-revision history and recovery. Replace-writes
+  snapshot the displaced body into `page_revisions` (newest 10 kept per page).
+  List a page's snapshots, read one by `revision_id`, or `restore: true` to put
+  one back — the body it displaces is snapshotted first, so a restore is never
+  itself a destructive overwrite. Revisions follow the page across renames and
+  are purged with it.
 
 Everything lives on disk as plain markdown plus a single SQLite file.
 No daemon, no external service, no GPU.

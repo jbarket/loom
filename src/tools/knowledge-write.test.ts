@@ -178,4 +178,133 @@ describe('knowledgeWrite', () => {
 
     expect(result).toMatch(/Error/i);
   });
+
+  // ── Upsert semantics: mode, title/domain revision, citation dedup ──
+
+  const baseCitation = {
+    claim: 'Rings is a resonator',
+    source_kind: 'web' as const,
+    source_locator: 'https://mutable-instruments.net/modules/rings/',
+    excerpt: 'Resonator module.',
+  };
+
+  async function seedRings() {
+    return knowledgeWrite(tempDir, {
+      slug: 'rings',
+      domain: 'music/eurorack',
+      title: 'Rings',
+      body: 'Original body.',
+      citations: [baseCitation],
+    });
+  }
+
+  it('reports created vs updated, and replace is the default upsert mode', async () => {
+    const first = await seedRings();
+    expect(first).toMatch(/Knowledge page created/);
+
+    const second = await knowledgeWrite(tempDir, {
+      slug: 'rings',
+      domain: 'music/eurorack',
+      title: 'Rings',
+      body: 'Replacement body.',
+      citations: [{ ...baseCitation, claim: 'Rings self-oscillates', excerpt: 'Self-oscillation.' }],
+    });
+    expect(second).toMatch(/Knowledge page updated \(body replaced\)/);
+
+    const backend = createKnowledgeBackend(tempDir);
+    try {
+      const page = await backend.getPage('rings');
+      expect(page!.body).toBe('Replacement body.');
+    } finally {
+      backend.close();
+    }
+  });
+
+  it('mode: "append" adds the new body after the existing one', async () => {
+    await seedRings();
+
+    const result = await knowledgeWrite(tempDir, {
+      slug: 'rings',
+      domain: 'music/eurorack',
+      title: 'Rings',
+      body: '## Addendum\nNew section.',
+      mode: 'append',
+      citations: [{ ...baseCitation, claim: 'Addendum claim', excerpt: 'Addendum excerpt.' }],
+    });
+    expect(result).toMatch(/Knowledge page updated \(body appended\)/);
+
+    const backend = createKnowledgeBackend(tempDir);
+    try {
+      const page = await backend.getPage('rings');
+      expect(page!.body).toBe('Original body.\n\n## Addendum\nNew section.');
+    } finally {
+      backend.close();
+    }
+  });
+
+  it('append mode enforces the combined body cap', async () => {
+    await knowledgeWrite(tempDir, {
+      slug: 'big',
+      domain: 'test',
+      title: 'Big',
+      body: 'x'.repeat(40 * 1024),
+      citations: [baseCitation],
+    });
+
+    const result = await knowledgeWrite(tempDir, {
+      slug: 'big',
+      domain: 'test',
+      title: 'Big',
+      body: 'y'.repeat(40 * 1024),
+      mode: 'append',
+      citations: [baseCitation],
+    });
+    expect(result).toMatch(/Error/i);
+    expect(result).toMatch(/hard cap/i);
+  });
+
+  it('re-sending identical citations on upsert dedupes instead of duplicating', async () => {
+    await seedRings();
+
+    const result = await knowledgeWrite(tempDir, {
+      slug: 'rings',
+      domain: 'music/eurorack',
+      title: 'Rings',
+      body: 'Original body.',
+      citations: [
+        baseCitation, // exact duplicate — must be skipped
+        { ...baseCitation, claim: 'A genuinely new claim', excerpt: 'New excerpt.' },
+      ],
+    });
+    expect(result).toMatch(/Citations added: 1 \(1 duplicate skipped\)/);
+
+    const backend = createKnowledgeBackend(tempDir);
+    try {
+      const page = await backend.getPage('rings');
+      expect(page!.citations).toHaveLength(2);
+    } finally {
+      backend.close();
+    }
+  });
+
+  it('title and domain follow the write on upsert', async () => {
+    await seedRings();
+
+    await knowledgeWrite(tempDir, {
+      slug: 'rings',
+      domain: 'music/eurorack/mutable',
+      title: 'Mutable Instruments Rings',
+      body: 'Revised.',
+      citations: [{ ...baseCitation, claim: 'Revision claim', excerpt: 'Revision excerpt.' }],
+    });
+
+    const backend = createKnowledgeBackend(tempDir);
+    try {
+      const page = await backend.getPage('rings');
+      expect(page!.title).toBe('Mutable Instruments Rings');
+      expect(page!.domain).toBe('music/eurorack/mutable');
+    } finally {
+      backend.close();
+    }
+  });
 });

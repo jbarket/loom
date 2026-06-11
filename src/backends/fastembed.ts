@@ -53,18 +53,36 @@ export class FastEmbedProvider implements EmbeddingProvider {
   async embed(text: string): Promise<number[]> {
     const embedder = await this.ensureEmbedder();
     const vectors = await collectBatches(embedder.embed([text], 1));
-    return vectors[0];
+    const vector = vectors[0];
+    if (!vector || vector.length === 0) {
+      throw new Error(
+        `fastembed: embed() produced no vector for a ${text.length}-char input (model ${this.config.model})`,
+      );
+    }
+    return vector;
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
     if (texts.length === 0) return [];
     const embedder = await this.ensureEmbedder();
-    return collectBatches(embedder.embed(texts, 32));
+    const vectors = await collectBatches(embedder.embed(texts, 32));
+    if (vectors.length !== texts.length) {
+      throw new Error(
+        `fastembed: embedBatch() produced ${vectors.length} vectors for ${texts.length} inputs (model ${this.config.model})`,
+      );
+    }
+    return vectors;
   }
 
   async embedQuery(text: string): Promise<number[]> {
     const embedder = await this.ensureEmbedder();
-    return embedder.queryEmbed(text);
+    const vector = await embedder.queryEmbed(text);
+    if (!vector || vector.length === 0) {
+      throw new Error(
+        `fastembed: embedQuery() produced no vector for a ${text.length}-char input (model ${this.config.model})`,
+      );
+    }
+    return vector;
   }
 
   private ensureEmbedder(): Promise<FlagEmbedding> {
@@ -77,10 +95,19 @@ export class FastEmbedProvider implements EmbeddingProvider {
         model: this.config.model as Exclude<EmbeddingModel, EmbeddingModel.CUSTOM>,
         cacheDir,
         showDownloadProgress: false,
-      }).then((e) => {
-        this.embedder = e;
-        return e;
-      });
+      }).then(
+        (e) => {
+          this.embedder = e;
+          return e;
+        },
+        (err: unknown) => {
+          // Transient failure (e.g. network hiccup during first model
+          // download) must not poison the singleton: clear the cached
+          // promise so the next call retries init from scratch.
+          this.initPromise = null;
+          throw err;
+        },
+      );
     }
     return this.initPromise;
   }

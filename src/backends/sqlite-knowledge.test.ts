@@ -118,11 +118,15 @@ describe('SqliteKnowledgeBackend', () => {
     });
 
     expect(result.uuid).toBe(originalUuid);
-    expect(result.title).toBe('Original Title'); // preserved
+    // Title follows the write — the page is addressed by slug, so a differing
+    // title on upsert is an intentional revision (title typos must be fixable).
+    expect(result.title).toBe('Changed Title');
+    expect(result.created).toBe(false);
+    expect(result.bodyMode).toBe('replace');
 
     const updated = await backend.getPage('test-page');
     expect(updated!.body).toBe('Updated body content');
-    expect(updated!.title).toBe('Original Title');
+    expect(updated!.title).toBe('Changed Title');
     expect(updated!.sourcing).toBe('sourced'); // preserved
   });
 

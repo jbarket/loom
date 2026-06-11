@@ -11,10 +11,12 @@ import { readFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseFrontmatter, type Block } from './types.js';
+import { assertSafePathSegment } from '../path-safety.js';
 
 const DIR = 'models';
 
 export async function read(contextDir: string, key: string): Promise<Block | null> {
+  assertSafePathSegment(key, 'model name');
   const path = resolve(contextDir, DIR, `${key}.md`);
   if (!existsSync(path)) return null;
   const raw = await readFile(path, 'utf-8');

@@ -160,4 +160,132 @@ describe('knowledgeRecall', () => {
     const result = await knowledgeRecall(tempDir, { query: 'Digitakt II' });
     expect(result).toMatch(/Elektron Digitakt II/);
   });
+
+  // ── Tiered recall: index vs full ──
+
+  it('browse without query defaults to index tier (no bodies, no citations)', async () => {
+    await seedPage('page-a', 'test', 'Alpha', 'First page body that should not appear in full.');
+    await seedPage('page-b', 'test', 'Beta', 'Second page body.');
+
+    const result = await knowledgeRecall(tempDir, {});
+    expect(result).toMatch(/Knowledge index — 2 pages/);
+    expect(result).toMatch(/`page-a`/);
+    expect(result).toMatch(/`page-b`/);
+    // Index shows a snippet, not the full formatted page with citations.
+    expect(result).not.toMatch(/\*\*Citations:\*\*/);
+  });
+
+  it('query defaults to full tier (whole pages with citations)', async () => {
+    await seedPage('rings', 'music/eurorack', 'Rings', 'Physical modelling resonator.');
+
+    const result = await knowledgeRecall(tempDir, { query: 'resonator' });
+    expect(result).toMatch(/Knowledge recall — 1 result/);
+    expect(result).toMatch(/Physical modelling resonator\./);
+    expect(result).toMatch(/\*\*Citations:\*\*/);
+  });
+
+  it('detail overrides the default in both directions', async () => {
+    await seedPage('rings', 'music/eurorack', 'Rings', 'Physical modelling resonator.');
+
+    const indexed = await knowledgeRecall(tempDir, { query: 'resonator', detail: 'index' });
+    expect(indexed).toMatch(/Knowledge index/);
+    expect(indexed).not.toMatch(/\*\*Citations:\*\*/);
+
+    const full = await knowledgeRecall(tempDir, { detail: 'full' });
+    expect(full).toMatch(/Knowledge recall/);
+    expect(full).toMatch(/\*\*Citations:\*\*/);
+  });
+
+  it('index tier does NOT stamp hit_count or last_accessed', async () => {
+    await seedPage('rings', 'music/eurorack', 'Rings', 'Physical modelling resonator.');
+
+    await knowledgeRecall(tempDir, { query: 'resonator', detail: 'index' });
+    await knowledgeRecall(tempDir, {}); // browse → index default
+
+    const backend = createKnowledgeBackend(tempDir);
+    try {
+      const page = await backend.getPage('rings');
+      expect(page!.hit_count).toBe(0);
+      expect(page!.last_accessed).toBeNull();
+    } finally {
+      backend.close();
+    }
+  });
+
+  it('full tier output is size-guarded — overflow degrades to index entries', async () => {
+    const bigBody = `Opening line of a very large page. ${'x'.repeat(15_000)}`;
+    await seedPage('big-1', 'test', 'Big One', bigBody);
+    await seedPage('big-2', 'test', 'Big Two', bigBody);
+    await seedPage('big-3', 'test', 'Big Three', bigBody);
+
+    const result = await knowledgeRecall(tempDir, { query: 'Opening line', detail: 'full' });
+    // First page is always rendered in full; the budget (24k chars) admits
+    // one 15k page but not two, so at least one match must degrade.
+    expect(result).toMatch(/output budget reached/);
+    expect(result).toMatch(/more match/);
+    // Every match is still visible — full or as an index entry.
+    for (const slug of ['big-1', 'big-2', 'big-3']) {
+      expect(result).toContain(slug);
+    }
+    // Hard ceiling: nowhere near 3 × 15k.
+    expect(result.length).toBeLessThan(30_000);
+  });
+
+  it('single oversized page is never truncated when it is the only full result', async () => {
+    const bigBody = `Huge page. ${'y'.repeat(30_000)}`;
+    await seedPage('huge', 'test', 'Huge', bigBody);
+
+    const result = await knowledgeRecall(tempDir, { query: 'Huge page' });
+    expect(result).toContain(bigBody);
+  });
+
+  // ── Domain filter: prefix must include the exact domain ──
+
+  it('domain filter matches pages whose domain equals the filter exactly', async () => {
+    await seedPage('exact', 'music/gear/elektron', 'Exact Domain Page', 'Lives at the exact domain.');
+    await seedPage('nested', 'music/gear/elektron/deep', 'Nested Page', 'Lives below it.');
+    await seedPage('other', 'music/theory', 'Other Page', 'Unrelated domain.');
+
+    const result = await knowledgeRecall(tempDir, { domain: 'music/gear/elektron', detail: 'index' });
+    expect(result).toMatch(/`exact`/);
+    expect(result).toMatch(/`nested`/);
+    expect(result).not.toMatch(/`other`/);
+  });
+
+  describe('sort_by_verified', () => {
+    it('orders never-verified then stalest-first and shows verified stamps', async () => {
+      await seedPage('fresh', 'test', 'Fresh', 'Recently verified page.');
+      await seedPage('stale', 'test', 'Stale', 'Long-unverified page.');
+      await seedPage('never', 'test', 'Never', 'Never-verified page.');
+
+      const b = createKnowledgeBackend(tempDir);
+      try {
+        await b.verifyPages({ slug: 'fresh', verified_at: '2026-06-01T00:00:00.000Z' });
+        await b.verifyPages({ slug: 'stale', verified_at: '2025-01-01T00:00:00.000Z' });
+        const raw = (b as unknown as { ensureOpen(): { prepare(sql: string): { run(...args: unknown[]): unknown } } })['ensureOpen']();
+        raw.prepare('UPDATE pages SET verified_at = NULL WHERE slug = ?').run('never');
+      } finally {
+        b.close();
+      }
+
+      const result = await knowledgeRecall(tempDir, { sort_by_verified: true, detail: 'index' });
+      const neverPos = result.indexOf('`never`');
+      const stalePos = result.indexOf('`stale`');
+      const freshPos = result.indexOf('`fresh`');
+      expect(neverPos).toBeGreaterThan(-1);
+      expect(neverPos).toBeLessThan(stalePos);
+      expect(stalePos).toBeLessThan(freshPos);
+
+      // Index entries carry the verification stamp so the verifier can
+      // apply its SLA filter without reading whole pages.
+      expect(result).toContain('verified: never');
+      expect(result).toContain('verified: 2025-01-01');
+    });
+
+    it('does not show verified stamps on normal browsing', async () => {
+      await seedPage('page', 'test', 'Page', 'A page.');
+      const result = await knowledgeRecall(tempDir, { detail: 'index' });
+      expect(result).not.toContain('verified:');
+    });
+  });
 });
