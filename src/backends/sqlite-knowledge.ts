@@ -198,7 +198,7 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
     }
   }
 
-  getPage(slug: string): Promise<KnowledgePageWithCitations | null> {
+  getPage(slug: string, opts?: { stampAccess?: boolean }): Promise<KnowledgePageWithCitations | null> {
     try {
       const db = this.ensureOpen();
 
@@ -207,6 +207,15 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
       ).get(slug) as KnowledgePage | undefined;
 
       if (!page) return Promise.resolve(null);
+
+      if (opts?.stampAccess) {
+        const now = new Date().toISOString();
+        db.prepare(
+          'UPDATE pages SET last_accessed = ?, hit_count = hit_count + 1 WHERE id = ?',
+        ).run(now, page.id);
+        page.last_accessed = now;
+        page.hit_count += 1;
+      }
 
       const citations = db.prepare(
         'SELECT * FROM citations WHERE page_id = ? ORDER BY id',

@@ -18,6 +18,13 @@ import { createKnowledgeBackend } from '../backends/index.js';
 import type { KnowledgePageWithCitations } from '../backends/types.js';
 
 export interface KnowledgeRecallInput {
+  /**
+   * Exact-slug lookup — fetches that single page in full detail, stamping
+   * access. Takes precedence over query/domain/limit. This is the precise
+   * path; LIKE token-matching can return the wrong page when bodies
+   * cross-reference each other.
+   */
+  slug?: string;
   query?: string;
   domain?: string;
   limit?: number;
@@ -95,6 +102,24 @@ export async function knowledgeRecall(
 
   const backend = createKnowledgeBackend(contextDir);
   try {
+    // Exact-slug lookup short-circuits the search path entirely.
+    if (input.slug) {
+      const peek = await backend.getPage(input.slug);
+      if (!peek) {
+        return `No knowledge page found for slug \`${input.slug}\`.`;
+      }
+      if (peek.status === 'archived') {
+        // Not stamped — an archived page surfacing in an error message is
+        // not a read, and a phantom hit would survive a later restore.
+        return (
+          `No active knowledge page for slug \`${input.slug}\` — it is archived. ` +
+          `Use knowledge_restore to bring it back.`
+        );
+      }
+      const page = await backend.getPage(input.slug, { stampAccess: true });
+      return `# Knowledge recall — 1 result\n\n${formatPage(page!)}`;
+    }
+
     const pages = await backend.queryPages({
       query: input.query,
       domain: input.domain,
@@ -119,7 +144,7 @@ export async function knowledgeRecall(
       return (
         `# Knowledge index — ${pages.length} page${plural}\n\n` +
         `${entries.join('\n')}\n\n` +
-        `_Recall a slug (or pass detail: "full") to read whole pages._`
+        `_Pass slug: "<slug>" (or detail: "full") to read whole pages._`
       );
     }
 

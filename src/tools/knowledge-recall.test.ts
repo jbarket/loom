@@ -252,6 +252,61 @@ describe('knowledgeRecall', () => {
     expect(result).not.toMatch(/`other`/);
   });
 
+  describe('slug lookup', () => {
+    it('fetches exactly the named page even when other pages mention its terms', async () => {
+      // The original failure: the Digitone II page mentions "Syntakt" in its
+      // body and outranks the actual Syntakt page on hit_count.
+      await seedPage('syntakt-config', 'test', 'Syntakt Config', 'Syntakt settings live here.');
+      await seedPage('digitone-config', 'test', 'Digitone Config', 'Unlike Syntakt, balanced inputs. Syntakt Config Reference mentioned.');
+
+      const result = await knowledgeRecall(tempDir, { slug: 'syntakt-config' });
+      expect(result).toContain('`syntakt-config`');
+      expect(result).toContain('Syntakt settings live here.');
+      expect(result).not.toContain('`digitone-config`');
+    });
+
+    it('stamps access on slug reads (a slug fetch is a real read)', async () => {
+      await seedPage('page', 'test', 'Page', 'Body.');
+      await knowledgeRecall(tempDir, { slug: 'page' });
+
+      const b = createKnowledgeBackend(tempDir);
+      try {
+        expect((await b.getPage('page'))!.hit_count).toBe(1);
+      } finally {
+        b.close();
+      }
+    });
+
+    it('reports an unknown slug as not found', async () => {
+      const result = await knowledgeRecall(tempDir, { slug: 'ghost' });
+      expect(result).toMatch(/No knowledge page found/i);
+      expect(result).toContain('ghost');
+    });
+
+    it('does not surface archived pages by slug, and says why', async () => {
+      await seedPage('retired', 'test', 'Retired', 'Old body.');
+      const b = createKnowledgeBackend(tempDir);
+      try {
+        await b.archivePage({ slug: 'retired' });
+      } finally {
+        b.close();
+      }
+
+      const result = await knowledgeRecall(tempDir, { slug: 'retired' });
+      expect(result).not.toContain('Old body.');
+      expect(result).toMatch(/archived/);
+    });
+
+    it('slug takes precedence over query', async () => {
+      await seedPage('alpha', 'test', 'Alpha', 'Alpha body.');
+      await seedPage('beta', 'test', 'Beta', 'Beta body.');
+
+      const result = await knowledgeRecall(tempDir, { slug: 'alpha', query: 'Beta' });
+      expect(result).toContain('Alpha body.');
+      expect(result).not.toContain('Beta body.');
+    });
+  });
+
   describe('sort_by_verified', () => {
     it('orders never-verified then stalest-first and shows verified stamps', async () => {
       await seedPage('fresh', 'test', 'Fresh', 'Recently verified page.');
