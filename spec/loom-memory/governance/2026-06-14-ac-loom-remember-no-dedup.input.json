@@ -1,5 +1,5 @@
 {
-  "asOf": "2026-06-13T04:00:00Z",
+  "asOf": "2026-06-14T00:00:00Z",
   "spec": [
     {
       "record": "preamble",
@@ -81,6 +81,7 @@
       "contractId": "c-loom-memory",
       "discoveredAt": "2026-06-13T03:00:00Z",
       "discoveredBy": "art",
+      "evidence": "src ref: categories.ts (MEMORY_CATEGORIES, isMemoryCategory + the read-accepts-arbitrary-strings comment) and src/server.ts:136 (remember category: z.enum(MEMORY_CATEGORIES)) vs :159 (recall category: z.string().optional()).",
       "fixtures": [
         "fx-loom-category-write",
         "fx-loom-category-read"
@@ -90,7 +91,7 @@
       "itemId": "it-loom-categories",
       "source": "discovered",
       "state": "active",
-      "triggeringEvent": "Observed in categories.ts (MEMORY_CATEGORIES, isMemoryCategory + the read-accepts-arbitrary-strings comment) and src/server.ts:136 (remember category: z.enum(MEMORY_CATEGORIES)) vs :159 (recall category: z.string().optional()).",
+      "triggeringEvent": "loom brownfield excavation (felag ceremony 4, 2026-06-13) — the first excavate dig",
       "type": "scenario"
     },
     {
@@ -100,6 +101,7 @@
       "contractId": "c-loom-memory",
       "discoveredAt": "2026-06-13T03:00:00Z",
       "discoveredBy": "art",
+      "evidence": "src ref: src/server.ts:137 — the remember category enum description enumerating the six meanings verbatim.",
       "fixtures": [
         "fx-loom-cat-user",
         "fx-loom-cat-feedback",
@@ -117,8 +119,8 @@
         }
       },
       "source": "discovered",
-      "state": "proposed",
-      "triggeringEvent": "Observed in src/server.ts:137 — the remember category enum description enumerating the six meanings verbatim.",
+      "state": "descriptive",
+      "triggeringEvent": "loom brownfield excavation (felag ceremony 4, 2026-06-13) — the first excavate dig",
       "type": "checklist"
     },
     {
@@ -128,6 +130,7 @@
       "contractId": "c-loom-memory",
       "discoveredAt": "2026-06-13T03:00:00Z",
       "discoveredBy": "art",
+      "evidence": "src ref: src/backends/sqlite-vec.ts remember() (~:96-138): unconditional INSERT of a fresh uuid/ref/embedding, no SELECT-before-INSERT anywhere in the path.",
       "fixtures": [
         "fx-loom-remember-twice"
       ],
@@ -135,8 +138,8 @@
       "item": "remember always inserts a new, distinct memory. Two remember calls with identical title and content yield two separately-stored memories with distinct refs — the store performs no existence check, no similarity check, and no merge on write. (Dedup is the writer's responsibility, served by the find_similar and memory_audit affordances, not by remember.)",
       "itemId": "it-loom-remember",
       "source": "discovered",
-      "state": "active",
-      "triggeringEvent": "Observed in src/backends/sqlite-vec.ts remember() (~:96-138): unconditional INSERT of a fresh uuid/ref/embedding, no SELECT-before-INSERT anywhere in the path.",
+      "state": "proposed",
+      "triggeringEvent": "loom brownfield excavation (felag ceremony 4, 2026-06-13) — the first excavate dig",
       "type": "scenario"
     },
     {
@@ -146,6 +149,7 @@
       "contractId": "c-loom-memory",
       "discoveredAt": "2026-06-13T03:00:00Z",
       "discoveredBy": "art",
+      "evidence": "src ref: src/backends/sqlite-vec.ts recall() (~:140-171): categoryFilter = category && category !== \"all\" ? category : null; project equality; limit default 10; rowToMatch relevance = 1 - distance; last_accessed UPDATE on hit ids.",
       "fixtures": [
         "fx-loom-recall-allcat",
         "fx-loom-recall-nocat",
@@ -158,7 +162,7 @@
       "itemId": "it-loom-recall",
       "source": "discovered",
       "state": "active",
-      "triggeringEvent": "Observed in src/backends/sqlite-vec.ts recall() (~:140-171): categoryFilter = category && category !== \"all\" ? category : null; project equality; limit default 10; rowToMatch relevance = 1 - distance; last_accessed UPDATE on hit ids.",
+      "triggeringEvent": "loom brownfield excavation (felag ceremony 4, 2026-06-13) — the first excavate dig",
       "type": "scenario"
     },
     {
@@ -168,6 +172,7 @@
       "contractId": "c-loom-memory",
       "discoveredAt": "2026-06-13T03:00:00Z",
       "discoveredBy": "art",
+      "evidence": "src ref: src/backends/sqlite-vec.ts findSimilar() (~:354-399): accept callback rejects vr.rowid === anchorId and 1 - vr.distance < minRelevance, plus category/project equality.",
       "fixtures": [
         "fx-loom-similar-exclude",
         "fx-loom-similar-floor",
@@ -178,7 +183,7 @@
       "itemId": "it-loom-recall",
       "source": "discovered",
       "state": "active",
-      "triggeringEvent": "Observed in src/backends/sqlite-vec.ts findSimilar() (~:354-399): accept callback rejects vr.rowid === anchorId and 1 - vr.distance < minRelevance, plus category/project equality.",
+      "triggeringEvent": "loom brownfield excavation (felag ceremony 4, 2026-06-13) — the first excavate dig",
       "type": "scenario"
     },
     {
@@ -188,6 +193,7 @@
       "contractId": "c-loom-memory",
       "discoveredAt": "2026-06-13T03:00:00Z",
       "discoveredBy": "art",
+      "evidence": "src ref: src/backends/sqlite-vec.ts recall()/searchVectors + rowToMatch: ranking is cosine distance over a fastembed embedding (non-deterministic, model-dependent), explicitly excluded from arithmetic fixturing.",
       "fixtures": [
         "fx-loom-relevance-hit"
       ],
@@ -202,8 +208,8 @@
         }
       },
       "source": "discovered",
-      "state": "proposed",
-      "triggeringEvent": "Observed in src/backends/sqlite-vec.ts recall()/searchVectors + rowToMatch: ranking is cosine distance over a fastembed embedding (non-deterministic, model-dependent), explicitly excluded from arithmetic fixturing.",
+      "state": "descriptive",
+      "triggeringEvent": "loom brownfield excavation (felag ceremony 4, 2026-06-13) — the first excavate dig",
       "type": "checklist"
     },
     {
@@ -213,6 +219,7 @@
       "contractId": "c-loom-memory",
       "discoveredAt": "2026-06-13T03:00:00Z",
       "discoveredBy": "art",
+      "evidence": "src ref: src/backends/ttl.ts: DURATION_RE = /^(\\d+)(d|h)$/; parseTTL returns null for permanent/undefined and throws on mismatch; computeExpiresAt = created + ms; isExpired = expiresAt && now >= expiry.",
       "fixtures": [
         "fx-loom-ttl-permanent",
         "fx-loom-ttl-days",
@@ -223,8 +230,8 @@
       "item": "TTL is parsed by the grammar /^(\\d+)(d|h)$/ plus the literal 'permanent'. For 'permanent' or an absent TTL, expiresAt is null and the memory never expires. For 'Nd'/'Nh', expiresAt = created + N days/hours. A memory is expired exactly when it has an expiresAt and now >= expiresAt. Any TTL that is neither 'permanent' nor matches the grammar is invalid (throws).",
       "itemId": "it-loom-ttl",
       "source": "discovered",
-      "state": "proposed",
-      "triggeringEvent": "Observed in src/backends/ttl.ts: DURATION_RE = /^(\\d+)(d|h)$/; parseTTL returns null for permanent/undefined and throws on mismatch; computeExpiresAt = created + ms; isExpired = expiresAt && now >= expiry.",
+      "state": "active",
+      "triggeringEvent": "loom brownfield excavation (felag ceremony 4, 2026-06-13) — the first excavate dig",
       "type": "scenario"
     },
     {
@@ -234,6 +241,7 @@
       "contractId": "c-loom-memory",
       "discoveredAt": "2026-06-13T03:00:00Z",
       "discoveredBy": "art",
+      "evidence": "src ref: src/backends/sqlite-vec.ts prune() (~:266-314): expired (isExpired) pushed+deleted with continue; ttl === \"permanent\" continue; lastTouch = last_accessed ?? updated ?? created < staleThreshold → stale; stale never deleted.",
       "fixtures": [
         "fx-loom-prune-split"
       ],
@@ -241,8 +249,8 @@
       "item": "prune classifies each non-archived memory: one with an expired expiresAt is EXPIRED (deleted unless dry run); a 'permanent' memory is neither expired nor stale; any other memory whose last touch (last_accessed, else updated, else created) is older than staleDays (default 30) is STALE — reported but never deleted. A memory that is expired is never also reported stale.",
       "itemId": "it-loom-ttl",
       "source": "discovered",
-      "state": "proposed",
-      "triggeringEvent": "Observed in src/backends/sqlite-vec.ts prune() (~:266-314): expired (isExpired) pushed+deleted with continue; ttl === \"permanent\" continue; lastTouch = last_accessed ?? updated ?? created < staleThreshold → stale; stale never deleted.",
+      "state": "active",
+      "triggeringEvent": "loom brownfield excavation (felag ceremony 4, 2026-06-13) — the first excavate dig",
       "type": "scenario"
     },
     {
@@ -252,6 +260,7 @@
       "contractId": "c-loom-memory",
       "discoveredAt": "2026-06-13T03:00:00Z",
       "discoveredBy": "art",
+      "evidence": "src ref: src/server.ts knowledge_write tool description: 'Knowledge is true independent of Jonathan — if it is about Jonathan or our work, store it in memory instead.'",
       "fixtures": [
         "fx-loom-route-knowledge",
         "fx-loom-route-memory-user",
@@ -268,8 +277,8 @@
         }
       },
       "source": "discovered",
-      "state": "proposed",
-      "triggeringEvent": "Observed in src/server.ts knowledge_write tool description: 'Knowledge is true independent of Jonathan — if it is about Jonathan or our work, store it in memory instead.'",
+      "state": "active",
+      "triggeringEvent": "loom brownfield excavation (felag ceremony 4, 2026-06-13) — the first excavate dig",
       "type": "checklist"
     },
     {
@@ -279,6 +288,7 @@
       "contractId": "c-loom-memory",
       "discoveredAt": "2026-06-13T03:00:00Z",
       "discoveredBy": "art",
+      "evidence": "src ref: src/server.ts: loom registers memory (remember/recall/...), knowledge (knowledge_*), and identity (identity/update-identity/dossier/bootstrap) tools and NO work-tracking verb; mirror of taskstore-core ac-ts-loom-boundary.",
       "fixtures": [
         "fx-loom-boundary-memory",
         "fx-loom-boundary-work"
@@ -294,8 +304,8 @@
         }
       },
       "source": "discovered",
-      "state": "proposed",
-      "triggeringEvent": "Observed structurally across src/server.ts: loom registers memory (remember/recall/...), knowledge (knowledge_*), and identity (identity/update-identity/dossier/bootstrap) tools and NO work-tracking verb; mirror of taskstore-core ac-ts-loom-boundary.",
+      "state": "active",
+      "triggeringEvent": "loom brownfield excavation (felag ceremony 4, 2026-06-13) — the first excavate dig",
       "type": "checklist"
     },
     {
@@ -515,7 +525,8 @@
           "category": "all"
         },
         "limit": 10
-      }
+      },
+      "projection": "the excavator deterministic model of loom recall: candidates carry pre-computed cosine distances, isolating the filter/projection (this contract) from the non-deterministic fastembed ranking (the descriptive ac-loom-recall-relevance). Not the impl wire format — its model."
     },
     {
       "record": "fixture",
@@ -550,7 +561,8 @@
           "category": "self"
         },
         "limit": 10
-      }
+      },
+      "projection": "the excavator deterministic model of loom recall: candidates carry pre-computed cosine distances, isolating the filter/projection (this contract) from the non-deterministic fastembed ranking (the descriptive ac-loom-recall-relevance). Not the impl wire format — its model."
     },
     {
       "record": "fixture",
@@ -595,7 +607,8 @@
           "category": "all"
         },
         "limit": 2
-      }
+      },
+      "projection": "the excavator deterministic model of loom recall: candidates carry pre-computed cosine distances, isolating the filter/projection (this contract) from the non-deterministic fastembed ranking (the descriptive ac-loom-recall-relevance). Not the impl wire format — its model."
     },
     {
       "record": "fixture",
@@ -632,7 +645,8 @@
         ],
         "filter": {},
         "limit": 10
-      }
+      },
+      "projection": "the excavator deterministic model of loom recall: candidates carry pre-computed cosine distances, isolating the filter/projection (this contract) from the non-deterministic fastembed ranking (the descriptive ac-loom-recall-relevance). Not the impl wire format — its model."
     },
     {
       "record": "fixture",
@@ -667,7 +681,8 @@
           "project": "abyss"
         },
         "limit": 10
-      }
+      },
+      "projection": "the excavator deterministic model of loom recall: candidates carry pre-computed cosine distances, isolating the filter/projection (this contract) from the non-deterministic fastembed ranking (the descriptive ac-loom-recall-relevance). Not the impl wire format — its model."
     },
     {
       "record": "fixture",
@@ -785,7 +800,8 @@
           "excludeId": "anchor"
         },
         "limit": 10
-      }
+      },
+      "projection": "the excavator deterministic model of loom recall: candidates carry pre-computed cosine distances, isolating the filter/projection (this contract) from the non-deterministic fastembed ranking (the descriptive ac-loom-recall-relevance). Not the impl wire format — its model."
     },
     {
       "record": "fixture",
@@ -820,7 +836,8 @@
           "excludeId": "anchor"
         },
         "limit": 10
-      }
+      },
+      "projection": "the excavator deterministic model of loom recall: candidates carry pre-computed cosine distances, isolating the filter/projection (this contract) from the non-deterministic fastembed ranking (the descriptive ac-loom-recall-relevance). Not the impl wire format — its model."
     },
     {
       "record": "fixture",
@@ -856,7 +873,8 @@
           "minRelevance": 0.7
         },
         "limit": 10
-      }
+      },
+      "projection": "the excavator deterministic model of loom recall: candidates carry pre-computed cosine distances, isolating the filter/projection (this contract) from the non-deterministic fastembed ranking (the descriptive ac-loom-recall-relevance). Not the impl wire format — its model."
     },
     {
       "record": "fixture",
@@ -928,16 +946,16 @@
     }
   ],
   "transition": {
-    "criterionId": "ac-loom-ttl-compute",
+    "criterionId": "ac-loom-remember-no-dedup",
     "to": "active",
-    "requestedAt": "2026-06-13T03:30:00Z",
+    "requestedAt": "2026-06-14T00:00:00Z",
     "requestedBy": "loom",
     "acknowledgments": [
       {
         "implementer": "loom",
         "decision": "ack",
-        "at": "2026-06-13T03:30:00Z",
-        "criterionHash": "sha256:2a4dd46a4019ae24e5c38c112bd66abf146efc46335809eb20c0ad1484993a08"
+        "at": "2026-06-14T00:00:00Z",
+        "criterionHash": "sha256:abd3cf3df00cce8b4a7063cc2bcade6d77d138035bc8bdfd62d3b0b76ec0acf2"
       }
     ]
   }

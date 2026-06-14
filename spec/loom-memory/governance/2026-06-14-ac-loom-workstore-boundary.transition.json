@@ -1,14 +1,14 @@
 {
   "criterionId": "ac-loom-workstore-boundary",
   "to": "active",
-  "requestedAt": "2026-06-13T03:30:00Z",
+  "requestedAt": "2026-06-14T00:00:00Z",
   "requestedBy": "loom",
   "acknowledgments": [
     {
       "implementer": "loom",
       "decision": "ack",
-      "at": "2026-06-13T03:30:00Z",
-      "criterionHash": "sha256:f69bf60470fb20d9635ffad90be84b4cf98d1362df18c6d175fb6dd374040c27"
+      "at": "2026-06-14T00:00:00Z",
+      "criterionHash": "sha256:84d1f63686545240cffd2395e246140070c42991f2358e8bdf3547d6e15642c4"
     }
   ]
 }

@@ -1,14 +1,14 @@
 {
   "criterionId": "ac-loom-memory-knowledge-boundary",
   "to": "active",
-  "requestedAt": "2026-06-13T03:30:00Z",
+  "requestedAt": "2026-06-14T00:00:00Z",
   "requestedBy": "loom",
   "acknowledgments": [
     {
       "implementer": "loom",
       "decision": "ack",
-      "at": "2026-06-13T03:30:00Z",
-      "criterionHash": "sha256:53e5b9dc81d450cb20aaf6e96097ed1da6f44c389d753032b3d9066f7188b157"
+      "at": "2026-06-14T00:00:00Z",
+      "criterionHash": "sha256:51c25a884aad39d73a28d669e0610d88ebca94bfc451436d0845934793667dbb"
     }
   ]
 }

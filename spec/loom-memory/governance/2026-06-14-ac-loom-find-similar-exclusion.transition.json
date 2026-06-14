@@ -1,14 +1,14 @@
 {
   "criterionId": "ac-loom-find-similar-exclusion",
   "to": "active",
-  "requestedAt": "2026-06-13T03:30:00Z",
+  "requestedAt": "2026-06-14T00:00:00Z",
   "requestedBy": "loom",
   "acknowledgments": [
     {
       "implementer": "loom",
       "decision": "ack",
-      "at": "2026-06-13T03:30:00Z",
-      "criterionHash": "sha256:ae725e07786bef95c26b1c6a718047e7cdca97e7ac81188ba850f110ed1af841"
+      "at": "2026-06-14T00:00:00Z",
+      "criterionHash": "sha256:c5534dfacf37ea8979ae7b9014511f87a28a7bd42df8805bd7ab726508d85287"
     }
   ]
 }
