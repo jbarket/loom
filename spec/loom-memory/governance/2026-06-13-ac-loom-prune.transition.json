@@ -1,0 +1,14 @@
+{
+  "criterionId": "ac-loom-prune",
+  "to": "active",
+  "requestedAt": "2026-06-13T03:30:00Z",
+  "requestedBy": "loom",
+  "acknowledgments": [
+    {
+      "implementer": "loom",
+      "decision": "ack",
+      "at": "2026-06-13T03:30:00Z",
+      "criterionHash": "sha256:770cb8af27fc30bb06c5a6b38276f70e2de40164f6f6d5ee807d00df7be30ad3"
+    }
+  ]
+}
