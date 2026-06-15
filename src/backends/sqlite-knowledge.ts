@@ -60,6 +60,10 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
     // Open in constructor for schema init; caller closes after use.
     this.db = new BetterSqlite3(config.dbPath);
     this.db.pragma('journal_mode = WAL');
+    // Single-writer (c-loom-strictness §single-writer): fail fast on a second
+    // concurrent writer (SQLITE_BUSY) instead of blocking for the 5s default —
+    // see sqlite-vec.ts for the rationale. The knowledge wing shares the policy.
+    this.db.pragma('busy_timeout = 0');
     this.db.pragma('user_version = 1');
     this.initSchema();
   }

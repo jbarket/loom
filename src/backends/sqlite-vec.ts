@@ -87,6 +87,13 @@ export class SqliteVecBackend implements MemoryBackend {
     mkdirSync(dirname(config.dbPath), { recursive: true });
     this.db = new BetterSqlite3(config.dbPath);
     this.db.pragma('journal_mode = WAL');
+    // Single-writer (c-loom-strictness §single-writer): WAL admits one writer at
+    // a time; busy_timeout = 0 makes a second concurrent writer FAIL FAST with
+    // SQLITE_BUSY rather than block for the better-sqlite3 default 5s. loom is
+    // synchronous with one connection per call, so this never bites the daemon
+    // itself — only a genuine second writer (e.g. a stray second instance) is
+    // refused, which is exactly the guarantee. No torn write, no silent race.
+    this.db.pragma('busy_timeout = 0');
     sqliteVec.load(this.db);
     this.initSchema();
   }

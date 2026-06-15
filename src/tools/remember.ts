@@ -8,12 +8,36 @@
 import { createBackend } from '../backends/index.js';
 import type { MemoryInput, MemoryRef } from '../backends/types.js';
 
-
+/**
+ * Lint-on-write (c-loom-strictness §lint): validate the record BEFORE it reaches
+ * the backend, so a malformed write is refused with a typed reason and the store
+ * is left untouched — never an empty/torn memory committed then discovered. The
+ * knowledge wing already gates its writes (a citation is required); this brings
+ * the memory wing to parity. Returns a reason string when invalid, else null.
+ */
+export function validateMemoryInput(input: MemoryInput): string | null {
+  if (typeof input.content !== 'string' || input.content.trim() === '') {
+    return 'memory content is required and cannot be empty';
+  }
+  if (typeof input.title !== 'string' || input.title.trim() === '') {
+    return 'memory title is required and cannot be empty';
+  }
+  if (typeof input.category !== 'string' || input.category.trim() === '') {
+    return 'memory category is required and cannot be empty';
+  }
+  return null;
+}
 
 export async function remember(
   contextDir: string,
   input: MemoryInput,
 ): Promise<MemoryRef> {
+  const reason = validateMemoryInput(input);
+  if (reason !== null) {
+    // Rejected pre-commit: nothing is opened or written. The thrown reason is
+    // the typed rejection (dispatch wraps it into a typed envelope at the edge).
+    throw new Error(`Error: ${reason}`);
+  }
   const backend = createBackend(contextDir);
   return backend.remember(input);
 }
