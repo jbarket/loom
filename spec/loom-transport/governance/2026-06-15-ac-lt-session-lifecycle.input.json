@@ -117,18 +117,18 @@
     {
       "record": "criterion",
       "id": "ac-lt-session-lifecycle",
-      "itemId": "it-lt-dispatch",
-      "type": "scenario",
       "class": "behavioral",
-      "gherkin": "Given loom is request/response only (static tool list, no server-initiated messages)\nWhen a client opens a GET server-stream, and separately POSTs against a session id loom no longer holds\nThen the GET is refused 405 (no stream offered, proceed POST-only) and the unknown-session POST is 404 (so the client re-initializes) — an idle disconnect self-heals instead of bricking on a 400",
-      "force": "MUST",
-      "state": "proposed",
-      "source": "forethought",
-      "evidence": "src/transport/http-server.ts:123-127 (GET -> 405, no server stream) and :157-162 (unknown session id -> 404 to trigger client re-initialize, per MCP spec); test src/transport/http-server.integration.test.ts ('returns 405 for a GET', 'returns 404 for a tool call against an unknown session'). Fixes the Claude-Desktop-via-mcp-remote brick where a dropped SSE stream + a 400 on the stale session was fatal.",
       "contractId": "c-loom-transport",
+      "evidence": "src/transport/http-server.ts: GET/DELETE route to the session transport (lines 163-169) so server push works; per-session ping heartbeat keeps the standalone SSE stream alive under proxy idle reaping and detects a dead client (lines 113-135, HEARTBEAT_MS=25s); unknown/expired session -> 404 (lines 170-173, 197-200) per MCP spec so the client re-initializes. Tests src/transport/http-server.integration.test.ts ('SSE heartbeat keeps the session alive', 'returns 404 for a tool call against an unknown session', 'returns 405 for a GET with no session'). Replaces the earlier stop-gap that disabled the stream (405) to stop the Desktop brick.",
       "fixtures": [
         "fx-lt-session-lifecycle"
-      ]
+      ],
+      "force": "MUST",
+      "gherkin": "Given loom serves the server->client SSE stream (server push: listChanged, progress, elicitation, ui:// updates) and keeps it warm with a periodic ping heartbeat\nWhen a client opens the stream on an established session and it sits idle past a proxy's reap window, and separately a client acts on a session loom no longer holds\nThen a GET/DELETE attaches to that session's transport (push works), the heartbeat keeps the idle stream from being reaped and closes the session of a client that stops answering, and an unknown/expired session yields 404 so the client re-initializes — a dropped stream self-heals instead of bricking on a 400",
+      "itemId": "it-lt-dispatch",
+      "source": "forethought",
+      "state": "proposed",
+      "type": "scenario"
     },
     {
       "record": "item",
@@ -352,32 +352,35 @@
       "record": "fixture",
       "id": "fx-lt-session-lifecycle",
       "contractId": "c-loom-transport",
-      "description": "No server SSE stream (GET->405); an unknown/expired session POST->404 so the client re-initializes.",
+      "description": "Server SSE stream is served and heartbeated; a dropped/unknown session yields 404 so the client re-initializes (self-heals).",
       "format": "transport/session@0",
       "input": {
         "requests": [
           {
             "method": "GET",
-            "sessionId": "any"
+            "session": "established",
+            "note": "opens server push stream"
+          },
+          {
+            "method": "idle",
+            "note": "longer than the proxy reap window"
           },
           {
             "method": "POST",
-            "sessionId": "expired-unknown",
+            "session": "expired-unknown",
             "body": "tools/call"
           },
           {
-            "method": "POST",
-            "sessionId": null,
-            "body": "initialize"
+            "method": "GET",
+            "session": null
           }
         ]
       },
       "expected": {
-        "status": [
-          405,
-          404,
-          200
-        ],
+        "streamServed": true,
+        "heartbeatKeepsAlive": true,
+        "unknownSessionStatus": 404,
+        "noSessionGetStatus": 405,
         "recovers": true
       }
     },
@@ -408,7 +411,7 @@
         "implementer": "loom",
         "decision": "ack",
         "at": "2026-06-15T00:00:00Z",
-        "criterionHash": "sha256:8d0bde64c6ac07dac86400f70368614fa8a0fd6b72f5d1bd2bbe7cc548811139"
+        "criterionHash": "sha256:a6d6fa4b2d167264ff8bd58b05371ab7487a37e06becd2a36ee3305a21a20707"
       }
     ]
   }

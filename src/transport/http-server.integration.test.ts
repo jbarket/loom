@@ -90,9 +90,8 @@ describe('c-loom-transport: session lifecycle (no-stream + recovery)', () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  // loom offers no server SSE stream — a GET must be 405 (proceed POST-only),
-  // so there is no long-lived connection to die behind a proxy.
-  it('returns 405 for a GET (no server stream offered)', async () => {
+  // A GET with no established session can't attach a stream -> 405.
+  it('returns 405 for a GET with no session', async () => {
     const res = await fetch(`http://127.0.0.1:${handle.port}/`, { method: 'GET' });
     expect(res.status).toBe(405);
   });
@@ -110,6 +109,28 @@ describe('c-loom-transport: session lifecycle (no-stream + recovery)', () => {
       body: JSON.stringify({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'recall', arguments: { query: 'x' } } }),
     });
     expect(res.status).toBe(404);
+  });
+});
+
+describe('c-loom-transport: SSE heartbeat keeps the session alive', () => {
+  it('survives several heartbeat cycles (live client pongs; session not reaped)', async () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'loom-hb-'));
+    // Fast heartbeat so several cycles elapse within the test.
+    const handle = await startHttpServer({ contextDir: tmpDir, host: '127.0.0.1', port: 0, heartbeatMs: 120 });
+    try {
+      const client = new Client({ name: 'loom-test', version: '0.0.0' }, { capabilities: {} });
+      await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${handle.port}/`)));
+      // Let ~6 heartbeat pings fire; a dead-detection bug would close the session.
+      await new Promise((r) => setTimeout(r, 800));
+      const r = await client.callTool({ name: 'recall', arguments: { query: 'x' } });
+      const text = ((r.content ?? []) as Array<{ type: string; text?: string }>)
+        .filter((c) => c.type === 'text').map((c) => c.text ?? '').join('');
+      expect(text).toMatch(/No memories found/); // session still alive after the heartbeats
+      await client.close();
+    } finally {
+      await handle.close();
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
 

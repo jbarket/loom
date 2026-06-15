@@ -17,7 +17,7 @@
 import { randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import { isInitializeRequest, EmptyResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { createLoomServer } from '../server.js';
 import {
   assertSafeBind,
@@ -26,6 +26,18 @@ import {
   DEFAULT_MAX_BODY_BYTES,
 } from './guards.js';
 
+/**
+ * SSE keep-alive: the SDK opens the standalone GET stream but sends no
+ * heartbeat, so an idle stream gets reaped by proxies/NAT (Traefik's default
+ * idle is ~180s) and the session bricks. We drive a protocol-native `ping` to
+ * the client over the stream — it keeps the connection warm AND detects a dead
+ * client (after a few misses the session is closed, and the client re-inits via
+ * the 404 path). The interval stays well under typical idle windows.
+ */
+const HEARTBEAT_MS = 25_000;
+const HEARTBEAT_TIMEOUT_MS = 10_000;
+const HEARTBEAT_MISSES_BEFORE_CLOSE = 2;
+
 export interface HttpServeOptions {
   contextDir: string;
   host: string;
@@ -33,6 +45,8 @@ export interface HttpServeOptions {
   /** When set, every request must present this bearer token. */
   token?: string;
   maxBytes?: number;
+  /** SSE keep-alive ping interval (ms). Default HEARTBEAT_MS; tests use a small value. */
+  heartbeatMs?: number;
 }
 
 export interface HttpServeHandle {
@@ -73,6 +87,7 @@ export async function startHttpServer(opts: HttpServeOptions): Promise<HttpServe
   // Bind-safety (ac-lt-bind-safety): refuse an unsafe host BEFORE we open a socket.
   assertSafeBind(opts.host);
   const maxBytes = opts.maxBytes ?? DEFAULT_MAX_BODY_BYTES;
+  const heartbeatMs = opts.heartbeatMs ?? HEARTBEAT_MS;
 
   // One transport (+ its connected server) per live MCP session.
   const sessions = new Map<string, StreamableHTTPServerTransport>();
@@ -94,7 +109,32 @@ export async function startHttpServer(opts: HttpServeOptions): Promise<HttpServe
         sessions.set(sid, transport);
       },
     });
+
+    // SSE keep-alive: ping the client over the standalone stream. The first tick
+    // is one interval out, by when the client has opened the stream. A live
+    // client pongs (the SDK answers ping automatically); repeated misses mean a
+    // dead peer or a reaped stream → close the session so it can't zombie, and
+    // the client recovers via the 404 re-init path.
+    let misses = 0;
+    const heartbeat = setInterval(() => {
+      void server.server
+        .request({ method: 'ping' }, EmptyResultSchema, { timeout: HEARTBEAT_TIMEOUT_MS })
+        .then(() => {
+          misses = 0;
+        })
+        .catch(() => {
+          misses += 1;
+          if (misses >= HEARTBEAT_MISSES_BEFORE_CLOSE) {
+            clearInterval(heartbeat);
+            void transport.close().catch(() => undefined);
+          }
+        });
+    }, heartbeatMs);
+    // Don't let the heartbeat keep the event loop alive (clean process exit / test teardown).
+    if (typeof heartbeat.unref === 'function') heartbeat.unref();
+
     transport.onclose = () => {
+      clearInterval(heartbeat);
       if (transport.sessionId) sessions.delete(transport.sessionId);
     };
     await server.connect(transport);
@@ -115,28 +155,26 @@ export async function startHttpServer(opts: HttpServeOptions): Promise<HttpServe
 
       const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
-      // GET = the optional server->client SSE stream. loom is request/response
-      // only (static tool list, no server-initiated messages), so we offer NO
-      // stream — a 405 tells the client to proceed POST-only (MCP spec). This
-      // removes the long-lived connection that otherwise dies on idle behind a
-      // proxy and bricks the session.
-      if (req.method === 'GET') {
-        res.writeHead(405, { 'content-type': 'application/json', allow: 'POST, DELETE' });
-        res.end(JSON.stringify({ error: 'method-not-allowed: loom offers no server stream; POST only' }));
-        return;
-      }
-
-      // DELETE = explicit session teardown — route to the session if it exists.
-      if (req.method === 'DELETE') {
+      // GET = the server->client SSE stream (server push: listChanged, progress,
+      // elicitation, ui:// updates). It attaches to an established session, so a
+      // GET routes to that session's transport. The stream is kept alive by the
+      // per-session heartbeat. A GET for a session we no longer hold is 404 (the
+      // client re-initializes); a GET with no session at all is 405.
+      if (req.method === 'GET' || req.method === 'DELETE') {
         const existing = sessionId ? sessions.get(sessionId) : undefined;
-        if (!existing) {
+        if (existing) {
+          return existing.handleRequest(req, res).catch((e: unknown) =>
+            sendError(res, 500, `internal: ${(e as Error).message}`),
+          );
+        }
+        if (sessionId) {
           res.writeHead(404, { 'content-type': 'application/json' });
-          res.end(JSON.stringify({ error: 'session not found' }));
+          res.end(JSON.stringify({ error: 'session not found; reinitialize' }));
           return;
         }
-        return existing.handleRequest(req, res).catch((e: unknown) =>
-          sendError(res, 500, `internal: ${(e as Error).message}`),
-        );
+        res.writeHead(405, { 'content-type': 'application/json', allow: 'POST' });
+        res.end(JSON.stringify({ error: 'method-not-allowed: open a session with an initialize POST first' }));
+        return;
       }
 
       if (req.method !== 'POST') return sendError(res, 405, 'method-not-allowed');
