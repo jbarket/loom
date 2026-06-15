@@ -22,6 +22,7 @@ import {
   RESOURCE_MIME_TYPE,
 } from '@modelcontextprotocol/ext-apps/server';
 import { resolveRepoRoot } from '../config.js';
+import { digestData } from '../backends/salience.js';
 
 interface ProbeApp {
   tool: string;
@@ -57,8 +58,8 @@ function registerApp(server: McpServer, app: ProbeApp): void {
   );
 }
 
-/** Register the env-gated MCP-App probes. Call only when probing. */
-export function registerHelloApp(server: McpServer, version: string): void {
+/** Register the env-gated MCP-App probes + the first real widget. Call only when probing. */
+export function registerHelloApp(server: McpServer, version: string, contextDir: string): void {
   registerApp(server, {
     tool: 'loom_hello',
     uri: 'ui://loom/hello',
@@ -72,5 +73,13 @@ export function registerHelloApp(server: McpServer, version: string): void {
     htmlFile: 'display-modes.html',
     description: 'MCP-App display-mode trial (Preact) — exercises inline / fullscreen / pip.',
     structured: () => ({ message: 'pick a display mode in the widget', version }),
+  });
+  registerApp(server, {
+    tool: 'loom_top_of_mind',
+    uri: 'ui://loom/top-of-mind',
+    htmlFile: 'top-of-mind.html',
+    description:
+      "Show what's top of mind — the salience-tiered memory digest as a widget. Inline = the hottest few; expand to fullscreen for the full Hot/Warm/Cool landscape.",
+    structured: () => digestData(contextDir) ?? { atoms: [], total: 0 },
   });
 }

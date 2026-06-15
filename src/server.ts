@@ -842,7 +842,7 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
   // MCP-App render probe — env-gated, throwaway. Not part of the tool surface
   // contract; only registered when explicitly validating ui:// rendering.
   if (process.env.LOOM_MCP_APP_HELLO) {
-    registerHelloApp(server, pkg.version);
+    registerHelloApp(server, pkg.version, contextDir);
   }
 
   return { server };

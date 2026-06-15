@@ -56,6 +56,7 @@ const BODIES = {
     <pre id="out"></pre>
   </div>`,
   'display-modes': `  <div id="root"></div>`,
+  'top-of-mind': `  <div id="root"></div>`,
 };
 
 async function buildWidget(name, srcRel) {
@@ -82,3 +83,4 @@ async function buildWidget(name, srcRel) {
 
 await buildWidget('hello', 'widgets/hello.widget.ts');
 await buildWidget('display-modes', 'widgets/display-modes.widget.tsx');
+await buildWidget('top-of-mind', 'widgets/top-of-mind.widget.tsx');

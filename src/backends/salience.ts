@@ -163,6 +163,40 @@ export function recomputeSalienceForContext(contextDir: string, nowMs: number): 
   }
 }
 
+export interface DigestAtom {
+  title: string;
+  category: string;
+  content: string;
+  salience: number;
+  tier: Tier;
+}
+
+/**
+ * Structured salience digest for a UI widget: the hottest authored atoms,
+ * tier-labeled, ordered hot→cold, plus the total memory count. Same
+ * assemble-not-generate view as the text digest — just shaped for rendering.
+ */
+export function digestData(
+  contextDir: string,
+  limit = 40,
+): { atoms: DigestAtom[]; total: number } | null {
+  const db = openMemoriesDb(contextDir, true);
+  if (!db) return null;
+  try {
+    if (!hasColumn(db, 'memories', 'salience')) return { atoms: [], total: 0 };
+    const total = (db.prepare('SELECT COUNT(*) AS n FROM memories WHERE archived = 0').get() as { n: number }).n;
+    const rows = db
+      .prepare(
+        'SELECT title, category, content, salience FROM memories WHERE archived = 0 ORDER BY salience DESC LIMIT ?',
+      )
+      .all(limit) as Omit<DigestAtom, 'tier'>[];
+    const atoms = rows.map((r) => ({ ...r, tier: tierOf(r.salience) }));
+    return { atoms, total };
+  } finally {
+    db.close();
+  }
+}
+
 /** Assemble the boot digest for a context from stored salience. Returns null if no store / nothing hot. */
 export function digestForContext(contextDir: string, opts: DigestOptions = {}): string | null {
   const db = openMemoriesDb(contextDir, true);
