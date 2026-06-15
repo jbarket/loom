@@ -58,7 +58,8 @@ function buildCurrentDb(dir: string): string {
       ttl TEXT,
       expires_at TEXT,
       archived INTEGER NOT NULL DEFAULT 0,
-      archive_note TEXT
+      archive_note TEXT,
+      salience REAL NOT NULL DEFAULT 0
     )
   `).run();
   db.prepare(`CREATE INDEX idx_memories_archived ON memories(archived)`).run();

@@ -121,12 +121,14 @@ describe('pendingMigrations', () => {
   beforeEach(() => { tmpDir = mkdtempSync(join(tmpdir(), 'loom-pend-')); });
   afterEach(() => { rmSync(tmpDir, { recursive: true, force: true }); });
 
-  it('returns all three migrations on an old-schema DB', () => {
+  it('returns every migration on an old-schema DB', () => {
     const db = openOldSchemaDb(join(tmpDir, 'old.db'));
     const pending = pendingMigrations(db);
     db.close();
 
-    expect(pending.length).toBe(3);
+    expect(pending.map((m) => m.id)).toEqual([
+      'add_archived', 'add_archive_note', 'idx_memories_archived', 'add_salience',
+    ]);
   });
 
   it('returns empty array after migrations have been applied', () => {

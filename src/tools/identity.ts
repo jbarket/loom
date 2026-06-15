@@ -15,6 +15,7 @@ import * as harnessBlock from '../blocks/harness.js';
 import * as modelBlock from '../blocks/model.js';
 import { resolveDefaultContextPath } from '../config.js';
 import { pathSegmentError } from '../path-safety.js';
+import { digestForContext } from '../backends/salience.js';
 
 async function readOptional(path: string): Promise<string | null> {
   try {
@@ -110,6 +111,17 @@ export async function loadIdentity(
   const preferences = await readOptional(join(contextDir, 'preferences.md'));
   if (preferences) {
     parts.push('# Preferences\n\n' + preferences.trim());
+  }
+
+  // Boot digest — the salience-tiered view of episodic memory, so a fresh sleeve
+  // wakes knowing what is top-of-mind vs settled background without fishing via
+  // recall. ASSEMBLED from authored atoms (never generated); injected after
+  // preferences. Best-effort — a missing/empty store just omits the block.
+  try {
+    const digest = digestForContext(contextDir);
+    if (digest) parts.push('# Top of Mind\n\n' + digest);
+  } catch {
+    // a digest failure must never block identity load
   }
 
   // Self-model — what the agent knows about its own capabilities

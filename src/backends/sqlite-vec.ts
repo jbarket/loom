@@ -112,8 +112,8 @@ export class SqliteVecBackend implements MemoryBackend {
     const insertMem = this.db.prepare(`
       INSERT INTO memories (
         uuid, ref, title, category, project, content, metadata,
-        created, ttl, expires_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        created, ttl, expires_at, salience
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insertVec = this.db.prepare(
       'INSERT INTO vec_memories(rowid, embedding) VALUES (?, ?)',
@@ -131,6 +131,7 @@ export class SqliteVecBackend implements MemoryBackend {
         timestamp,
         input.ttl ?? null,
         expiresAt,
+        1.0, // a freshly authored memory is hot; the lane decays it from here
       );
       insertVec.run(BigInt(result.lastInsertRowid), toVecBuffer(vector));
     });

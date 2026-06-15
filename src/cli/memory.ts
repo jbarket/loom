@@ -4,6 +4,7 @@
 import { parseArgs } from 'node:util';
 import { memoryList } from '../tools/memory-list.js';
 import { prune } from '../tools/prune.js';
+import { recomputeSalienceForContext, digestForContext } from '../backends/salience.js';
 import { findSimilar } from '../tools/find-similar.js';
 import { memoryAudit } from '../tools/memory-audit.js';
 import { archive } from '../tools/archive.js';
@@ -66,7 +67,7 @@ Options (restore):
 Global: --context-dir, --help/-h
 `;
 
-const SUBCOMMANDS = new Set(['list', 'prune', 'similar', 'audit', 'archive', 'restore']);
+const SUBCOMMANDS = new Set(['list', 'prune', 'similar', 'audit', 'archive', 'restore', 'recompute-salience', 'digest']);
 
 export async function run(argv: string[], io: IOStreams): Promise<number> {
   const { flags: global, rest } = extractGlobalFlags(argv);
@@ -85,6 +86,20 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
   const env = resolveEnv(global, io.env);
   try { assertStackVersionCompatible(env.contextDir); }
   catch (err) { io.stderr(`${(err as Error).message}\n`); return 1; }
+
+  // recompute-salience — the consolidation lane's entry point (it-loom-salience):
+  // refresh the stored temperature for every memory from its timestamps.
+  if (sub === 'recompute-salience') {
+    const n = recomputeSalienceForContext(env.contextDir, Date.now());
+    io.stdout(`recomputed salience for ${n ?? 0} memories\n`);
+    return 0;
+  }
+  // digest — preview the assembled boot digest (the same view injected at identity-load).
+  if (sub === 'digest') {
+    const d = digestForContext(env.contextDir);
+    io.stdout((d ?? '(no digest — empty store)') + '\n');
+    return 0;
+  }
 
   if (sub === 'list') {
     let parsed;

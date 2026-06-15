@@ -59,6 +59,16 @@ export const MIGRATIONS: readonly Migration[] = [
       db.prepare('CREATE INDEX idx_memories_archived ON memories(archived)').run();
     },
   },
+  {
+    id: 'add_salience',
+    description: 'Add salience temperature for the tiered boot digest (it-loom-salience)',
+    pending: (db) => !hasColumn(db, 'memories', 'salience'),
+    run: (db) => {
+      // Fresh column; new writes set 1.0 (hot), the consolidation lane recomputes
+      // existing rows from their timestamps. Default 0 = cold until first refresh.
+      db.prepare('ALTER TABLE memories ADD COLUMN salience REAL NOT NULL DEFAULT 0').run();
+    },
+  },
 ];
 
 /**
