@@ -35,6 +35,7 @@ import { updateIdentity } from './tools/update-identity.js';
 import { bootstrap } from './tools/bootstrap.js';
 import { harnessInit, harnessDescribe } from './tools/harness.js';
 import { resolvePeerToHarness, normalizePeer } from './blocks/harness.js';
+import { registerHelloApp } from './transport/mcp-app-hello.js';
 import { knowledgeWrite } from './tools/knowledge-write.js';
 import { knowledgeRecall } from './tools/knowledge-recall.js';
 import { knowledgeMaintain } from './tools/knowledge-maintain.js';
@@ -837,6 +838,12 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );
+
+  // MCP-App render probe — env-gated, throwaway. Not part of the tool surface
+  // contract; only registered when explicitly validating ui:// rendering.
+  if (process.env.LOOM_MCP_APP_HELLO) {
+    registerHelloApp(server, pkg.version);
+  }
 
   return { server };
 }
