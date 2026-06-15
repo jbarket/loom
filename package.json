@@ -26,7 +26,7 @@
     "url": "https://github.com/jbarket/loom/issues"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/build-widgets.mjs",
     "prepare": "tsc",
     "prepublishOnly": "npm run build && npm test",
     "dev": "tsx src/index.ts",
@@ -47,6 +47,7 @@
   "author": "Art E Fish + Jonathan Barket",
   "license": "AGPL-3.0-or-later",
   "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.7.4",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^12.10.0",
     "fastembed": "^2.1.0",
@@ -56,6 +57,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.8.0",
+    "esbuild": "^0.28.1",
     "tsx": "^4.22.1",
     "typescript": "^6.0.3",
     "vitest": "^4.1.6"
