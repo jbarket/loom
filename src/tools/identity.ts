@@ -154,11 +154,14 @@ export async function loadIdentity(
     if (block) {
       parts.push(`# Harness: ${effectiveClient}\n\n${block.body}`);
     } else {
+      // Genuinely unknown runtime: instead of a bare "(manifest missing)" stub,
+      // instruct the connected harness to self-describe via harness_describe.
       parts.push(
-        `# Harness: ${effectiveClient} (manifest missing)\n\n` +
-        `No manifest found at ${contextDir}/harnesses/${effectiveClient}.md. ` +
-        `Write one — here's the template:\n\n` +
-        harnessBlock.template(effectiveClient),
+        `# Harness: ${effectiveClient} (unknown)\n\n` +
+        `I don't have a manifest for this runtime. Describe yourself by calling ` +
+        `the harness_describe tool with a manifest covering: tool surface / ` +
+        `prefixes, sandbox & filesystem, delegation primitive, scheduling, ` +
+        `session search, memory layers, and gotchas.`,
       );
     }
   }

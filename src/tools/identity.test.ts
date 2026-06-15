@@ -223,12 +223,14 @@ describe('loadIdentity — harness manifest', () => {
     expect(result).not.toContain('# Harness:');
   });
 
-  it('emits a nudge section when client is set but no manifest exists', async () => {
+  it('emits a self-describe onboarding block when client is set but no manifest exists', async () => {
     await writeFile(join(tempDir, 'IDENTITY.md'), 'Creed');
-    const result = await loadIdentity(tempDir, undefined, 'claude-code');
-    expect(result).toContain('# Harness: claude-code (manifest missing)');
-    expect(result).toContain('harness: claude-code');
-    expect(result).toContain('## Tool prefixes');
+    const result = await loadIdentity(tempDir, undefined, 'mystery-runtime');
+    expect(result).toContain('# Harness: mystery-runtime (unknown)');
+    expect(result).toContain('harness_describe');
+    expect(result).toContain('Describe yourself');
+    // The bare "(manifest missing)" placeholder is gone.
+    expect(result).not.toContain('manifest missing');
   });
 
   it('emits the harness manifest body when present', async () => {

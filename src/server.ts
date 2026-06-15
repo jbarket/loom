@@ -26,7 +26,8 @@ import { archive } from './tools/archive.js';
 import { restore } from './tools/restore.js';
 import { updateIdentity } from './tools/update-identity.js';
 import { bootstrap } from './tools/bootstrap.js';
-import { harnessInit } from './tools/harness.js';
+import { harnessInit, harnessDescribe } from './tools/harness.js';
+import { resolvePeerToHarness, normalizePeer } from './blocks/harness.js';
 import { knowledgeWrite } from './tools/knowledge-write.js';
 import { knowledgeRecall } from './tools/knowledge-recall.js';
 import { knowledgeMaintain } from './tools/knowledge-maintain.js';
@@ -91,8 +92,13 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
       ),
     },
     async ({ project, client, model, role }) => {
-      // Precedence: explicit param > the connected peer (handshake clientInfo) > LOOM_CLIENT.
-      const effectiveClient = client ?? resolveClientFromPeer(server.server.getClientVersion()?.name);
+      // Precedence: explicit param > data-driven manifest resolution > the
+      // static code-map seed fallback > LOOM_CLIENT (inside loadIdentity).
+      const peer = server.server.getClientVersion()?.name;
+      // A connected peer always gets its harness OR an onboarding prompt (via its
+      // normalized name); LOOM_CLIENT is only the no-peer fallback (in loadIdentity).
+      const effectiveClient =
+        client ?? (await resolvePeerToHarness(contextDir, peer)) ?? resolveClientFromPeer(peer) ?? (peer ? normalizePeer(peer) : undefined);
       const result = await loadIdentity(contextDir, project, effectiveClient, model, role);
       return { content: [{ type: 'text' as const, text: result }] };
     },
@@ -122,7 +128,11 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
       ),
     },
     async ({ project, client, model, role }) => {
-      const effectiveClient = client ?? resolveClientFromPeer(server.server.getClientVersion()?.name);
+      const peer = server.server.getClientVersion()?.name;
+      // A connected peer always gets its harness OR an onboarding prompt (via its
+      // normalized name); LOOM_CLIENT is only the no-peer fallback (in loadIdentity).
+      const effectiveClient =
+        client ?? (await resolvePeerToHarness(contextDir, peer)) ?? resolveClientFromPeer(peer) ?? (peer ? normalizePeer(peer) : undefined);
       const result = await loadDossier(contextDir, project, effectiveClient, model, role);
       return { content: [{ type: 'text' as const, text: result }] };
     },
@@ -378,6 +388,26 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     },
     async ({ name, overwrite }) => {
       const text = await harnessInit(contextDir, { name, overwrite });
+      return { content: [{ type: 'text' as const, text }] };
+    },
+  );
+
+  server.tool(
+    'harness_describe',
+    'Self-describe the CURRENTLY CONNECTED harness: write its manifest at ' +
+    '<contextDir>/harnesses/<key>.md (see stack spec v1 §4.7). Call this when ' +
+    'identity() reports an onboarding block for an unknown runtime. The target is ' +
+    'derived from your own MCP clientInfo.name — you can only describe yourself, ' +
+    'not another harness. Re-runnable: overwrites the manifest each time. The body ' +
+    'should cover: tool surface / prefixes, sandbox & filesystem, delegation ' +
+    'primitive, scheduling, session search, memory layers, and gotchas.',
+    {
+      content: z.string().describe('The manifest body (markdown). Frontmatter is stamped automatically.'),
+      version: z.string().optional().describe('Manifest version stamp (default "0.1").'),
+    },
+    async ({ content, version }) => {
+      const peer = server.server.getClientVersion()?.name;
+      const text = await harnessDescribe(contextDir, { content, version }, peer);
       return { content: [{ type: 'text' as const, text }] };
     },
   );

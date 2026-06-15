@@ -54,6 +54,10 @@ an agent's persistent state:
 - **`bootstrap`** — initialize a fresh agent from a short interview.
 - **`harness_init`** — scaffold a harness manifest (a harness is the
   MCP-capable runtime the agent runs in: Claude Code, Codex, Gemini CLI, etc.).
+- **`harness_describe`** — let the currently connected harness self-describe:
+  write its own manifest, keyed to its MCP `clientInfo.name`. A harness can only
+  describe itself, never another — the target is the connected peer, not a
+  caller-supplied name.
 - **`knowledge_write`** — upsert an entity page by slug into the knowledge
   store (a separate `knowledge.db`). On an existing slug the body replaces by
   default (`mode: "append"` adds instead), title/domain follow the write, and

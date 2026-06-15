@@ -22,7 +22,7 @@ export const TOOLS = [
   'identity', 'dossier', 'remember', 'recall', 'update', 'forget',
   'memory_list', 'memory_prune', 'find_similar', 'memory_audit',
   'memory_archive', 'memory_restore',
-  'update_identity', 'bootstrap', 'harness_init',
+  'update_identity', 'bootstrap', 'harness_init', 'harness_describe',
   'knowledge_write', 'knowledge_recall', 'knowledge_maintain',
   'knowledge_archive', 'knowledge_restore', 'knowledge_supersede', 'knowledge_move', 'knowledge_merge',
   'knowledge_purge', 'knowledge_verify', 'knowledge_history',
