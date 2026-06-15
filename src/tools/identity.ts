@@ -24,6 +24,36 @@ async function readOptional(path: string): Promise<string | null> {
   }
 }
 
+/**
+ * Map an MCP peer's handshake clientInfo.name to a loom client/harness name.
+ *
+ * A single HTTP daemon is inherently multi-client: the connecting peer — not a
+ * server-wide LOOM_CLIENT env — should pick the harness. The server reads the
+ * peer from the `initialize` handshake (server.getClientVersion()) and passes
+ * its name here. Resolution precedence at the call site is:
+ *   explicit `client` param  >  this (the connected peer)  >  LOOM_CLIENT env.
+ *
+ * Unknown / proxy-ish peers return undefined so the call falls back to
+ * LOOM_CLIENT — never override a working default with a name we can't place
+ * (which would only yield a "(manifest missing)" block). Known aliases are
+ * normalized cross-vendor: e.g. Claude Desktop identifies as "claude-ai".
+ */
+const PEER_CLIENT_ALIASES: Record<string, string> = {
+  'claude-code': 'claude-code',
+  'claude-ai': 'claude-desktop', // Claude Desktop's MCP clientInfo.name
+  'claude-desktop': 'claude-desktop',
+  claude: 'claude-desktop',
+  'gemini-cli': 'gemini-cli',
+  gemini: 'gemini-cli',
+  opencode: 'opencode',
+};
+
+export function resolveClientFromPeer(peerName?: string): string | undefined {
+  if (!peerName) return undefined;
+  const normalized = peerName.trim().toLowerCase().replace(/[\s_]+/g, '-');
+  return PEER_CLIENT_ALIASES[normalized];
+}
+
 export async function loadIdentity(
   contextDir: string,
   project?: string,

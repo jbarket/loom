@@ -12,7 +12,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { assertStackVersionCompatible, assertContextBootable, resolveRepoRoot } from './config.js';
 import { MEMORY_CATEGORIES } from './categories.js';
-import { loadIdentity } from './tools/identity.js';
+import { loadIdentity, resolveClientFromPeer } from './tools/identity.js';
 import { loadDossier } from './tools/dossier.js';
 import { remember } from './tools/remember.js';
 import { recall } from './tools/recall.js';
@@ -91,7 +91,9 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
       ),
     },
     async ({ project, client, model, role }) => {
-      const result = await loadIdentity(contextDir, project, client, model, role);
+      // Precedence: explicit param > the connected peer (handshake clientInfo) > LOOM_CLIENT.
+      const effectiveClient = client ?? resolveClientFromPeer(server.server.getClientVersion()?.name);
+      const result = await loadIdentity(contextDir, project, effectiveClient, model, role);
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );
@@ -120,7 +122,8 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
       ),
     },
     async ({ project, client, model, role }) => {
-      const result = await loadDossier(contextDir, project, client, model, role);
+      const effectiveClient = client ?? resolveClientFromPeer(server.server.getClientVersion()?.name);
+      const result = await loadDossier(contextDir, project, effectiveClient, model, role);
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );

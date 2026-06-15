@@ -79,6 +79,14 @@ export async function startHttpServer(opts: HttpServeOptions): Promise<HttpServe
 
   async function openSession(): Promise<StreamableHTTPServerTransport> {
     const { server } = createLoomServer({ contextDir: opts.contextDir });
+    // Fires AFTER the initialize handshake completes — getClientVersion() is
+    // populated here (it is not yet at onsessioninitialized). Logging the peer
+    // makes the resolved harness observable and reveals an unmapped client's
+    // real clientInfo.name so the alias table can be extended.
+    server.server.oninitialized = () => {
+      const peer = server.server.getClientVersion();
+      process.stderr.write(`loom: peer connected client=${JSON.stringify(peer ?? null)}\n`);
+    };
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       enableJsonResponse: true,
