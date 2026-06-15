@@ -78,6 +78,41 @@ describe('c-loom-transport: HTTP daemon', () => {
   });
 });
 
+describe('c-loom-transport: session lifecycle (no-stream + recovery)', () => {
+  let tmpDir: string;
+  let handle: HttpServeHandle;
+  beforeEach(async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'loom-sess-'));
+    handle = await startHttpServer({ contextDir: tmpDir, host: '127.0.0.1', port: 0 });
+  });
+  afterEach(async () => {
+    await handle.close();
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  // loom offers no server SSE stream — a GET must be 405 (proceed POST-only),
+  // so there is no long-lived connection to die behind a proxy.
+  it('returns 405 for a GET (no server stream offered)', async () => {
+    const res = await fetch(`http://127.0.0.1:${handle.port}/`, { method: 'GET' });
+    expect(res.status).toBe(405);
+  });
+
+  // An expired/unknown session must be 404 so the client RE-INITIALIZES rather
+  // than bricking on a 400 (the Desktop failure mode).
+  it('returns 404 for a tool call against an unknown session (triggers re-init)', async () => {
+    const res = await fetch(`http://127.0.0.1:${handle.port}/`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+        'mcp-session-id': 'ghost-session-that-does-not-exist',
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'recall', arguments: { query: 'x' } } }),
+    });
+    expect(res.status).toBe(404);
+  });
+});
+
 describe('c-loom-transport: open token + bind-safety', () => {
   // ac-lt-auth-gate (no token configured -> open, network is the boundary)
   it('serves without a token when none is configured', async () => {

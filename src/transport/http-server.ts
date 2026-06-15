@@ -115,14 +115,31 @@ export async function startHttpServer(opts: HttpServeOptions): Promise<HttpServe
 
       const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
-      // Non-POST (GET stream / DELETE end) routes to an existing session only.
-      if (req.method !== 'POST') {
+      // GET = the optional server->client SSE stream. loom is request/response
+      // only (static tool list, no server-initiated messages), so we offer NO
+      // stream — a 405 tells the client to proceed POST-only (MCP spec). This
+      // removes the long-lived connection that otherwise dies on idle behind a
+      // proxy and bricks the session.
+      if (req.method === 'GET') {
+        res.writeHead(405, { 'content-type': 'application/json', allow: 'POST, DELETE' });
+        res.end(JSON.stringify({ error: 'method-not-allowed: loom offers no server stream; POST only' }));
+        return;
+      }
+
+      // DELETE = explicit session teardown — route to the session if it exists.
+      if (req.method === 'DELETE') {
         const existing = sessionId ? sessions.get(sessionId) : undefined;
-        if (!existing) return sendError(res, 400, 'bad-input: unknown or missing session');
+        if (!existing) {
+          res.writeHead(404, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'session not found' }));
+          return;
+        }
         return existing.handleRequest(req, res).catch((e: unknown) =>
           sendError(res, 500, `internal: ${(e as Error).message}`),
         );
       }
+
+      if (req.method !== 'POST') return sendError(res, 405, 'method-not-allowed');
 
       // POST: read + cap the body, then route by session / initialize.
       const body = await collectBody(req, maxBytes);
@@ -136,6 +153,14 @@ export async function startHttpServer(opts: HttpServeOptions): Promise<HttpServe
 
       let transport = sessionId ? sessions.get(sessionId) : undefined;
       if (!transport) {
+        if (sessionId) {
+          // A session id we don't have (expired / dropped). Per MCP spec, 404
+          // tells the client to start over with a fresh initialize — so an idle
+          // disconnect self-heals instead of bricking on a 400.
+          res.writeHead(404, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'session not found; reinitialize' }));
+          return;
+        }
         if (!isInitializeRequest(parsed)) {
           return sendError(res, 400, 'bad-input: no valid session; expected an initialize request');
         }

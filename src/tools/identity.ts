@@ -50,7 +50,10 @@ const PEER_CLIENT_ALIASES: Record<string, string> = {
 
 export function resolveClientFromPeer(peerName?: string): string | undefined {
   if (!peerName) return undefined;
-  const normalized = peerName.trim().toLowerCase().replace(/[\s_]+/g, '-');
+  // Proxies annotate the name, e.g. "claude-ai (via mcp-remote 0.1.37)" — take
+  // the base identity before the first parenthetical, then normalize.
+  const base = peerName.split(/\s*\(/, 1)[0];
+  const normalized = base.trim().toLowerCase().replace(/[\s_]+/g, '-');
   return PEER_CLIENT_ALIASES[normalized];
 }
 

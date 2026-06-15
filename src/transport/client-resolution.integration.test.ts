@@ -20,6 +20,11 @@ describe('resolveClientFromPeer (the mapping)', () => {
     expect(resolveClientFromPeer('Claude_Desktop')).toBe('claude-desktop');
     expect(resolveClientFromPeer('gemini-cli')).toBe('gemini-cli');
   });
+  it('strips a proxy annotation like "(via mcp-remote 0.1.37)"', () => {
+    // The real clientInfo Claude Desktop sends through mcp-remote.
+    expect(resolveClientFromPeer('claude-ai (via mcp-remote 0.1.37)')).toBe('claude-desktop');
+    expect(resolveClientFromPeer('claude-code (via mcp-remote 0.2.0)')).toBe('claude-code');
+  });
   it('returns undefined for unknown/proxy peers so LOOM_CLIENT wins (no regression)', () => {
     expect(resolveClientFromPeer(undefined)).toBeUndefined();
     expect(resolveClientFromPeer('')).toBeUndefined();
