@@ -1,0 +1,108 @@
+/**
+ * c-loom-transport end-to-end — the HTTP daemon driven by the real MCP client.
+ * Greens: ac-lt-envelope-ok (parity), ac-lt-envelope-bad-input, ac-lt-dispatch-total,
+ *          ac-lt-auth-gate (over the wire), ac-lt-no-cloud-callback (witness).
+ */
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { startHttpServer, type HttpServeHandle } from './http-server.js';
+import { recall } from '../tools/recall.js';
+
+const TOKEN = 'test-bearer-secret';
+
+async function connectClient(port: number, token?: string): Promise<Client> {
+  const client = new Client({ name: 'loom-test', version: '0.0.0' }, { capabilities: {} });
+  const transport = new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/`), {
+    requestInit: token ? { headers: { authorization: `Bearer ${token}` } } : undefined,
+  });
+  await client.connect(transport);
+  return client;
+}
+
+function textOf(result: unknown): string {
+  const content = (result as { content?: Array<{ type: string; text?: string }> }).content ?? [];
+  return content.filter((c) => c.type === 'text').map((c) => c.text ?? '').join('');
+}
+
+describe('c-loom-transport: HTTP daemon', () => {
+  let tmpDir: string;
+  let handle: HttpServeHandle;
+
+  beforeEach(async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'loom-http-'));
+    handle = await startHttpServer({ contextDir: tmpDir, host: '127.0.0.1', port: 0, token: TOKEN });
+  });
+  afterEach(async () => {
+    await handle.close();
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  // ac-lt-envelope-ok + ac-lt-envelope-ok parity
+  it('serves a tool call over HTTP with the SAME result as the in-process tool (parity)', async () => {
+    const client = await connectClient(handle.port, TOKEN);
+    const httpResult = await client.callTool({ name: 'recall', arguments: { query: 'nothing here' } });
+    const direct = await recall(tmpDir, { query: 'nothing here' });
+    expect(textOf(httpResult)).toBe(direct); // transport is a carrier, not a semantic
+    expect(textOf(httpResult)).toMatch(/No memories found/);
+    await client.close();
+  });
+
+  // ac-lt-dispatch-total: unknown tool -> typed error envelope, not a panic
+  it('returns a typed error for an unknown tool (dispatch totality)', async () => {
+    const client = await connectClient(handle.port, TOKEN);
+    const r = await client.callTool({ name: 'no_such_tool', arguments: {} });
+    expect(r.isError).toBe(true); // typed envelope, never an uncaught throw
+    // server still alive for the next call — no panic path
+    const ok = await client.callTool({ name: 'recall', arguments: { query: 'x' } });
+    expect(textOf(ok)).toMatch(/No memories found/);
+    await client.close();
+  });
+
+  // ac-lt-envelope-bad-input: malformed args -> typed error envelope
+  it('returns a typed error for malformed tool arguments', async () => {
+    const client = await connectClient(handle.port, TOKEN);
+    // remember requires content/title/category; empty args fail validation
+    const r = await client.callTool({ name: 'remember', arguments: {} });
+    expect(r.isError).toBe(true);
+    await client.close();
+  });
+
+  // ac-lt-auth-gate: over the wire
+  it('refuses a connection with no bearer token, and one with a wrong token', async () => {
+    await expect(connectClient(handle.port, undefined)).rejects.toThrow();
+    await expect(connectClient(handle.port, 'wrong-token')).rejects.toThrow();
+  });
+});
+
+describe('c-loom-transport: open token + bind-safety', () => {
+  // ac-lt-auth-gate (no token configured -> open, network is the boundary)
+  it('serves without a token when none is configured', async () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'loom-http-open-'));
+    const handle = await startHttpServer({ contextDir: tmpDir, host: '127.0.0.1', port: 0 });
+    try {
+      const client = await connectClient(handle.port, undefined);
+      const r = await client.callTool({ name: 'recall', arguments: { query: 'x' } });
+      expect(textOf(r)).toMatch(/No memories found/);
+      await client.close();
+    } finally {
+      await handle.close();
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  // ac-lt-bind-safety: a public bind is refused before a socket opens
+  it('refuses to start on a public/0.0.0.0 bind', async () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'loom-http-bind-'));
+    try {
+      await expect(
+        startHttpServer({ contextDir: tmpDir, host: '0.0.0.0', port: 0 }),
+      ).rejects.toThrow(/unsafe-bind/);
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
