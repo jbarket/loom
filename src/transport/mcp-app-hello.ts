@@ -23,6 +23,7 @@ import {
 } from '@modelcontextprotocol/ext-apps/server';
 import { resolveRepoRoot } from '../config.js';
 import { digestData } from '../backends/salience.js';
+import { listProposals } from '../backends/proposals.js';
 
 interface ProbeApp {
   tool: string;
@@ -81,5 +82,13 @@ export function registerHelloApp(server: McpServer, version: string, contextDir:
     description:
       "Show what's top of mind — the salience-tiered memory digest as a widget. Inline = the hottest few; expand to fullscreen for the full Hot/Warm/Cool landscape.",
     structured: () => digestData(contextDir) ?? { atoms: [], total: 0 },
+  });
+  registerApp(server, {
+    tool: 'loom_proposals',
+    uri: 'ui://loom/proposals',
+    htmlFile: 'proposals.html',
+    description:
+      'Review the capture-propose queue — pending memory drafts awaiting ratification. Ratify (commit to memory) or reject each. Inline = the count + newest; expand to review the full queue.',
+    structured: () => ({ proposals: listProposals(contextDir) }),
   });
 }
