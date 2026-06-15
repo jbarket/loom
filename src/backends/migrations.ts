@@ -34,6 +34,13 @@ function hasIndex(db: Database, table: string, name: string): boolean {
   return info.some((i) => i.name === name);
 }
 
+function hasTable(db: Database, table: string): boolean {
+  const row = db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
+    .get(table) as { name: string } | undefined;
+  return row !== undefined;
+}
+
 export const MIGRATIONS: readonly Migration[] = [
   {
     id: 'add_archived',
@@ -67,6 +74,34 @@ export const MIGRATIONS: readonly Migration[] = [
       // Fresh column; new writes set 1.0 (hot), the consolidation lane recomputes
       // existing rows from their timestamps. Default 0 = cold until first refresh.
       db.prepare('ALTER TABLE memories ADD COLUMN salience REAL NOT NULL DEFAULT 0').run();
+    },
+  },
+  {
+    id: 'add_proposals',
+    description:
+      'Add proposals staging table for the capture-propose queue — drafts a ' +
+      'background lane stages for ratification; NOT authored canon until ratified',
+    pending: (db) => !hasTable(db, 'proposals'),
+    run: (db) => {
+      // The staging area for the capture-propose queue. A proposal is NOT an
+      // authored memory: it lives in its own table, invisible to recall / list /
+      // salience / find_similar, and only becomes a real memory via an explicit
+      // ratify (which routes through remember() so it is validated like any write).
+      db.prepare(`
+        CREATE TABLE proposals (
+          id        INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid      TEXT NOT NULL UNIQUE,
+          category  TEXT,
+          title     TEXT,
+          content   TEXT,
+          project   TEXT,
+          ttl       TEXT,
+          metadata  TEXT DEFAULT '{}',
+          source    TEXT,
+          created   TEXT,
+          status    TEXT NOT NULL DEFAULT 'pending'
+        )
+      `).run();
     },
   },
 ];

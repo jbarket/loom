@@ -64,6 +64,21 @@ function buildCurrentDb(dir: string): string {
   `).run();
   db.prepare(`CREATE INDEX idx_memories_archived ON memories(archived)`).run();
   db.prepare(`
+    CREATE TABLE proposals (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid      TEXT NOT NULL UNIQUE,
+      category  TEXT,
+      title     TEXT,
+      content   TEXT,
+      project   TEXT,
+      ttl       TEXT,
+      metadata  TEXT DEFAULT '{}',
+      source    TEXT,
+      created   TEXT,
+      status    TEXT NOT NULL DEFAULT 'pending'
+    )
+  `).run();
+  db.prepare(`
     CREATE VIRTUAL TABLE vec_memories USING vec0(embedding float[4] distance_metric=cosine)
   `).run();
   db.close();

@@ -72,6 +72,27 @@ describe('runMigrations', () => {
     expect(applied).toContain('idx_memories_archived');
   });
 
+  it('creates the proposals table on an old-schema DB', () => {
+    const db = openOldSchemaDb(join(tmpDir, 'props.db'));
+
+    const results = runMigrations(db, { strict: true });
+    const applied = results.filter((r) => r.status === 'applied').map((r) => r.id);
+    expect(applied).toContain('add_proposals');
+
+    const tbl = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'proposals'")
+      .get() as { name: string } | undefined;
+    expect(tbl?.name).toBe('proposals');
+
+    const cols = (db.pragma('table_info(proposals)') as { name: string }[]).map((c) => c.name);
+    expect(cols).toEqual(
+      expect.arrayContaining([
+        'id', 'uuid', 'category', 'title', 'content', 'project', 'ttl', 'metadata', 'source', 'created', 'status',
+      ]),
+    );
+    db.close();
+  });
+
   it('skips already-applied migrations (idempotent)', () => {
     const db = openOldSchemaDb(join(tmpDir, 'idm.db'));
     runMigrations(db, { strict: true });
@@ -127,7 +148,7 @@ describe('pendingMigrations', () => {
     db.close();
 
     expect(pending.map((m) => m.id)).toEqual([
-      'add_archived', 'add_archive_note', 'idx_memories_archived', 'add_salience',
+      'add_archived', 'add_archive_note', 'idx_memories_archived', 'add_salience', 'add_proposals',
     ]);
   });
 

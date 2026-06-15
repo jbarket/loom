@@ -24,6 +24,13 @@ import { findSimilar } from './tools/find-similar.js';
 import { memoryAudit } from './tools/memory-audit.js';
 import { archive } from './tools/archive.js';
 import { restore } from './tools/restore.js';
+import {
+  propose,
+  listProposals,
+  ratifyProposal,
+  rejectProposal,
+  UnknownProposalError,
+} from './backends/proposals.js';
 import { updateIdentity } from './tools/update-identity.js';
 import { bootstrap } from './tools/bootstrap.js';
 import { harnessInit, harnessDescribe } from './tools/harness.js';
@@ -321,6 +328,107 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     async ({ ref, category, title }) => {
       const result = await restore(contextDir, { ref, category, title });
       return { content: [{ type: 'text' as const, text: result }] };
+    },
+  );
+
+  // ─── Capture-propose queue ────────────────────────────────────────────────────
+  // The staging area a background lane drafts memory writes into. A proposal is
+  // NOT authored canon: it lives in a separate table, invisible to recall /
+  // memory_list / the salience digest / find_similar, and becomes a real memory
+  // only via an explicit memory_ratify. Never auto-committed.
+
+  server.tool(
+    'memory_propose',
+    'Stage a DRAFT memory in the capture-propose queue for later ratification. ' +
+    'A proposal is NOT an authored memory: it is invisible to recall, memory_list, ' +
+    'find_similar, and the boot digest until it is ratified via memory_ratify. ' +
+    'Use this when a background lane wants to suggest a write without committing it — ' +
+    'the human (or Art) reviews and ratifies before it becomes canon. Drafts may be ' +
+    'rough; validation runs at ratify time.',
+    {
+      category: z.enum(MEMORY_CATEGORIES).describe(
+        'Memory category: user (about the human), project (about work), self (capability/learning), feedback (corrections/confirmations), reference (external pointers), pursuit (active goal or ongoing creative thread)'
+      ),
+      title: z.string().describe('Short title for the proposed memory'),
+      content: z.string().describe('The proposed memory content'),
+      project: z.string().optional().describe('Associated project, if any'),
+      ttl: z.string().optional().describe('Time-to-live: "7d", "30d", "24h", "permanent", or omit'),
+      metadata: z.record(z.string(), z.unknown()).optional().describe('Arbitrary key-value metadata'),
+      source: z.string().optional().describe('Where this proposal came from, e.g. a lane name'),
+    },
+    async ({ category, title, content, project, ttl, metadata, source }) => {
+      const { id, uuid } = propose(contextDir, { category, title, content, project, ttl, metadata, source });
+      return { content: [{ type: 'text' as const, text: `Proposal staged: #${id} "${title}" (${uuid}) — pending ratification` }] };
+    },
+  );
+
+  server.tool(
+    'memory_proposals',
+    'List all pending proposals in the capture-propose queue, newest first. ' +
+    'These are DRAFTS awaiting ratification — they are not part of memory and ' +
+    'do not appear in recall, memory_list, find_similar, or the boot digest. ' +
+    'Ratify one with memory_ratify or discard it with memory_reject.',
+    {},
+    async () => {
+      const rows = listProposals(contextDir);
+      if (rows.length === 0) {
+        return { content: [{ type: 'text' as const, text: 'No pending proposals.' }] };
+      }
+      const lines = rows.map((r) => {
+        const src = r.source ? ` [${r.source}]` : '';
+        const body = (r.content ?? '').replace(/\s+/g, ' ').trim();
+        const clipped = body.length > 120 ? body.slice(0, 117).trimEnd() + '…' : body;
+        return `#${r.id} (${r.category ?? '?'})${src} ${r.title ?? '(untitled)'} — ${clipped}`;
+      });
+      return { content: [{ type: 'text' as const, text: `${rows.length} pending proposal(s):\n${lines.join('\n')}` }] };
+    },
+  );
+
+  server.tool(
+    'memory_ratify',
+    'Ratify a pending proposal into a REAL memory. Loads the proposal, applies any ' +
+    'optional overrides (your edits on accept), and commits it through the same ' +
+    'validated write path as remember — so an invalid proposal is refused with its ' +
+    'typed reason and stays pending. On success the memory becomes recallable and the ' +
+    'proposal is removed from the queue. This is the gate: no proposal becomes canon ' +
+    'without it.',
+    {
+      id: z.number().int().positive().describe('Proposal id (from memory_proposals)'),
+      title: z.string().optional().describe('Override the proposed title on accept'),
+      content: z.string().optional().describe('Override the proposed content on accept'),
+      category: z.enum(MEMORY_CATEGORIES).optional().describe('Override the proposed category on accept'),
+      project: z.string().optional().describe('Override the proposed project on accept'),
+      ttl: z.string().optional().describe('Override the proposed TTL on accept'),
+    },
+    async ({ id, title, content, category, project, ttl }) => {
+      try {
+        const ref = await ratifyProposal(contextDir, id, { title, content, category, project, ttl });
+        return { content: [{ type: 'text' as const, text: `Proposal #${id} ratified → ${ref.ref}` }] };
+      } catch (err) {
+        if (err instanceof UnknownProposalError) {
+          return { content: [{ type: 'text' as const, text: `Proposal #${id} not found.` }] };
+        }
+        const reason = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text' as const, text: `Proposal #${id} refused — ${reason}. It remains pending.` }] };
+      }
+    },
+  );
+
+  server.tool(
+    'memory_reject',
+    'Discard a pending proposal without committing it. Deletes the staging row; ' +
+    'no memory is written. Use this for drafts that should not become canon.',
+    {
+      id: z.number().int().positive().describe('Proposal id (from memory_proposals)'),
+    },
+    async ({ id }) => {
+      const removed = rejectProposal(contextDir, id);
+      return {
+        content: [{
+          type: 'text' as const,
+          text: removed ? `Proposal #${id} rejected and removed.` : `Proposal #${id} not found.`,
+        }],
+      };
     },
   );
 

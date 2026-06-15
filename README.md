@@ -49,6 +49,16 @@ an agent's persistent state:
 - **`memory_archive` / `memory_restore`** — soft-retire a memory with a
   tombstone (who/when/why + original body preserved) instead of deleting it.
   Archived memories are excluded from recall and audit but remain recoverable.
+- **`memory_propose` / `memory_proposals` / `memory_ratify` / `memory_reject`** —
+  the capture-propose queue: a staging area a background lane drafts memory
+  writes into, that Art ratifies before they become canon. A proposal is **not**
+  authored memory — it lives in a separate `proposals` table, invisible to
+  `recall`, `memory_list`, `find_similar`, and the boot digest. `memory_propose`
+  stages a draft; `memory_proposals` lists what's pending; `memory_ratify`
+  commits one through the same validated write path as `remember` (an invalid
+  proposal is refused and stays pending); `memory_reject` discards one. Never
+  auto-committed — ratification is the gate that keeps loom's one-writer,
+  authored model intact while getting auto-capture ergonomics.
 - **`update_identity`** — section-level edits to `preferences.md` and
   `self-model.md`. The terminal creed stays immutable through the tool layer.
 - **`bootstrap`** — initialize a fresh agent from a short interview.

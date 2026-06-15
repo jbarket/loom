@@ -9,6 +9,13 @@ import { findSimilar } from '../tools/find-similar.js';
 import { memoryAudit } from '../tools/memory-audit.js';
 import { archive } from '../tools/archive.js';
 import { restore } from '../tools/restore.js';
+import {
+  propose,
+  listProposals,
+  ratifyProposal,
+  rejectProposal,
+  UnknownProposalError,
+} from '../backends/proposals.js';
 import { createBackend } from '../backends/index.js';
 import { assertStackVersionCompatible } from '../config.js';
 import { extractGlobalFlags, resolveEnv } from './args.js';
@@ -24,6 +31,10 @@ Subcommands:
   audit     One-shot health report (counts, stale, duplicates, expired)
   archive   Soft-retire a memory with a tombstone (recoverable)
   restore   Return an archived memory to the active set
+  propose   Stage a draft memory in the capture-propose queue (not yet canon)
+  proposals List pending proposals awaiting ratification
+  ratify    Ratify a pending proposal into a real memory (with optional overrides)
+  reject    Discard a pending proposal without committing it
 
 Options (list):
   --category <name>    Filter
@@ -64,10 +75,39 @@ Options (restore):
   --title <name>       Title of archived memory to restore (used with --category)
   --json               Emit RestoreResult
 
+Options (propose):
+  --category <name>    Proposed category (required)
+  --title <name>       Proposed title (required)
+  --content <text>     Proposed content (required)
+  --project <name>     Associated project
+  --ttl <value>        Time-to-live ("7d", "permanent", ...)
+  --source <name>      Where the proposal came from (e.g. a lane name)
+  --json               Emit the staged ProposalRef
+
+Options (proposals):
+  --json               Emit ProposalRow[]
+
+Options (ratify):
+  <id>                 Proposal id to ratify (positional)
+  --title <text>       Override the proposed title on accept
+  --content <text>     Override the proposed content on accept
+  --category <name>    Override the proposed category on accept
+  --project <name>     Override the proposed project on accept
+  --ttl <value>        Override the proposed TTL on accept
+  --json               Emit the resulting MemoryRef
+
+Options (reject):
+  <id>                 Proposal id to reject (positional)
+  --json               Emit { rejected: boolean }
+
 Global: --context-dir, --help/-h
 `;
 
-const SUBCOMMANDS = new Set(['list', 'prune', 'similar', 'audit', 'archive', 'restore', 'recompute-salience', 'digest']);
+const SUBCOMMANDS = new Set([
+  'list', 'prune', 'similar', 'audit', 'archive', 'restore',
+  'propose', 'proposals', 'ratify', 'reject',
+  'recompute-salience', 'digest',
+]);
 
 export async function run(argv: string[], io: IOStreams): Promise<number> {
   const { flags: global, rest } = extractGlobalFlags(argv);
@@ -321,6 +361,137 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
     const text = await restore(env.contextDir, input);
     io.stdout(text.endsWith('\n') ? text : text + '\n');
     return /not found/i.test(text) ? 3 : 0;
+  }
+
+  if (sub === 'propose') {
+    let parsed;
+    try {
+      parsed = parseArgs({
+        args: subRest,
+        options: {
+          category: { type: 'string' },
+          title:    { type: 'string' },
+          content:  { type: 'string' },
+          project:  { type: 'string' },
+          ttl:      { type: 'string' },
+          source:   { type: 'string' },
+        },
+        strict: true,
+        allowPositionals: false,
+      });
+    } catch (err) {
+      io.stderr(`${(err as Error).message}\n${USAGE}`);
+      return 2;
+    }
+    const { category, title, content, project, ttl, source } = parsed.values;
+    if (!category || !title || !content) {
+      io.stderr(`memory propose requires --category, --title, and --content.\n`);
+      return 2;
+    }
+    try {
+      const ref = propose(env.contextDir, { category, title, content, project, ttl, source });
+      if (env.json) { renderJson(io, ref); return 0; }
+      io.stdout(`Proposal staged: #${ref.id} "${title}" — pending ratification\n`);
+      return 0;
+    } catch (err) {
+      io.stderr(`${(err as Error).message}\n`);
+      return 1;
+    }
+  }
+
+  if (sub === 'proposals') {
+    if (subRest.length > 0) {
+      io.stderr(`memory proposals takes no positional arguments.\n${USAGE}`);
+      return 2;
+    }
+    const rows = listProposals(env.contextDir);
+    if (env.json) { renderJson(io, rows); return 0; }
+    if (rows.length === 0) {
+      io.stdout(`No pending proposals.\n`);
+      return 0;
+    }
+    const lines = rows.map((r) => {
+      const src = r.source ? ` [${r.source}]` : '';
+      const body = (r.content ?? '').replace(/\s+/g, ' ').trim();
+      const clipped = body.length > 120 ? body.slice(0, 117).trimEnd() + '…' : body;
+      return `#${r.id} (${r.category ?? '?'})${src} ${r.title ?? '(untitled)'} — ${clipped}`;
+    });
+    io.stdout(`${rows.length} pending proposal(s):\n${lines.join('\n')}\n`);
+    return 0;
+  }
+
+  if (sub === 'ratify') {
+    let parsed;
+    try {
+      parsed = parseArgs({
+        args: subRest,
+        options: {
+          title:    { type: 'string' },
+          content:  { type: 'string' },
+          category: { type: 'string' },
+          project:  { type: 'string' },
+          ttl:      { type: 'string' },
+        },
+        strict: true,
+        allowPositionals: true,
+      });
+    } catch (err) {
+      io.stderr(`${(err as Error).message}\n${USAGE}`);
+      return 2;
+    }
+    const id = Number.parseInt(parsed.positionals[0] ?? '', 10);
+    if (!Number.isInteger(id) || id <= 0) {
+      io.stderr(`memory ratify requires a positive proposal id.\n`);
+      return 2;
+    }
+    const overrides = {
+      title:    parsed.values.title,
+      content:  parsed.values.content,
+      category: parsed.values.category,
+      project:  parsed.values.project,
+      ttl:      parsed.values.ttl,
+    };
+    try {
+      const ref = await ratifyProposal(env.contextDir, id, overrides);
+      if (env.json) { renderJson(io, ref); return 0; }
+      io.stdout(`Proposal #${id} ratified → ${ref.ref}\n`);
+      return 0;
+    } catch (err) {
+      if (err instanceof UnknownProposalError) {
+        io.stderr(`Proposal #${id} not found.\n`);
+        return 3;
+      }
+      io.stderr(`Proposal #${id} refused — ${(err as Error).message}. It remains pending.\n`);
+      return 1;
+    }
+  }
+
+  if (sub === 'reject') {
+    let parsed;
+    try {
+      parsed = parseArgs({
+        args: subRest,
+        options: {},
+        strict: true,
+        allowPositionals: true,
+      });
+    } catch (err) {
+      io.stderr(`${(err as Error).message}\n${USAGE}`);
+      return 2;
+    }
+    const id = Number.parseInt(parsed.positionals[0] ?? '', 10);
+    if (!Number.isInteger(id) || id <= 0) {
+      io.stderr(`memory reject requires a positive proposal id.\n`);
+      return 2;
+    }
+    const removed = rejectProposal(env.contextDir, id);
+    if (env.json) { renderJson(io, { rejected: removed }); return removed ? 0 : 3; }
+    if (removed) {
+      io.stdout(`Proposal #${id} rejected and removed.\n`);
+      return 0;
+    }
+    io.stderr(`Proposal #${id} not found.\n`);
+    return 3;
   }
 
   // prune
