@@ -27,7 +27,7 @@ To play locally: `asciinema play assets/demo.cast`
 
 ## What it is
 
-A Model Context Protocol server exposing thirteen tools that read and write
+A Model Context Protocol server exposing 31 tools that read and write
 an agent's persistent state:
 
 - **`identity`** — loads the terminal creed — the free-form markdown document
@@ -223,6 +223,83 @@ the harness when it tells you to. Your agent will wake on its next session.
 If you'd rather wire everything by hand, every piece is a CLI
 command. See the CLI reference below.
 
+## Serving loom over the mesh
+
+By default `loom serve` speaks MCP over **stdio** — the harness spawns
+loom as a child process, one per session, co-located on the same box.
+That's the right model when the agent and its state live together.
+
+`loom serve --http` instead runs loom as a long-lived **HTTP MCP
+daemon**, so a chat client on one machine can reach loom's identity and
+memory while the heavy state (the SQLite stores, the fastembed model)
+stays on a single host. This is the two-surface model: e.g. Claude
+Desktop on a laptop talking to a loom daemon on a home server, both
+agent and stack carried by the same identity.
+
+```bash
+# loopback only (default host 127.0.0.1, port 8787)
+loom serve --http
+
+# bind a mesh interface so other machines on the tailnet can reach it
+loom serve --http --host 100.94.0.12 --port 8787
+```
+
+Host, port, and an optional bearer token come from flags or environment:
+
+| Variable | Flag | Default | Description |
+|---|---|---|---|
+| `LOOM_HTTP_HOST` | `--host` | `127.0.0.1` | Interface to bind |
+| `LOOM_HTTP_PORT` | `--port` | `8787` | Port to listen on |
+| `LOOM_BEARER_TOKEN` | — | *(unset)* | When set, every request must present this token |
+
+### The security boundary is the network
+
+The daemon **refuses to bind a public interface.** At startup it
+asserts the host is loopback, an RFC1918 private address
+(`10/8`, `192.168/16`, `172.16–31`), the Tailscale CGNAT range
+(`100.64.0.0/10`), or an IPv6 ULA / link-local / loopback. A
+`0.0.0.0` / `::` bind-all wildcard or any globally routable address is
+rejected before a socket opens. The intended deployment is behind
+Tailscale (or a LAN), where the tailnet *is* the access control.
+
+A `LOOM_BEARER_TOKEN` adds defense in depth: when set, every request
+must carry a matching `Authorization: Bearer …` header (compared in
+constant time). When unset, the network boundary alone gates access —
+appropriate for a token-less tailnet-only daemon.
+
+### Session and stream behavior
+
+- **One server per session.** Each MCP session (keyed by the
+  `mcp-session-id` header) gets its own server + transport over the
+  shared context directory. loom's durable state lives in the stores,
+  not the session, so sessions are cheap routing handles — the
+  StreamableHTTP persistent-daemon pattern Claude Desktop uses.
+- **Oversized-payload guard.** Request bodies are capped (1 MiB) and
+  refused with a `413` before the handler runs.
+- **SSE keep-alive heartbeat.** The server drives a protocol-native
+  `ping` to the client over the server→client stream every ~25s, so an
+  idle stream survives a proxy/NAT idle reaper. A dead peer (repeated
+  missed pings) closes the session cleanly.
+- **404-on-unknown-session.** A request for a session the daemon no
+  longer holds returns `404`, telling the client to re-initialize — so
+  an idle disconnect self-heals instead of bricking.
+
+The connecting client picks its own harness from the MCP handshake
+`clientInfo.name` (see [harness self-describe](#harness-manifests-and-self-describe)),
+so a single daemon serves multiple harnesses correctly.
+
+### Behind a reverse proxy
+
+Terminate TLS at a reverse proxy in front of the daemon and point the
+client at the hostname. With `mcp-remote` as the client-side bridge:
+
+```bash
+npx mcp-remote https://loom.example.ts.net/
+```
+
+(If the proxy's default idle timeout is shorter than ~3 minutes, the
+keep-alive heartbeat already covers the server→client stream.)
+
 ## Examples
 
 ### Memory roundtrip (MCP)
@@ -279,6 +356,13 @@ You are a persistent coding assistant. You prefer directness.
 Working style: async pair programming. Skip the hedging…
 …
 
+# Top of Mind
+## Top of mind
+- **felag continuation under review** (pursuit) — reconsidering whether to keep…
+
+## Recent
+- **apiGroup split** (project) — TaskEventType lives under work.felag.dev/v1alpha1…
+
 ## Self-Model
 ### Strengths
 - TypeScript systems architecture
@@ -287,6 +371,35 @@ Working style: async pair programming. Skip the hedging…
 
 The agent reads this before any task work, re-establishing who it is
 regardless of which harness or model it's running on.
+
+### The boot digest — waking with what's in flight
+
+The `# Top of Mind` block above is the **boot digest**: a salience-tiered
+view of episodic memory injected at identity-load, so a fresh session
+wakes knowing what's top-of-mind without having to fish via `recall`.
+
+Each memory carries a stored salience "temperature" that **decays by a
+per-category half-life** (pursuit coolest-fastest at 7 days, through
+project, self/feedback, reference, up to user at 90 days) and **reheats
+on access** — a `recall` hit, a write, or an update bumps it back toward
+hot. The digest fills a token budget **hottest-first** and groups the
+selected memories into tiers (Hot / Warm / Cool, labeled *Top of mind* /
+*Recent* / *Background*).
+
+The integrity property: the digest is **assembled, never generated.**
+It selects and orders existing authored memories — it never synthesizes
+new prose. loom holds the pen.
+
+Two CLI verbs drive it (the same machinery the consolidation lane uses):
+
+```bash
+# Recompute and store each memory's salience from its timestamps
+# (the consolidation lane's entry point)
+loom memory recompute-salience --context-dir ~/.config/loom/my-agent
+
+# Preview the assembled digest — the exact view injected at identity-load
+loom memory digest --context-dir ~/.config/loom/my-agent
+```
 
 ## CLI
 
@@ -306,6 +419,18 @@ npx loomai recall "meeting preferences" --context-dir ~/.config/loom/my-agent
 
 # List all memories in a category
 npx loomai memory list --category feedback --context-dir ~/.config/loom/my-agent
+
+# Preview the boot digest (and recompute stored salience)
+npx loomai memory digest --context-dir ~/.config/loom/my-agent
+npx loomai memory recompute-salience --context-dir ~/.config/loom/my-agent
+
+# Capture-propose queue: list pending drafts, ratify or reject one
+npx loomai memory proposals --context-dir ~/.config/loom/my-agent
+npx loomai memory ratify 3 --context-dir ~/.config/loom/my-agent
+npx loomai memory reject 4 --context-dir ~/.config/loom/my-agent
+
+# Run loom as an HTTP MCP daemon (mesh-reachable; default stays stdio)
+npx loomai serve --http --host 127.0.0.1 --port 8787
 
 # Initialize a fresh agent
 npx loomai bootstrap --context-dir ~/.config/loom/new-agent
@@ -365,16 +490,49 @@ loom migrate --dry-run   # check without applying
 loom migrate --json      # machine-readable output
 ```
 
-### `loom harness init` — scaffold a harness manifest
+### Harness manifests and self-describe
 
-`loom harness init <name>` writes `<context>/harnesses/<name>.md` from
-the stack template. Name falls back to `--client` then
-`$LOOM_CLIENT`. `--force` overwrites; `--json` for scripting.
+A **harness** is the MCP-capable runtime the agent runs in (Claude Code,
+Codex, Gemini CLI, …). Each one the agent has ever sleeved into gets one
+manifest at `<context>/harnesses/<name>.md`, describing it independently
+of the model inside — tool prefixes, delegation primitive, scheduling,
+session search, known gotchas.
 
-Typical use: `identity()` reports "manifest missing" for the current
-harness — run `loom harness init` (or call `harness_init` via MCP) to
-drop a template you can then fill in with the harness's tool prefixes,
-delegation primitive, etc.
+**Scaffold one.** `loom harness init <name>` writes
+`<context>/harnesses/<name>.md` from the stack template. Name falls back
+to `--client` then `$LOOM_CLIENT`. `--force` overwrites; `--json` for
+scripting.
+
+**Or let the runtime describe itself.** A connected harness can author
+its own manifest via the `harness_describe` MCP tool. The target is
+derived from the **connected peer** (its MCP `clientInfo.name`), never a
+caller-supplied name — a harness can only describe *itself*, never
+another harness and never the creed. With no connected peer, the call is
+refused. When `identity()` is loaded by a runtime it has no manifest
+for, the harness block becomes a self-describe onboarding prompt (call
+`harness_describe` with a manifest covering tool surface, sandbox,
+delegation, scheduling, session search, memory layers, gotchas) instead
+of a bare "(manifest missing)" stub.
+
+**Resolution is data-driven.** Mapping a connecting `clientInfo.name` to
+a manifest is done from the files on disk, not a hardcoded code table. A
+peer matches a manifest when its normalized name equals the manifest's
+filename *or* one of the comma-separated values in the manifest's
+`answersTo` frontmatter. So a new harness is recognized by **dropping a
+file** — no code change:
+
+```markdown
+---
+harness: claude-desktop
+version: 0.3
+answersTo: claude-ai
+---
+```
+
+Here Claude Desktop connects with `clientInfo.name = "claude-ai"`; the
+`answersTo` line routes it to `claude-desktop.md`. Proxy annotations like
+`"claude-ai (via mcp-remote 0.1.37)"` are stripped to the base identity
+before matching.
 
 ## Configuration
 
@@ -388,6 +546,9 @@ All configuration is through environment variables:
 | `LOOM_FASTEMBED_CACHE_DIR` | `~/.cache/loom/fastembed/` | Where to cache ONNX models |
 | `LOOM_MODEL` | *(unset)* | Model identifier for model-manifest context: `claude-opus`, `gemma4`, etc. |
 | `LOOM_CLIENT` | *(unset)* | Client adapter hint: `claude-code`, `gemini-cli`, etc. |
+| `LOOM_HTTP_HOST` | `127.0.0.1` | Bind host for `loom serve --http` (bind-safety enforced) |
+| `LOOM_HTTP_PORT` | `8787` | Bind port for `loom serve --http` |
+| `LOOM_BEARER_TOKEN` | *(unset)* | Bearer token required on every HTTP request when set |
 
 `--context-dir <path>` works as a CLI alternative to
 `LOOM_CONTEXT_DIR`.
@@ -414,7 +575,21 @@ $LOOM_CONTEXT_DIR/
 
 ## Roadmap
 
-v0.4 work is tracked in the open:
+Recently shipped (v0.4):
+
+- **HTTP MCP transport** — `loom serve --http`, the mesh-reachable
+  daemon, with bind-safety, optional bearer auth, a payload guard, an
+  SSE keep-alive heartbeat, and 404-on-unknown-session self-healing.
+  See [Serving loom over the mesh](#serving-loom-over-the-mesh).
+- **The boot digest** — salience-tiered `# Top of Mind` view assembled
+  at identity-load; `loom memory digest` / `recompute-salience`.
+- **Harness self-describe** — `harness_describe` lets a runtime author
+  its own manifest, with data-driven `answersTo` resolution.
+- **Capture-propose queue** — `memory_propose` / `memory_proposals` /
+  `memory_ratify` / `memory_reject`: drafts ratified before they become
+  canon.
+
+Still tracked in the open:
 
 - [Project board](https://github.com/users/jbarket/projects/1/views/1) —
   live status of what's in flight, queued, and shipped.
@@ -448,6 +623,14 @@ and `docs/archive/plans/` — implementation history, frozen after merge.
   policy, and provenance verification walkthrough.
 - [`SECURITY.md`](SECURITY.md) — supported scope, how to report
   vulnerabilities, and the "no secrets in the stack" invariant.
+- **Mesh boundary (HTTP daemon).** The network is the security
+  boundary. `loom serve --http` refuses to bind a public or `0.0.0.0`
+  interface — only loopback or a mesh address (RFC1918 / Tailscale
+  CGNAT / IPv6 ULA) — so the daemon is reachable only from inside the
+  tailnet or LAN. An optional `LOOM_BEARER_TOKEN` adds a
+  constant-time-checked auth gate on top, and an oversized-payload
+  guard rejects bodies over the cap. See
+  [Serving loom over the mesh](#serving-loom-over-the-mesh).
 
 ## Development
 

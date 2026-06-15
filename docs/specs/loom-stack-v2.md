@@ -122,7 +122,22 @@ version: 0.4
 ```
 
 If no manifest exists for the current harness, create one with
-`harness_init` (MCP) or `loom harness init` (CLI) before other work.
+`harness_init` (MCP) or `loom harness init` (CLI) before other work —
+or let the runtime author its own via `harness_describe` (see below).
+
+**Optional frontmatter — `answersTo`.** A comma-separated list of MCP
+`clientInfo.name` values this manifest answers to. Peer→harness
+resolution is data-driven from the files on disk: a connecting peer
+matches a manifest when its normalized name equals the filename *or* one
+of the `answersTo` aliases. A new harness is recognized by dropping a
+file — no code change. (Example: Claude Desktop connects as `claude-ai`;
+`answersTo: claude-ai` on `claude-desktop.md` routes it correctly.)
+
+**Self-describe.** `harness_describe` (MCP) lets the *connected*
+runtime write its own manifest, scoped to the peer's `clientInfo.name` —
+a harness can only describe itself, never another harness or the creed.
+When `identity()` is loaded for a runtime with no manifest, the harness
+block is a self-describe onboarding prompt rather than a blank stub.
 
 #### `models/<name>.md` — model manifest
 
@@ -161,9 +176,13 @@ When a runtime loads a stack, the canonical order is:
 4. **Model manifest.** `models/<model>.md` for the current sleeve.
    Missing → write one during the session via plain file edit. There is
    no tool for this; `harness_init` only handles harness manifests.
-5. **Memories lazily.** Do not eagerly load the memory store. The
-   agent calls `recall` on demand. The identity payload may include a
-   lightweight summary (category counts, recent refs) as a hint.
+5. **Boot digest.** The identity payload injects a `# Top of Mind`
+   block — a salience-tiered (Hot / Warm / Cool) view of episodic
+   memory, assembled hottest-first to a token budget from existing
+   authored memories. Never generated prose; a pure selection over
+   authored atoms. Omitted when the store is empty or unmigrated.
+6. **Memories lazily.** Do not eagerly load the memory store beyond the
+   digest. The agent calls `recall` on demand.
 
 The wake sequence is an adapter-level concern. Every adapter implements
 this ordering.
@@ -208,6 +227,20 @@ guard).
 **Prune.** `memory_prune` deletes memories whose TTL has elapsed and
 reports those untouched beyond a stale threshold (default 30 days).
 
+**Salience.** Each memory carries a stored salience temperature in
+`(0, 1]` that decays by a per-category half-life (pursuit 7d, project
+10d, self/feedback 30d, reference 45d, user 90d; default 30d) and
+reheats on touch (recall / write / update). The consolidation lane
+recomputes the stored value (`loom memory recompute-salience`); the boot
+digest is assembled from it (`loom memory digest`).
+
+**Propose / ratify.** The capture-propose queue stages *draft* memory
+writes in a separate `proposals` table — invisible to recall,
+`memory_list`, `find_similar`, and the digest. A draft becomes canon
+only via `memory_ratify`, which commits through the validated `remember`
+path (an invalid draft is refused and stays pending); `memory_reject`
+discards one. Never auto-committed.
+
 ### 3.3 Storage layout
 
 `memories.db` is a sqlite-vec database with two tables:
@@ -226,7 +259,8 @@ memories (
   updated       TEXT,
   last_accessed TEXT,                    -- updated on recall hit
   ttl           TEXT,                    -- e.g. "7d", "permanent"
-  expires_at    TEXT                     -- computed from created + ttl
+  expires_at    TEXT,                    -- computed from created + ttl
+  salience      REAL                     -- stored temperature (0,1]; lane-recomputed
 )
 
 vec_memories (                           -- sqlite-vec virtual table
@@ -247,7 +281,7 @@ silently breaks recall.
 
 ## 4. MCP tool surface
 
-The server registers exactly 12 tools. All names use underscores
+The server registers exactly 31 tools. All names use underscores
 (MCP convention). When loaded via Claude Code the prefix is
 `mcp__loom__`.
 
@@ -303,7 +337,7 @@ layer plus operational tooling.
 | `memory`          | Memory maintenance (see sub-subcommands below).                  |
 | `harness`         | Harness manifest lifecycle.                                      |
 | `bootstrap`       | Initialize a new identity from an onboarding interview.          |
-| `serve`           | Start the MCP server on stdio (alias for the default startup).   |
+| `serve`           | Start the MCP server. Default is stdio; `--http [--host --port]` runs the mesh-reachable HTTP daemon (bind-safety enforced; optional `LOOM_BEARER_TOKEN`). |
 | `inject`          | Write the loom-managed block into harness dotfiles (e.g. CLAUDE.md). |
 | `install`         | First-time installation and setup.                               |
 | `doctor`          | Diagnose stack health; report version, missing files, git state. |
@@ -316,6 +350,10 @@ layer plus operational tooling.
 | `prune`    | Report / remove expired and stale memories.          |
 | `similar`  | Surface semantically near memories by ref or text.   |
 | `audit`    | One-shot health report (counts, stale, dupes, expired). |
+| `archive` / `restore` | Soft-retire a memory with a tombstone, or return it. |
+| `recompute-salience` | Recompute and store each memory's salience (consolidation lane). |
+| `digest`   | Preview the assembled boot digest.                   |
+| `propose` / `proposals` / `ratify` / `reject` | The capture-propose queue: stage, list, ratify, or discard draft writes. |
 
 ### `loom harness` sub-subcommands
 
