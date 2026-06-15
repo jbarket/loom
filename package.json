@@ -51,6 +51,7 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^12.10.0",
     "fastembed": "^2.1.0",
+    "preact": "^10.29.2",
     "sqlite-vec": "^0.1.9",
     "zod": "^4.4.3"
   },
