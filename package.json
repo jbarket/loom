@@ -49,18 +49,18 @@
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^1.7.4",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "better-sqlite3": "^12.10.0",
+    "better-sqlite3": "^12.11.1",
     "fastembed": "^2.1.0",
-    "preact": "^10.29.2",
+    "preact": "^10.29.7",
     "sqlite-vec": "^0.1.9",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^25.8.0",
+    "@types/node": "^26.1.1",
     "esbuild": "^0.28.1",
-    "tsx": "^4.22.1",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.6"
+    "tsx": "^4.23.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   }
 }
