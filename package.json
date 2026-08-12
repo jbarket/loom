@@ -48,7 +48,7 @@
   "license": "AGPL-3.0-or-later",
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^1.7.4",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "better-sqlite3": "^12.10.0",
     "fastembed": "^2.1.0",
     "preact": "^10.29.2",
