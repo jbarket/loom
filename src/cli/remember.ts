@@ -18,6 +18,7 @@ Options:
   --project <name>       Project tag
   --ttl <dur>            TTL like "7d", "30d", or "permanent"
   --refs <csv>           Comma-separated reference refs stored in metadata
+  --meta <json>          JSON object merged into metadata (e.g. '{"where":"voice"}')
   --json                 Emit MemoryRef
   --context-dir <path>   Agent context dir
   --help, -h             Show this help
@@ -34,6 +35,7 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
         project:  { type: 'string' },
         ttl:      { type: 'string' },
         refs:     { type: 'string' },
+        meta:     { type: 'string' },
         help:     { type: 'boolean', short: 'h' },
       },
       strict: true,
@@ -71,13 +73,26 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
     ? parsed.values.refs.split(',').map((s) => s.trim()).filter(Boolean)
     : undefined;
 
+  let meta: Record<string, unknown> | undefined;
+  if (parsed.values.meta) {
+    try {
+      const parsedMeta: unknown = JSON.parse(parsed.values.meta);
+      if (!parsedMeta || typeof parsedMeta !== 'object' || Array.isArray(parsedMeta)) throw new Error('not an object');
+      meta = parsedMeta as Record<string, unknown>;
+    } catch (err) {
+      io.stderr(`--meta must be a JSON object: ${(err as Error).message}\n`);
+      return 2;
+    }
+  }
+  const metadata = refsList || meta ? { ...(meta ?? {}), ...(refsList ? { refs: refsList } : {}) } : undefined;
+
   const ref = await remember(env.contextDir, {
     category,
     title,
     content: body,
     project:  parsed.values.project,
     ttl:      parsed.values.ttl,
-    metadata: refsList ? { refs: refsList } : undefined,
+    metadata,
   });
 
   if (env.json) { renderJson(io, ref); return 0; }

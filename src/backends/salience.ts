@@ -14,6 +14,7 @@ import { existsSync } from 'node:fs';
 import BetterSqlite3, { type Database } from 'better-sqlite3';
 import { resolveSqliteDbPath } from '../config.js';
 import { runMigrations } from './migrations.js';
+import { EPISODE_CATEGORY } from '../categories.js';
 
 function hasColumn(db: Database, table: string, column: string): boolean {
   return (db.pragma(`table_info(${table})`) as { name: string }[]).some((c) => c.name === column);
@@ -21,6 +22,7 @@ function hasColumn(db: Database, table: string, column: string): boolean {
 
 /** Per-category half-life in days: hot working categories cool fast, identity-level facts cool slow. */
 export const HALF_LIVES: Record<string, number> = {
+  episode: 1,
   pursuit: 7,
   project: 10,
   self: 30,
@@ -187,9 +189,9 @@ export function digestData(
     const total = (db.prepare('SELECT COUNT(*) AS n FROM memories WHERE archived = 0').get() as { n: number }).n;
     const rows = db
       .prepare(
-        'SELECT title, category, content, salience FROM memories WHERE archived = 0 ORDER BY salience DESC LIMIT ?',
+        'SELECT title, category, content, salience FROM memories WHERE archived = 0 AND category != ? ORDER BY salience DESC LIMIT ?',
       )
-      .all(limit) as Omit<DigestAtom, 'tier'>[];
+      .all(EPISODE_CATEGORY, limit) as Omit<DigestAtom, 'tier'>[];
     const atoms = rows.map((r) => ({ ...r, tier: tierOf(r.salience) }));
     return { atoms, total };
   } finally {
@@ -207,9 +209,11 @@ export function digestForContext(contextDir: string, opts: DigestOptions = {}): 
     if (!hasColumn(db, 'memories', 'salience')) return null;
     const rows = db
       .prepare(
-        'SELECT title, category, content, salience FROM memories WHERE archived = 0 ORDER BY salience DESC LIMIT 100',
+        // Episodes are the tape, not the digest: a fresh episode is always
+        // salience 1.0 and would crowd Top of Mind with what just happened.
+        'SELECT title, category, content, salience FROM memories WHERE archived = 0 AND category != ? ORDER BY salience DESC LIMIT 100',
       )
-      .all() as DigestRow[];
+      .all(EPISODE_CATEGORY) as DigestRow[];
     return assembleDigest(rows, opts);
   } finally {
     db.close();

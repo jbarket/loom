@@ -42,6 +42,12 @@ an agent's persistent state:
 - **`remember` / `recall` / `update` / `forget`** — episodic memory with
   semantic (vector) recall, optional TTL, and category filtering.
 - **`memory_list` / `memory_prune`** — browse and maintain the store.
+- **`episodes`** — the episode tape: the short-term, cross-body tier. Every
+  body leaves a `category: episode` note (where it was / what was said or
+  decided / what shipped / what's open; 48h TTL by default) and every body
+  gets the last 24h of them at boot as a plain time-ordered tape, injected
+  right after preferences. Never salience-ranked — it's what just *happened*,
+  not what's important. `loom memory tape [--hours N]` is the CLI view.
 - **`find_similar`** — surface memories semantically near an existing entry or
   free-form text; used for deduplication and memory consolidation.
 - **`memory_audit`** — one-shot health report: stale entries, near-duplicate

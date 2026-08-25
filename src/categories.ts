@@ -14,7 +14,17 @@ export const MEMORY_CATEGORIES = [
   'feedback',
   'reference',
   'pursuit',
+  // Short-term cross-body tier (t-142): a 3-line "where / what / open" note a
+  // sleeve leaves so the NEXT sleeve knows what just happened across all of
+  // Art. Defaults to a 48h TTL on write; injected at boot as a time-ordered
+  // tape (never salience-ranked) and excluded from the Top-of-Mind digest.
+  'episode',
 ] as const;
+
+/** The category that carries the short-term cross-body tape. */
+export const EPISODE_CATEGORY = 'episode';
+/** Episodes expire by default — they are a tape, not the stack. */
+export const EPISODE_DEFAULT_TTL = '48h';
 
 export type MemoryCategory = (typeof MEMORY_CATEGORIES)[number];
 

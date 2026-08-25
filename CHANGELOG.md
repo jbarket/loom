@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Episode tier** — `episode` memory category (48h TTL by default), the
+  `episodes` MCP tool and `loom memory tape [--hours N]` CLI, and a
+  "Last 24h across bodies" block in `identity` (after preferences, before
+  Top of Mind). Short-term cross-body memory: what other sleeves did in the
+  last day, time-ordered and unconditional. Episodes are excluded from the
+  salience digest (they would always be hottest). (Art t-142, 2026-08-25)
+
 - **Soft-archive tier** (`memory_archive` / `memory_restore` MCP tools;
   `loom memory archive` / `loom memory restore` CLI subcommands). Memories
   can now be soft-retired with a tombstone (note + `archived_at` timestamp)
