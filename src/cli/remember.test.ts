@@ -74,6 +74,26 @@ describe('loom remember', () => {
     expect(stderr).toMatch(/user, project, self, feedback, reference, pursuit/);
   });
 
+  it('--meta merges a JSON object into metadata (episode where-tag path)', async () => {
+    const { stdout, code } = await runCliCaptured(
+      ['remember', 'ep', '--category', 'episode', '--meta', '{"where":"voice","session_id":"abc"}', '--json', '--context-dir', tempDir],
+      { stdin: 'what happened' },
+    );
+    expect(code).toBe(0);
+    expect(JSON.parse(stdout).category).toBe('episode');
+    const { stdout: tape } = await runCliCaptured(['memory', 'tape', '--context-dir', tempDir]);
+    expect(tape).toContain('[voice] ep — what happened');
+  });
+
+  it('rejects --meta that is not a JSON object', async () => {
+    const { code, stderr } = await runCliCaptured(
+      ['remember', 'ep', '--category', 'episode', '--meta', '[1]', '--context-dir', tempDir],
+      { stdin: 'x' },
+    );
+    expect(code).toBe(2);
+    expect(stderr).toMatch(/--meta must be a JSON object/);
+  });
+
   it('accepts every category in the shared vocabulary', async () => {
     const { code } = await runCliCaptured(
       ['remember', 'pursuit note', '--category', 'pursuit', '--context-dir', tempDir],

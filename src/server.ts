@@ -20,6 +20,7 @@ import { update } from './tools/update.js';
 import { forget } from './tools/forget.js';
 import { prune } from './tools/prune.js';
 import { memoryList } from './tools/memory-list.js';
+import { tapeForContext } from './backends/episodes.js';
 import { findSimilar } from './tools/find-similar.js';
 import { memoryAudit } from './tools/memory-audit.js';
 import { archive } from './tools/archive.js';
@@ -155,7 +156,7 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     'should be available in future sessions.',
     {
       category: z.enum(MEMORY_CATEGORIES).describe(
-        'Memory category: user (about the human), project (about work), self (capability/learning), feedback (corrections/confirmations), reference (external pointers), pursuit (active goal or ongoing creative thread)'
+        'Memory category: user (about the human), project (about work), self (capability/learning), feedback (corrections/confirmations), reference (external pointers), pursuit (active goal or ongoing creative thread), episode (short-term cross-body tape: where you were / what was said or decided / what shipped / what is open — 48h TTL by default, set metadata.where to your surface e.g. "discord:#general", "voice", "wake:<id>", "lane:tending", "terminal")'
       ),
       title: z.string().describe('Short title for the memory'),
       content: z.string().describe('The memory content — what you learned, observed, or were told'),
@@ -256,6 +257,21 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
   );
 
   server.tool(
+    'episodes',
+    'The episode tape: what happened across ALL bodies of this identity in the ' +
+    'last N hours, time-ordered (oldest first), never ranked. The same block ' +
+    'identity injects at boot — call it mid-session to catch up on what other ' +
+    'sleeves did since you loaded, or for the nightly pass to index the day.',
+    {
+      hours: z.number().positive().optional().describe('Look-back window in hours (default 24)'),
+    },
+    async ({ hours }) => {
+      const tape = tapeForContext(contextDir, { hours, tokenBudget: 6000 });
+      return { content: [{ type: 'text' as const, text: tape ?? `No episodes in the last ${hours ?? 24}h.` }] };
+    },
+  );
+
+  server.tool(
     'find_similar',
     'Surface memories semantically near an existing ref or free-form text. ' +
     'Use during consolidation/dream workflows to find overlap and dedupe ' +
@@ -348,7 +364,7 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     'rough; validation runs at ratify time.',
     {
       category: z.enum(MEMORY_CATEGORIES).describe(
-        'Memory category: user (about the human), project (about work), self (capability/learning), feedback (corrections/confirmations), reference (external pointers), pursuit (active goal or ongoing creative thread)'
+        'Memory category: user (about the human), project (about work), self (capability/learning), feedback (corrections/confirmations), reference (external pointers), pursuit (active goal or ongoing creative thread), episode (short-term cross-body tape: where you were / what was said or decided / what shipped / what is open — 48h TTL by default, set metadata.where to your surface e.g. "discord:#general", "voice", "wake:<id>", "lane:tending", "terminal")'
       ),
       title: z.string().describe('Short title for the proposed memory'),
       content: z.string().describe('The proposed memory content'),

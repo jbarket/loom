@@ -5,6 +5,7 @@ import { parseArgs } from 'node:util';
 import { memoryList } from '../tools/memory-list.js';
 import { prune } from '../tools/prune.js';
 import { recomputeSalienceForContext, digestForContext } from '../backends/salience.js';
+import { tapeForContext } from '../backends/episodes.js';
 import { findSimilar } from '../tools/find-similar.js';
 import { memoryAudit } from '../tools/memory-audit.js';
 import { archive } from '../tools/archive.js';
@@ -35,6 +36,9 @@ Subcommands:
   proposals List pending proposals awaiting ratification
   ratify    Ratify a pending proposal into a real memory (with optional overrides)
   reject    Discard a pending proposal without committing it
+  recompute-salience  Refresh stored salience from timestamps (consolidation lane)
+  digest    Preview the Top-of-Mind boot digest
+  tape      The episode tape: last --hours (default 24) across all bodies, time-ordered
 
 Options (list):
   --category <name>    Filter
@@ -106,7 +110,7 @@ Global: --context-dir, --help/-h
 const SUBCOMMANDS = new Set([
   'list', 'prune', 'similar', 'audit', 'archive', 'restore',
   'propose', 'proposals', 'ratify', 'reject',
-  'recompute-salience', 'digest',
+  'recompute-salience', 'digest', 'tape',
 ]);
 
 export async function run(argv: string[], io: IOStreams): Promise<number> {
@@ -138,6 +142,21 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
   if (sub === 'digest') {
     const d = digestForContext(env.contextDir);
     io.stdout((d ?? '(no digest — empty store)') + '\n');
+    return 0;
+  }
+  // tape — the episode tier (t-142): what happened across all bodies, time-ordered.
+  if (sub === 'tape') {
+    let parsed;
+    try {
+      parsed = parseArgs({ args: subRest, options: { hours: { type: 'string' } }, strict: true });
+    } catch (err) {
+      io.stderr(`${(err as Error).message}\n${USAGE}`);
+      return 2;
+    }
+    const hours = parsed.values.hours ? Number(parsed.values.hours) : undefined;
+    if (hours !== undefined && !(hours > 0)) { io.stderr(`--hours must be a positive number\n`); return 2; }
+    const t = tapeForContext(env.contextDir, { hours, tokenBudget: 6000 });
+    io.stdout((t ?? `(no episodes in the last ${hours ?? 24}h)`) + '\n');
     return 0;
   }
 

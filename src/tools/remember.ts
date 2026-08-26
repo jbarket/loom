@@ -7,6 +7,7 @@
  */
 import { createBackend } from '../backends/index.js';
 import type { MemoryInput, MemoryRef } from '../backends/types.js';
+import { EPISODE_CATEGORY, EPISODE_DEFAULT_TTL } from '../categories.js';
 
 /**
  * Lint-on-write (c-loom-strictness §lint): validate the record BEFORE it reaches
@@ -39,5 +40,10 @@ export async function remember(
     throw new Error(`Error: ${reason}`);
   }
   const backend = createBackend(contextDir);
+  // An episode is short-term by definition: without an explicit ttl it gets the
+  // tier default, so a body can never accidentally leave a permanent episode.
+  if (input.category === EPISODE_CATEGORY && !input.ttl) {
+    input = { ...input, ttl: EPISODE_DEFAULT_TTL };
+  }
   return backend.remember(input);
 }

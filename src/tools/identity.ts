@@ -16,6 +16,7 @@ import * as modelBlock from '../blocks/model.js';
 import { resolveDefaultContextPath } from '../config.js';
 import { pathSegmentError } from '../path-safety.js';
 import { digestForContext } from '../backends/salience.js';
+import { tapeForContext } from '../backends/episodes.js';
 
 async function readOptional(path: string): Promise<string | null> {
   try {
@@ -111,6 +112,26 @@ export async function loadIdentity(
   const preferences = await readOptional(join(contextDir, 'preferences.md'));
   if (preferences) {
     parts.push('# Preferences\n\n' + preferences.trim());
+  }
+
+  // Episode tape (t-142) — the short-term cross-body tier: what happened across
+  // ALL sleeves in the last 24h, time-ordered and unconditional. Injected right
+  // after preferences so a fresh body knows what the last body did before it
+  // reads anything ranked. Best-effort: no store / no episodes → no block.
+  try {
+    const tape = tapeForContext(contextDir);
+    if (tape) {
+      parts.push(
+        '# Last 24h across bodies\n\n' +
+        '_Episodes other sleeves of you left (short-term, 48h TTL). This is the tape, ' +
+        'oldest first — what just happened, not what is important. Write your own before ' +
+        'you end (category `episode`, metadata.where = your surface); the harness writes a ' +
+        'fallback if you forget._\n\n' +
+        tape,
+      );
+    }
+  } catch {
+    // the tape must never block identity load
   }
 
   // Boot digest — the salience-tiered view of episodic memory, so a fresh sleeve
