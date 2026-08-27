@@ -15,7 +15,7 @@
     "CHANGELOG.md"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "repository": {
     "type": "git",
@@ -47,20 +47,25 @@
   "author": "Art E Fish + Jonathan Barket",
   "license": "AGPL-3.0-or-later",
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^1.7.4",
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "better-sqlite3": "^12.10.0",
+    "@modelcontextprotocol/ext-apps": "^1.7.5",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "better-sqlite3": "^13.0.3",
     "fastembed": "^2.1.0",
-    "preact": "^10.29.2",
+    "preact": "^10.29.8",
     "sqlite-vec": "^0.1.9",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^25.8.0",
-    "esbuild": "^0.28.1",
-    "tsx": "^4.22.1",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.6"
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.3.0",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  },
+  "allowScripts": {
+    "better-sqlite3": true,
+    "esbuild": true,
+    "onnxruntime-node": true
   }
 }
