@@ -84,6 +84,14 @@ export function resolveKnowledgeDbPath(contextDir: string): string {
 }
 
 /**
+ * Local-only observation logs (e.g. `telemetry/recall.jsonl`). Lives inside
+ * the context dir so it travels with the agent and never leaves the machine.
+ */
+export function resolveTelemetryDir(contextDir: string): string {
+  return resolve(contextDir, 'telemetry');
+}
+
+/**
  * Assert that the knowledge database path does not co-locate with the memory
  * database path. If they resolve to the same file (or inode), throw.
  */

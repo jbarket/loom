@@ -17,6 +17,7 @@ Options:
   --category <name>      Filter by category
   --project <name>       Filter by project
   --limit <n>            Max results (default backend-specific)
+  --diversity <f>        MMR diversity 0..1 (default 0.3); 0 = pure relevance order
   --json                 Emit MemoryMatch[] as JSON
   --context-dir <path>   Agent context dir
   --help, -h             Show this help
@@ -31,8 +32,9 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
       options: {
         category: { type: 'string' },
         project:  { type: 'string' },
-        limit:    { type: 'string' },
-        help:     { type: 'boolean', short: 'h' },
+        limit:     { type: 'string' },
+        diversity: { type: 'string' },
+        help:      { type: 'boolean', short: 'h' },
       },
       strict: true,
       allowPositionals: true,
@@ -58,11 +60,20 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
     return 2;
   }
 
+  const diversity = parsed.values.diversity !== undefined
+    ? Number.parseFloat(parsed.values.diversity)
+    : undefined;
+  if (diversity !== undefined && (Number.isNaN(diversity) || diversity < 0 || diversity > 1)) {
+    io.stderr(`--diversity must be between 0 and 1.\n`);
+    return 2;
+  }
+
   const input = {
     query,
     category: parsed.values.category,
     project:  parsed.values.project,
     limit,
+    diversity,
   };
 
   if (env.json) {

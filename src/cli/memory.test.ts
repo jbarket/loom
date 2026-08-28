@@ -57,6 +57,50 @@ describe('loom memory', () => {
     });
   });
 
+  describe('recall-stats', () => {
+    it('reports an empty window when nothing has been logged', async () => {
+      const { stdout, code } = await runCliCaptured(
+        ['memory', 'recall-stats', '--context-dir', tempDir],
+      );
+      expect(code).toBe(0);
+      expect(stdout).toMatch(/0 searches/);
+    });
+
+    it('summarizes searches made through the CLI, including misses', async () => {
+      await runCliCaptured(['recall', 'alpha', '--context-dir', tempDir]);
+      await runCliCaptured(['recall', 'zzz', '--context-dir', tempDir, '--category', 'nope']);
+      const { stdout, code } = await runCliCaptured(
+        ['memory', 'recall-stats', '--context-dir', tempDir, '--since', '24h'],
+      );
+      expect(code).toBe(0);
+      expect(stdout).toMatch(/last 24h\): 2 searches/);
+      expect(stdout).toMatch(/hit rate\s+1\/2 \(50%\)/);
+      expect(stdout).toMatch(/Recent misses/);
+      expect(stdout).toMatch(/"zzz"\s+\[category=nope\]/);
+    });
+
+    it('emits RecallStats with --json', async () => {
+      await runCliCaptured(['recall', 'alpha', '--context-dir', tempDir]);
+      const { stdout, code } = await runCliCaptured(
+        ['memory', 'recall-stats', '--context-dir', tempDir, '--json'],
+      );
+      expect(code).toBe(0);
+      const parsed = JSON.parse(stdout);
+      expect(parsed).toMatchObject({ since: '7d', searches: 1, hits: 1, misses: 0 });
+      expect(parsed).toHaveProperty('medianLatencyMs');
+      expect(parsed).toHaveProperty('medianTopScore');
+      expect(parsed).toHaveProperty('recentMisses');
+    });
+
+    it('exits 2 on a bad --since', async () => {
+      const { stderr, code } = await runCliCaptured(
+        ['memory', 'recall-stats', '--context-dir', tempDir, '--since', 'yesterday'],
+      );
+      expect(code).toBe(2);
+      expect(stderr).toMatch(/--since/);
+    });
+  });
+
   it('returns exit 2 for unknown memory subcommand', async () => {
     const { stderr, code } = await runCliCaptured(
       ['memory', 'bogus', '--context-dir', tempDir],

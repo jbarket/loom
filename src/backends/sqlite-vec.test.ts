@@ -778,4 +778,99 @@ describe('SqliteVecBackend', () => {
       expect(result.restored).toHaveLength(0);
     });
   });
+
+  describe('MMR diversity re-ranking', () => {
+    // Two exact duplicates on "loom alpha" and one memory on "gamma". The query
+    // "loom alpha gamma" ranks the duplicates first (0.816) and gamma third
+    // (0.577); with the default diversity MMR swaps the second duplicate for gamma.
+    async function seed(b: SqliteVecBackend): Promise<void> {
+      await b.remember({ category: 'project', title: 'Loom alpha plan', content: 'loom alpha' });
+      await b.remember({ category: 'project', title: 'Loom alpha plan (dup)', content: 'loom alpha' });
+      await b.remember({ category: 'project', title: 'Gamma note', content: 'gamma' });
+    }
+
+    it('displaces a near-duplicate with a less-relevant but different memory', async () => {
+      await seed(backend);
+      const results = await backend.recall({ query: 'loom alpha gamma', limit: 2 });
+      expect(results).toHaveLength(2);
+      expect(results[0].title).toMatch(/^Loom alpha plan/);
+      expect(results[1].title).toBe('Gamma note');
+      expect(results[0].relevance).toBeGreaterThan(results[1].relevance);
+    });
+
+    it('diversity: 0 reproduces the pure relevance ranking', async () => {
+      await seed(backend);
+      const results = await backend.recall({ query: 'loom alpha gamma', limit: 2, diversity: 0 });
+      expect(results.map((r) => r.title).sort()).toEqual(['Loom alpha plan', 'Loom alpha plan (dup)']);
+    });
+
+    it('leaves the ranking alone when there are no more candidates than limit', async () => {
+      await seed(backend);
+      const results = await backend.recall({ query: 'loom alpha gamma', limit: 5 });
+      expect(results).toHaveLength(3);
+      expect(results[2].title).toBe('Gamma note');
+      for (let i = 1; i < results.length; i++) {
+        expect(results[i - 1].relevance).toBeGreaterThanOrEqual(results[i].relevance);
+      }
+    });
+
+    it('still honours category / project filters before re-ranking', async () => {
+      await seed(backend);
+      await backend.remember({ category: 'user', title: 'Beta pref', content: 'loom beta', project: 'vigil' });
+      const byCat = await backend.recall({ query: 'loom alpha gamma', category: 'user', limit: 2 });
+      expect(byCat.map((r) => r.title)).toEqual(['Beta pref']);
+      const byProj = await backend.recall({ query: 'loom', project: 'vigil', limit: 2 });
+      expect(byProj.map((r) => r.title)).toEqual(['Beta pref']);
+    });
+  });
+
+  describe('recall observation', () => {
+    it('reports pool size, returned count, top score and MMR drops to the observer', async () => {
+      const seen: import('./types.js').RecallObservation[] = [];
+      const observed = new SqliteVecBackend(
+        { dbPath: join(tmpDir, 'observed.db'), onRecall: (o) => { seen.push(o); } },
+        makeKeywordEmbedder(),
+      );
+      try {
+        await observed.remember({ category: 'project', title: 'A', content: 'loom alpha' });
+        await observed.remember({ category: 'project', title: 'A dup', content: 'loom alpha' });
+        await observed.remember({ category: 'project', title: 'G', content: 'gamma' });
+        const results = await observed.recall({ query: 'loom alpha gamma', limit: 2, category: 'project' });
+        expect(seen).toHaveLength(1);
+        const o = seen[0];
+        expect(o.tool).toBe('recall');
+        expect(o.query).toBe('loom alpha gamma');
+        expect(o.category).toBe('project');
+        expect(o.project).toBeUndefined();
+        expect(o.limit).toBe(2);
+        expect(o.diversity).toBeCloseTo(0.3);
+        expect(o.candidates).toBe(3);
+        expect(o.returned).toBe(2);
+        expect(o.topScore).toBeCloseTo(results[0].relevance);
+        expect(o.threshold).toBeNull();
+        expect(o.diversityDrops).toBe(1);
+        expect(o.hit).toBe(true);
+        expect(o.latencyMs).toBeGreaterThanOrEqual(0);
+        expect(Date.parse(o.ts)).not.toBeNaN();
+
+        await observed.recall({ query: 'loom', category: 'nothing-here' });
+        expect(seen[1]).toMatchObject({ hit: false, returned: 0, topScore: null, candidates: 0 });
+      } finally {
+        observed.close();
+      }
+    });
+
+    it('a throwing observer never fails the search', async () => {
+      const angry = new SqliteVecBackend(
+        { dbPath: join(tmpDir, 'angry.db'), onRecall: () => { throw new Error('disk full'); } },
+        makeKeywordEmbedder(),
+      );
+      try {
+        await angry.remember({ category: 'project', title: 'A', content: 'loom alpha' });
+        await expect(angry.recall({ query: 'loom alpha' })).resolves.toHaveLength(1);
+      } finally {
+        angry.close();
+      }
+    });
+  });
 });
