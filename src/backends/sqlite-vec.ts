@@ -36,8 +36,10 @@ import type {
   ArchiveResult,
   RestoreInput,
   RestoreResult,
+  RecallObservation,
 } from './types.js';
 import { computeExpiresAt, isExpired } from './ttl.js';
+import { mmrSelect, DEFAULT_DIVERSITY } from './mmr.js';
 import { globToMatcher } from './glob.js';
 import { runMigrations } from './migrations.js';
 
@@ -52,6 +54,12 @@ function slugify(text: string): string {
 export interface SqliteVecConfig {
   /** Absolute path to the SQLite database file */
   dbPath: string;
+  /**
+   * Observer for the recall observation log. Called once per recall with
+   * the search's telemetry; errors it throws are swallowed — a failed
+   * observation never fails a search.
+   */
+  onRecall?: (obs: RecallObservation) => void;
 }
 
 interface MemoryRow {
@@ -146,7 +154,9 @@ export class SqliteVecBackend implements MemoryBackend {
   }
 
   async recall(input: RecallInput): Promise<MemoryMatch[]> {
+    const startedAt = performance.now();
     const limit = input.limit ?? 10;
+    const diversity = clamp01(input.diversity ?? DEFAULT_DIVERSITY);
 
     const queryVector = await (this.embedder.embedQuery?.(input.query) ??
       this.embedder.embed(input.query));
@@ -155,11 +165,30 @@ export class SqliteVecBackend implements MemoryBackend {
       input.category && input.category !== 'all' ? input.category : null;
     const projectFilter = input.project ?? null;
 
-    const hits = this.searchVectors(queryVector, limit, limit * 4, (mem) => {
+    // With diversity on, over-fetch a candidate pool so MMR has something to
+    // trade off. At diversity 0 this is exactly the pre-MMR search: pool == limit.
+    const poolSize = diversity > 0 ? Math.max(limit * 3, 12) : limit;
+    const candidates = this.searchVectors(queryVector, poolSize, poolSize * 4, (mem) => {
       if (categoryFilter && mem.category !== categoryFilter) return false;
       if (projectFilter && mem.project !== projectFilter) return false;
       return true;
     });
+
+    // MMR only re-orders/selects among candidates that already passed the
+    // filters; with <= limit candidates it returns them in relevance order.
+    let hits = candidates;
+    let diversityDrops = 0;
+    if (diversity > 0 && candidates.length > limit) {
+      const vectors = this.loadVectors(candidates.map((c) => c.mem.id));
+      const pool = candidates.map((hit) => ({
+        hit,
+        relevance: 1 - hit.distance,
+        vector: vectors.get(hit.mem.id) ?? EMPTY_VECTOR,
+      }));
+      const picked = mmrSelect(pool, limit, diversity);
+      hits = picked.selected.map((c) => c.hit);
+      diversityDrops = picked.diversityDrops;
+    }
 
     const results = hits.map((h) => rowToMatch(h.mem, h.distance));
     const hitIds = hits.map((h) => h.mem.id);
@@ -174,6 +203,23 @@ export class SqliteVecBackend implements MemoryBackend {
       });
       tx(hitIds);
     }
+
+    this.observeRecall({
+      ts: new Date().toISOString(),
+      tool: 'recall',
+      query: input.query,
+      category: categoryFilter ?? undefined,
+      project: projectFilter ?? undefined,
+      limit,
+      diversity,
+      candidates: candidates.length,
+      returned: results.length,
+      topScore: results.length > 0 ? results[0].relevance : null,
+      threshold: null,
+      diversityDrops,
+      latencyMs: Math.round(performance.now() - startedAt),
+      hit: results.length > 0,
+    });
 
     return results;
   }
@@ -658,6 +704,33 @@ export class SqliteVecBackend implements MemoryBackend {
     return out;
   }
 
+  private observeRecall(obs: RecallObservation): void {
+    if (!this.config.onRecall) return;
+    try {
+      this.config.onRecall(obs);
+    } catch {
+      // Telemetry never fails a search.
+    }
+  }
+
+  /** Stored embeddings for a set of memory ids (point lookups; pools are small). */
+  private loadVectors(ids: number[]): Map<number, Float32Array> {
+    const stmt = this.db.prepare(
+      'SELECT embedding FROM vec_memories WHERE rowid = ?',
+    );
+    const out = new Map<number, Float32Array>();
+    for (const id of ids) {
+      const row = stmt.get(BigInt(id)) as { embedding: Buffer } | undefined;
+      if (!row) continue;
+      out.set(id, new Float32Array(
+        row.embedding.buffer,
+        row.embedding.byteOffset,
+        row.embedding.byteLength / 4,
+      ));
+    }
+    return out;
+  }
+
   private initSchema(): void {
     const statements = [
       `CREATE TABLE IF NOT EXISTS memories (
@@ -711,6 +784,13 @@ export class SqliteVecBackend implements MemoryBackend {
 }
 
 // ── Helpers ──
+
+const EMPTY_VECTOR: Float32Array = new Float32Array(0);
+
+function clamp01(x: number): number {
+  if (!Number.isFinite(x)) return DEFAULT_DIVERSITY;
+  return Math.min(1, Math.max(0, x));
+}
 
 function toVecBuffer(vector: number[]): Buffer {
   return Buffer.from(new Float32Array(vector).buffer);

@@ -13,6 +13,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **MMR diversity re-ranking on `recall`** — after the vector search, the
+  candidate pool (`max(limit*3, 12)`) is re-ranked with Maximal Marginal
+  Relevance (`λ·relevance − (1−λ)·max cosine sim to already-picked`,
+  λ = 0.7) so near-duplicate memories on a well-covered topic stop crowding
+  out different ones. The top result is unchanged; with ≤ `limit`
+  candidates nothing moves. New optional `diversity` (0..1, default 0.3 =
+  1−λ) on the `recall` tool and `loom recall --diversity`; `0` reproduces
+  the old ranking exactly. Idea from xai-org/grok-build's memory search
+  (Apache-2.0; idea only, no code). (Art, 2026-08-28)
+
+- **Recall observation log** — every `recall` appends one JSON line to
+  `<context>/telemetry/recall.jsonl` (query ≤120 chars, filters, pool
+  size, returned, topScore, MMR drops, latency, hit). Local-only, never
+  throws, `LOOM_RECALL_LOG=0` disables. `loom memory recall-stats
+  [--since 7d] [--json]` reads it back: counts, hit rate, median latency
+  and topScore, the 10 most recent misses. (Art, 2026-08-28)
+
 - **Episode tier** — `episode` memory category (48h TTL by default), the
   `episodes` MCP tool and `loom memory tape [--hours N]` CLI, and a
   "Last 24h across bodies" block in `identity` (after preferences, before

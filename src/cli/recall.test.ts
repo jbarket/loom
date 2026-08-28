@@ -53,6 +53,32 @@ describe('loom recall', () => {
     expect(parsed.every((m: { category: string }) => m.category === 'reference')).toBe(true);
   });
 
+  it.each(['abc', '-0.1', '1.5'])('exits 2 when --diversity is %s', async (bad) => {
+    const { stderr, code } = await runCliCaptured(
+      ['recall', 'q', '--context-dir', tempDir, `--diversity=${bad}`],
+    );
+    expect(code).toBe(2);
+    expect(stderr).toMatch(/between 0 and 1/);
+  });
+
+  it('accepts --diversity 0 and 1', async () => {
+    for (const d of ['0', '1']) {
+      const { stdout, code } = await runCliCaptured(
+        ['recall', 'blue widget', '--context-dir', tempDir, '--diversity', d, '--json'],
+      );
+      expect(code).toBe(0);
+      expect(JSON.parse(stdout)[0]).toHaveProperty('title', 'blue widget');
+    }
+  });
+
+  it('appends an observation to telemetry/recall.jsonl', async () => {
+    const { readFileSync } = await import('node:fs');
+    await runCliCaptured(['recall', 'blue widget', '--context-dir', tempDir]);
+    const lines = readFileSync(join(tempDir, 'telemetry', 'recall.jsonl'), 'utf-8').trim().split('\n');
+    const last = JSON.parse(lines[lines.length - 1]);
+    expect(last).toMatchObject({ tool: 'recall', query: 'blue widget', hit: true, returned: 1 });
+  });
+
   it.each(['abc', '0', '-1'])('exits 2 when --limit is %s', async (bad) => {
     const { stderr, code } = await runCliCaptured(
       ['recall', 'q', '--context-dir', tempDir, `--limit=${bad}`],

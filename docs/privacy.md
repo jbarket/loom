@@ -38,8 +38,13 @@ cache directory from a machine that has run loom once.
 
 ### What does *not* cross the network
 
-- No analytics, metrics, crash reporting, or usage telemetry — there
-  is no telemetry code in loom and no dependency that adds it.
+- No analytics, crash reporting, or usage telemetry leaves the machine —
+  there is no phone-home code in loom and no dependency that adds it.
+  The one observation log loom keeps is local: `recall` appends a line
+  per search to `<context>/telemetry/recall.jsonl` (query, hit/miss,
+  latency, scores) so `loom memory recall-stats` can tell you whether
+  recall is working. It is a plain file in the agent's own context dir;
+  `LOOM_RECALL_LOG=0` turns it off.
 - No cloud account, no login, no API key, no remote vector database.
 - No outbound call on session start, memory write, memory read,
   pursuits update, or identity update.

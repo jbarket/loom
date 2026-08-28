@@ -18,6 +18,12 @@ import {
   UnknownProposalError,
 } from '../backends/proposals.js';
 import { createBackend } from '../backends/index.js';
+import {
+  readRecallObservations,
+  summarizeRecallObservations,
+  formatRecallStats,
+  parseSinceDuration,
+} from '../backends/recall-log.js';
 import { assertStackVersionCompatible } from '../config.js';
 import { extractGlobalFlags, resolveEnv } from './args.js';
 import { renderJson } from './io.js';
@@ -39,6 +45,7 @@ Subcommands:
   recompute-salience  Refresh stored salience from timestamps (consolidation lane)
   digest    Preview the Top-of-Mind boot digest
   tape      The episode tape: last --hours (default 24) across all bodies, time-ordered
+  recall-stats  Summarize the recall observation log (hit rate, latency, misses)
 
 Options (list):
   --category <name>    Filter
@@ -104,13 +111,17 @@ Options (reject):
   <id>                 Proposal id to reject (positional)
   --json               Emit { rejected: boolean }
 
+Options (recall-stats):
+  --since <window>     Look back this far: 30m, 24h, 7d (default), 2w
+  --json               Emit RecallStats
+
 Global: --context-dir, --help/-h
 `;
 
 const SUBCOMMANDS = new Set([
   'list', 'prune', 'similar', 'audit', 'archive', 'restore',
   'propose', 'proposals', 'ratify', 'reject',
-  'recompute-salience', 'digest', 'tape',
+  'recompute-salience', 'digest', 'tape', 'recall-stats',
 ]);
 
 export async function run(argv: string[], io: IOStreams): Promise<number> {
@@ -157,6 +168,26 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
     if (hours !== undefined && !(hours > 0)) { io.stderr(`--hours must be a positive number\n`); return 2; }
     const t = tapeForContext(env.contextDir, { hours, tokenBudget: 6000 });
     io.stdout((t ?? `(no episodes in the last ${hours ?? 24}h)`) + '\n');
+    return 0;
+  }
+
+  // recall-stats — read the local recall observation log (telemetry/recall.jsonl).
+  if (sub === 'recall-stats') {
+    let parsed;
+    try {
+      parsed = parseArgs({ args: subRest, options: { since: { type: 'string' } }, strict: true });
+    } catch (err) {
+      io.stderr(`${(err as Error).message}\n${USAGE}`);
+      return 2;
+    }
+    const window = parsed.values.since ?? '7d';
+    let sinceMs: number;
+    try { sinceMs = parseSinceDuration(window); }
+    catch (err) { io.stderr(`${(err as Error).message}\n`); return 2; }
+    const rows = readRecallObservations(env.contextDir, { since: new Date(Date.now() - sinceMs) });
+    const stats = summarizeRecallObservations(rows);
+    if (env.json) { renderJson(io, { since: window, ...stats }); return 0; }
+    io.stdout(formatRecallStats(stats, window) + '\n');
     return 0;
   }
 

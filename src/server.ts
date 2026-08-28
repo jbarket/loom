@@ -175,15 +175,22 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
   server.tool(
     'recall',
     'Retrieve memories relevant to a query or topic. Returns matching memories ' +
-    'from the persistent store. Use this when you need context from past sessions.',
+    'from the persistent store. Use this when you need context from past sessions. ' +
+    'Results are re-ranked for diversity (MMR, λ=0.7 by default) so near-duplicate ' +
+    'memories on a well-covered topic don\'t crowd out different ones; the top ' +
+    'result is always the most relevant. Pass diversity: 0 for pure relevance order.',
     {
       query: z.string().describe('What to search for — topic, keyword, or question'),
       category: z.string().optional().describe('Filter to a specific memory category, or omit for all'),
       project: z.string().optional().describe('Filter to a specific project'),
       limit: z.number().int().positive().optional().describe('Maximum results to return (default: 10)'),
+      diversity: z.number().min(0).max(1).optional().describe(
+        'MMR diversity 0..1 (default 0.3 = 1−λ). 0 reproduces the plain relevance ranking; ' +
+        'higher trades relevance for coverage of distinct memories.'
+      ),
     },
-    async ({ query, category, project, limit }) => {
-      const result = await recall(contextDir, { query, category, project, limit });
+    async ({ query, category, project, limit, diversity }) => {
+      const result = await recall(contextDir, { query, category, project, limit, diversity });
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );

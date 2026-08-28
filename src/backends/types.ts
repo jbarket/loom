@@ -30,6 +30,40 @@ export interface RecallInput {
   category?: string;
   project?: string;
   limit?: number;
+  /**
+   * MMR diversity, 0..1 (default 0.3, i.e. λ = 0.7). Re-ranks the candidate
+   * pool so near-duplicate memories don't crowd out different ones. 0 keeps
+   * the pure relevance ranking.
+   */
+  diversity?: number;
+}
+
+/**
+ * One line of the recall observation log (`<contextDir>/telemetry/recall.jsonl`).
+ * Local-only: a file in the agent's own context dir, never sent anywhere.
+ */
+export interface RecallObservation {
+  /** ISO timestamp of the search. */
+  ts: string;
+  tool: 'recall' | 'knowledge_recall';
+  /** The query, truncated to 120 chars on write. */
+  query: string;
+  category?: string;
+  project?: string;
+  limit: number;
+  /** MMR diversity that was applied (0 = plain relevance ranking). */
+  diversity: number;
+  /** Candidate pool size after filters, before MMR. */
+  candidates: number;
+  returned: number;
+  /** Relevance of the best returned match, null on a miss. */
+  topScore: number | null;
+  /** Relevance floor applied, if any (recall currently applies none). */
+  threshold: number | null;
+  /** Top-relevance candidates displaced by MMR. */
+  diversityDrops: number;
+  latencyMs: number;
+  hit: boolean;
 }
 
 export interface MemoryMatch {

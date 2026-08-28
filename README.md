@@ -420,8 +420,12 @@ npx loomai wake --context-dir ~/.config/loom/my-agent
 echo "Prefers async updates over live standups" | npx loomai remember "working style" \
   --category user --context-dir ~/.config/loom/my-agent
 
-# Search
+# Search (MMR-diversified by default; --diversity 0 for pure relevance order)
 npx loomai recall "meeting preferences" --context-dir ~/.config/loom/my-agent
+npx loomai recall "meeting preferences" --diversity 0.5 --context-dir ~/.config/loom/my-agent
+
+# Is recall working? Hit rate, latency, scores, recent misses from the local observation log
+npx loomai memory recall-stats --since 7d --context-dir ~/.config/loom/my-agent
 
 # List all memories in a category
 npx loomai memory list --category feedback --context-dir ~/.config/loom/my-agent
@@ -548,6 +552,7 @@ All configuration is through environment variables:
 |---|---|---|
 | `LOOM_CONTEXT_DIR` | `~/.config/loom/default` | Path to agent's context directory |
 | `LOOM_SQLITE_DB_PATH` | `<context>/memories.db` | Override the memory DB path |
+| `LOOM_RECALL_LOG` | *(on)* | Set to `0` to stop `recall` appending to the local `<context>/telemetry/recall.jsonl` observation log |
 | `LOOM_FASTEMBED_MODEL` | `fast-bge-small-en-v1.5` | fastembed model ID |
 | `LOOM_FASTEMBED_CACHE_DIR` | `~/.cache/loom/fastembed/` | Where to cache ONNX models |
 | `LOOM_MODEL` | *(unset)* | Model identifier for model-manifest context: `claude-opus`, `gemma4`, etc. |
@@ -571,6 +576,8 @@ $LOOM_CONTEXT_DIR/
 ├── preferences.md          # user working style; agent-editable
 ├── self-model.md           # agent's self-knowledge; agent-editable
 ├── memories.db             # sqlite-vec store of record
+├── telemetry/
+│   └── recall.jsonl        # local recall observation log (`loom memory recall-stats`)
 ├── projects/               # optional per-project briefs
 │   └── <project>.md
 ├── harnesses/              # optional per-harness manifests
