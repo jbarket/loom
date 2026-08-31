@@ -1,10 +1,18 @@
 /**
  * knowledge_write tool — upsert an entity page by slug/title.
  *
- * Enforces the epistemic gate (§E1): a page whose ONLY citation support is
- * source_kind="conversation" is stored as `provisional`, never `sourced`.
- * Filing test: knowledge is true independent of Jonathan; if it's about
- * Jonathan / our work, it belongs in the memory store.
+ * Two knowledge classes:
+ *   world/  — facts true independent of us (default; domain = "music/gear", etc.)
+ *   ours/   — Art-created artifacts revised-in-place (domain starts with "ours/").
+ *             Cited to repo paths/commits, loom_memory refs, or live-system probes.
+ *
+ * Epistemic gate (§E1):
+ *   - conversation-only citations → provisional (both classes).
+ *   - any repo citation → internal (ours/ class; overrides the sourced gate).
+ *   - any web citation (no repo) → sourced (world/ default).
+ *
+ * Filing test for world/ pages: knowledge is true independent of Jonathan; if
+ * it's about Jonathan / our work use memory or ours/ instead, not the world class.
  */
 import { createKnowledgeBackend } from '../backends/index.js';
 
@@ -23,10 +31,14 @@ export interface KnowledgeWriteInput {
   mode?: 'replace' | 'append';
   citations: Array<{
     claim: string;
-    source_kind: 'web' | 'loom_memory' | 'conversation';
+    source_kind: 'web' | 'loom_memory' | 'conversation' | 'repo';
     source_locator?: string;
     excerpt: string;
   }>;
+  /** ours/ class: who created or last owned this artifact (e.g. "art", "jonathan"). */
+  created_by?: string;
+  /** ours/ class: artifact version or revision tag (e.g. "v2", "2026-08-19"). */
+  version?: string;
 }
 
 function slugify(title: string): string {
@@ -37,12 +49,19 @@ function slugify(title: string): string {
     .slice(0, 128);
 }
 
-/** §E1: conversation-only citations → provisional. */
+/**
+ * §E1: Epistemic gate.
+ * - conversation-only → provisional (both classes).
+ * - any repo citation → internal (ours/ class; repo = git path/commit/ref).
+ * - any web citation, no repo → sourced (world/ default).
+ */
 function determineSourcing(
   citations: KnowledgeWriteInput['citations'],
-): 'sourced' | 'provisional' {
+): 'sourced' | 'provisional' | 'internal' {
   if (citations.length === 0) return 'provisional';
-  return citations.every((c) => c.source_kind === 'conversation') ? 'provisional' : 'sourced';
+  if (citations.every((c) => c.source_kind === 'conversation')) return 'provisional';
+  if (citations.some((c) => c.source_kind === 'repo')) return 'internal';
+  return 'sourced';
 }
 
 export async function knowledgeWrite(
@@ -74,13 +93,17 @@ export async function knowledgeWrite(
       freshness_anchor: input.freshness_anchor,
       bodyMode: input.mode,
       citations: input.citations,
+      created_by: input.created_by,
+      version: input.version,
     });
 
     const sourcingNote =
       sourcing === 'provisional'
         ? '\n> **Provisional** — sole support is conversation citations. ' +
-          'Add a web or loom_memory citation to promote to sourced.'
-        : '';
+          'Add a web or repo citation to promote to sourced/internal.'
+        : sourcing === 'internal'
+          ? '\n> **Internal** — ours/ class artifact; cited to repo/live-system sources.'
+          : '';
 
     const action =
       result.bodyMode === 'create' ? 'created'

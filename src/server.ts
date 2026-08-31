@@ -548,28 +548,33 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
 
   server.tool(
     'knowledge_write',
-    'Upsert an entity page by slug. On an existing slug: body REPLACES by default ' +
-    '(mode: "append" adds to it instead), title/domain follow the write, and citations ' +
-    'are always appended with exact-duplicate dedup — safe to re-send. ' +
-    'Knowledge is true independent of Jonathan — if it is about Jonathan or our work, ' +
-    'store it in memory instead. ' +
-    'Epistemic gate (§E1): a page whose ONLY citation support is source_kind="conversation" ' +
-    'is stored provisional, not sourced. Requires at least one citation.',
+    'Upsert a knowledge page by slug. Two classes:\n' +
+    '  world/ (default) — facts true independent of us. Domain = "music/gear", "software/loom", etc.\n' +
+    '  ours/  — Art-created artifacts, revised-in-place (breakbrain density model, homelab design,\n' +
+    '            wake-chain spec, script templates). Domain starts with "ours/", e.g. "ours/art-ops".\n' +
+    'On an existing slug: body REPLACES by default (mode: "append" adds to it instead), ' +
+    'title/domain follow the write, citations always appended with exact-duplicate dedup — safe to re-send.\n' +
+    'Epistemic gate (§E1):\n' +
+    '  • conversation-only citations → provisional (both classes).\n' +
+    '  • any repo citation → internal (ours/ class; repo = git path / commit / live-system probe).\n' +
+    '  • any web citation, no repo → sourced (world/ default).\n' +
+    'World filing test: knowledge must be true independent of Jonathan. For our own artifacts use ours/.',
     {
-      title: z.string().describe('Page title — the entity name (e.g. "Mutable Instruments Rings")'),
+      title: z.string().describe('Page title — the entity name (e.g. "Mutable Instruments Rings") or artifact name (e.g. "breakbrain density model")'),
       domain: z.string().describe(
-        'Domain tag, e.g. "music/eurorack", "programming/typescript". ' +
+        'Domain tag. World class: "music/eurorack", "programming/typescript". ' +
+        'Ours class: prefix with "ours/" — e.g. "ours/art-ops", "ours/breakbrain", "ours/homelab". ' +
         'Hierarchical string; sub-domains queryable via prefix filter.',
       ),
-      body: z.string().describe('Synthesized markdown body for the entity page (max 64 KB)'),
+      body: z.string().describe('Synthesized markdown body for the entity or artifact page (max 64 KB)'),
       slug: z.string().optional().describe(
         'Entity key for upsert — stable URL-safe identifier. ' +
         'Derived from title if omitted.',
       ),
       freshness_anchor: z.string().optional().describe(
         'The version/date the page\'s claims are valid as-of — e.g. "Syntakt OS 1.21" for a ' +
-        'device, or "as of 2026-05" for a topic. Drives the verification engine: a page is ' +
-        're-verified when this anchor moves or the freshness SLA elapses.',
+        'device, "as of 2026-05" for a topic, or "t-81 / 2026-08-31" for an ours/ artifact. ' +
+        'Drives the verification engine: a page is re-verified when this anchor moves or the freshness SLA elapses.',
       ),
       mode: z.enum(['replace', 'append']).optional().describe(
         'Body combine mode when the slug already exists: "replace" (default) overwrites the ' +
@@ -578,18 +583,27 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
       ),
       citations: z.array(z.object({
         claim: z.string().describe('The assertion this citation supports'),
-        source_kind: z.enum(['web', 'loom_memory', 'conversation']).describe(
-          'web = external URL; loom_memory = opaque memory ref; conversation = session distillation',
+        source_kind: z.enum(['web', 'loom_memory', 'conversation', 'repo']).describe(
+          'web = external URL; loom_memory = opaque memory ref; conversation = session distillation; ' +
+          'repo = git repo path / commit / live-system probe (ours/ class)',
         ),
-        source_locator: z.string().optional().describe('URL, memory ref, or session ID'),
-        excerpt: z.string().describe('Inline supporting quote — link-rot insurance (max 4 KB)'),
+        source_locator: z.string().optional().describe('URL, memory ref, session ID, or repo path + commit hash'),
+        excerpt: z.string().describe('Inline supporting quote or repo excerpt — link-rot insurance (max 4 KB)'),
       })).describe(
         'Support citations. At least one required. ' +
-        'All-conversation support → page stored provisional.',
+        'All-conversation → provisional. Any repo → internal (ours/). Any web → sourced.',
+      ),
+      created_by: z.string().optional().describe(
+        'ours/ class: who created or last owned this artifact (e.g. "art", "jonathan"). ' +
+        'Preserved across upserts when omitted.',
+      ),
+      version: z.string().optional().describe(
+        'ours/ class: artifact version or revision tag (e.g. "v2", "2026-08-31", "t-81"). ' +
+        'Preserved across upserts when omitted.',
       ),
     },
-    async ({ title, domain, body, slug, freshness_anchor, mode, citations }) => {
-      const result = await knowledgeWrite(contextDir, { title, domain, body, slug, freshness_anchor, mode, citations });
+    async ({ title, domain, body, slug, freshness_anchor, mode, citations, created_by, version }) => {
+      const result = await knowledgeWrite(contextDir, { title, domain, body, slug, freshness_anchor, mode, citations, created_by, version });
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );
@@ -640,7 +654,8 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     '(1) expansion candidates — thin body + high hit_count (needs deepening); ' +
     '(2) cold pages — not accessed recently (unused or undiscovered); ' +
     '(3) misfile audit — provisional sourcing or conversation-only citations ' +
-    '(should be in the memory store instead). Pair with knowledge_write to act on findings.',
+    '(world/ class: should be in the memory store instead; ours/ class with internal sourcing are NOT misfiles — they are correct). ' +
+    'Pair with knowledge_write to act on findings.',
     {
       expansion_hit_threshold: z.number().int().nonnegative().optional().describe(
         'hit_count floor for expansion candidates (default 3; 0 considers every page)',
