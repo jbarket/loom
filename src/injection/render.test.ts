@@ -1,6 +1,22 @@
 import { describe, it, expect } from 'vitest';
 import { HARNESSES } from './harnesses.js';
-import { renderBlock } from './render.js';
+import { renderBlock, hashBlockContent } from './render.js';
+
+describe('hashBlockContent', () => {
+  it('produces a 16-char hex string', () => {
+    const h = hashBlockContent('some inner content\n');
+    expect(h).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it('is deterministic for equal inputs', () => {
+    const inner = 'same content\n';
+    expect(hashBlockContent(inner)).toBe(hashBlockContent(inner));
+  });
+
+  it('differs for different inputs', () => {
+    expect(hashBlockContent('content A\n')).not.toBe(hashBlockContent('content B\n'));
+  });
+});
 
 describe('renderBlock', () => {
   const contextDir = '/home/agent/.config/loom/art';
@@ -41,6 +57,26 @@ describe('renderBlock', () => {
     const a = renderBlock(HARNESSES['claude-code'], contextDir);
     const b = renderBlock(HARNESSES['claude-code'], contextDir);
     expect(a).toBe(b);
+  });
+
+  it('embeds a <!-- loom:hash --> line before the end marker', () => {
+    const block = renderBlock(HARNESSES['claude-code'], contextDir);
+    expect(block).toMatch(/<!-- loom:hash [0-9a-f]{16} -->/);
+    // Hash line must appear before end marker
+    const hashIdx = block.indexOf('<!-- loom:hash ');
+    const endIdx = block.indexOf('<!-- loom:end -->');
+    expect(hashIdx).toBeGreaterThan(0);
+    expect(hashIdx).toBeLessThan(endIdx);
+  });
+
+  it('hash changes when contextDir changes', () => {
+    const a = renderBlock(HARNESSES['claude-code'], '/ctx/one');
+    const b = renderBlock(HARNESSES['claude-code'], '/ctx/two');
+    const hashA = a.match(/<!-- loom:hash ([0-9a-f]{16}) -->/)?.[1];
+    const hashB = b.match(/<!-- loom:hash ([0-9a-f]{16}) -->/)?.[1];
+    expect(hashA).toBeDefined();
+    expect(hashB).toBeDefined();
+    expect(hashA).not.toBe(hashB);
   });
 
   it('contains the "prefer MCP, fall back to CLI" phrasing', () => {

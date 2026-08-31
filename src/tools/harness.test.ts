@@ -36,6 +36,77 @@ describe('harnessInit (MCP)', () => {
   });
 });
 
+describe('harnessInit with target — managed block injection', () => {
+  let ctx: string;
+  let dir: string;
+
+  beforeEach(async () => {
+    ctx = await mkdtemp(join(tmpdir(), 'loom-harness-mcp-ctx-'));
+    dir = await mkdtemp(join(tmpdir(), 'loom-harness-mcp-target-'));
+  });
+  afterEach(async () => {
+    await rm(ctx, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it('writes a managed block with markers and hash comment on first call', async () => {
+    const target = join(dir, 'CLAUDE.md');
+    const text = await harnessInit(ctx, { name: 'claude-code', target });
+    expect(text).toContain('Managed block:');
+    expect(text).toContain('created');
+    const body = await readFile(target, 'utf-8');
+    expect(body).toContain('<!-- loom:start v1 harness=claude-code -->');
+    expect(body).toMatch(/<!-- loom:hash [0-9a-f]{16} -->/);
+    expect(body).toContain('<!-- loom:end -->');
+    expect(body).toContain('mcp__loom__identity');
+  });
+
+  it('returns no-change on a second identical call (hash matches)', async () => {
+    const target = join(dir, 'CLAUDE.md');
+    await harnessInit(ctx, { name: 'claude-code', target });
+    const text = await harnessInit(ctx, { name: 'claude-code', target });
+    expect(text).toContain('no-change');
+  });
+
+  it('reinstalls (updated) when block content between markers is corrupted', async () => {
+    const target = join(dir, 'CLAUDE.md');
+    await harnessInit(ctx, { name: 'claude-code', target });
+    // Corrupt the inner body (leaving markers intact)
+    const original = await readFile(target, 'utf-8');
+    const corrupted = original.replace('Persistent identity via loom', 'CORRUPTED by user');
+    await writeFile(target, corrupted, 'utf-8');
+    const text = await harnessInit(ctx, { name: 'claude-code', target });
+    expect(text).toContain('updated');
+    const restored = await readFile(target, 'utf-8');
+    expect(restored).toContain('Persistent identity via loom');
+    expect(restored).not.toContain('CORRUPTED by user');
+  });
+
+  it('appends block to existing file that has no markers', async () => {
+    const target = join(dir, 'CLAUDE.md');
+    await writeFile(target, '# My project\n\nHand-written content.\n', 'utf-8');
+    const text = await harnessInit(ctx, { name: 'claude-code', target });
+    expect(text).toContain('appended');
+    const body = await readFile(target, 'utf-8');
+    expect(body).toContain('# My project');
+    expect(body).toContain('<!-- loom:start v1 harness=claude-code -->');
+  });
+
+  it('does not write a block when target is omitted', async () => {
+    const text = await harnessInit(ctx, { name: 'claude-code' });
+    expect(text).not.toContain('Managed block:');
+  });
+
+  it('works with an unknown harness name (defaults to mcp__loom__ prefix)', async () => {
+    const target = join(dir, 'AGENTS.md');
+    const text = await harnessInit(ctx, { name: 'my-custom-harness', target });
+    expect(text).toContain('Managed block:');
+    const body = await readFile(target, 'utf-8');
+    expect(body).toContain('<!-- loom:start v1 harness=my-custom-harness -->');
+    expect(body).toContain('mcp__loom__identity');
+  });
+});
+
 describe('harnessDescribe (MCP, peer-scoped)', () => {
   let ctx: string;
   beforeEach(async () => { ctx = await mkdtemp(join(tmpdir(), 'loom-harness-describe-mcp-')); });

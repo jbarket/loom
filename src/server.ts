@@ -513,13 +513,24 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     'harness_init',
     'Scaffold a harness manifest at <contextDir>/harnesses/<name>.md from the template ' +
     '(see stack spec v1 §4.7). Call this when identity() reports a missing manifest for the ' +
-    'current harness. Idempotent: skip-exists by default; overwrite: true replaces.',
+    'current harness. Idempotent: skip-exists by default; overwrite: true replaces.\n\n' +
+    'When `target` is supplied, also writes a loom-managed block (bounded by ' +
+    '<!-- loom:start / loom:end --> markers with an embedded <!-- loom:hash --> line) ' +
+    'into that file — typically the project CLAUDE.md. Re-runnable: the block is ' +
+    'left unchanged when already present and intact ("no-change"), reinstalled when ' +
+    'missing or corrupted ("created" / "updated"). Pass an absolute path or a path ' +
+    'relative to the current working directory.',
     {
       name: z.string().describe('Harness name (e.g. "claude-code", "codex", "gemini-cli")'),
       overwrite: z.boolean().optional().describe('Replace existing manifest (default: false)'),
+      target: z.string().optional().describe(
+        'Path to the dotfile to inject the managed loom block into (e.g. an absolute path ' +
+        'to CLAUDE.md / AGENTS.md / GEMINI.md). When omitted only the harness manifest ' +
+        'is scaffolded.',
+      ),
     },
-    async ({ name, overwrite }) => {
-      const text = await harnessInit(contextDir, { name, overwrite });
+    async ({ name, overwrite, target }) => {
+      const text = await harnessInit(contextDir, { name, overwrite, target });
       return { content: [{ type: 'text' as const, text }] };
     },
   );
