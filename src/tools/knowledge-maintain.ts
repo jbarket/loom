@@ -5,7 +5,12 @@
  *   1. Expansion candidates — thin body + high hit_count (needs deepening)
  *   2. Cold pages — no recent hits (unused/undiscovered)
  *   3. Misfile audit — provisional sourcing or all-conversation citations
- *      (should be memories, not knowledge)
+ *      (world/ class: should be memories, not knowledge.
+ *       ours/ class with internal sourcing: NOT misfiled — these are correct.)
+ *
+ * Two knowledge classes (t-81, 2026-08-31):
+ *   world/ — facts true independent of us (default).
+ *   ours/  — Art-created artifacts; domain starts with "ours/", sourcing = "internal".
  */
 import { createKnowledgeBackend } from '../backends/index.js';
 import type { KnowledgePageWithCitations } from '../backends/types.js';
@@ -21,7 +26,14 @@ export interface KnowledgeMaintainOptions {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function isConversationOnly(page: KnowledgePageWithCitations): boolean {
+/**
+ * True for world-class pages that look like misfiles (should be in memory).
+ * ours/ pages with `internal` sourcing are NEVER misfiles — excluded entirely.
+ * ours/ pages that are still provisional ARE flagged: they lack a repo citation.
+ */
+function isMisfiled(page: KnowledgePageWithCitations): boolean {
+  // ours/ class with internal sourcing: correct placement, never a misfile.
+  if (page.domain.startsWith('ours/') && page.sourcing === 'internal') return false;
   if (page.sourcing === 'provisional') return true;
   if (page.citations.length === 0) return false;
   return page.citations.every((c) => c.source_kind === 'conversation');
@@ -53,7 +65,7 @@ export async function knowledgeMaintain(
       (p) => isCold(p, coldMs) && p.status === 'active',
     );
     const misfiled = pages.filter(
-      (p) => isConversationOnly(p) && p.status === 'active',
+      (p) => isMisfiled(p) && p.status === 'active',
     );
 
     const activeCount = pages.filter((p) => p.status === 'active').length;
@@ -108,19 +120,24 @@ function formatMaintainReport(
 
   // ── Misfile audit ─────────────────────────────────────────────────────────
   lines.push('');
-  lines.push('## Misfile audit (provisional sourcing or conversation-only citations → candidate memories)');
+  lines.push('## Misfile audit (provisional sourcing or conversation-only citations)');
   lines.push('');
   if (misfiled.length === 0) {
     lines.push('None — all active pages have independent citation support.');
   } else {
     lines.push(
-      `${misfiled.length} page${misfiled.length === 1 ? '' : 's'} may belong in the memory store instead of knowledge:`,
+      `${misfiled.length} page${misfiled.length === 1 ? '' : 's'} may need attention:`,
     );
-    lines.push('> **Filing test:** knowledge is true independent of Jonathan. ' +
-      'If it is *about Jonathan or our work*, it belongs in memory.');
+    lines.push(
+      '> **World class:** knowledge is true independent of Jonathan — provisional/conversation-only pages belong in memory.\n' +
+      '> **Ours class (domain: ours/):** should have at least one `repo` citation to reach `internal` sourcing.',
+    );
     for (const p of misfiled) {
       const reason = p.sourcing === 'provisional' ? 'provisional' : 'conversation-only citations';
-      lines.push(`- \`${p.slug}\` — *${p.title}* (${p.domain}) — ${reason}`);
+      const hint = p.domain.startsWith('ours/')
+        ? '→ add a repo citation (git path / commit)'
+        : '→ add a web citation or relocate to memory';
+      lines.push(`- \`${p.slug}\` — *${p.title}* (${p.domain}) — ${reason} ${hint}`);
     }
   }
 

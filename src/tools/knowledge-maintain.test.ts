@@ -110,7 +110,7 @@ describe('knowledgeMaintain', () => {
     const result = await knowledgeMaintain(tempDir);
     expect(result).toMatch(/misfile-candidate/);
     expect(result).toMatch(/provisional/);
-    expect(result).toMatch(/memory store/i);
+    expect(result).toMatch(/relocate to memory/i);
   });
 
   it('reports misfiled pages (all-conversation citations)', async () => {

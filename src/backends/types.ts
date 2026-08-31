@@ -259,7 +259,7 @@ export interface KnowledgePageInput {
   title: string;
   domain: string;
   body: string;
-  sourcing?: 'sourced' | 'provisional';
+  sourcing?: 'sourced' | 'provisional' | 'internal';
   provenance?: string;
   /** ISO timestamp the page's claims were last verified as true. Defaults to write time. */
   verified_at?: string;
@@ -272,11 +272,21 @@ export interface KnowledgePageInput {
    * body after the existing one separated by a blank line. Ignored on create.
    */
   bodyMode?: 'replace' | 'append';
+  /**
+   * For ours/ class pages: who created or last owned this artifact
+   * (e.g. "art", "jonathan"). Preserved across upserts when omitted.
+   */
+  created_by?: string;
+  /**
+   * For ours/ class pages: artifact version or revision tag
+   * (e.g. "v2", "2026-08-19", "t-81"). Preserved across upserts when omitted.
+   */
+  version?: string;
 }
 
 export interface KnowledgeCitationInput {
   claim: string;
-  source_kind: 'web' | 'loom_memory' | 'conversation';
+  source_kind: 'web' | 'loom_memory' | 'conversation' | 'repo';
   source_locator?: string;
   excerpt: string;
 }
@@ -300,6 +310,10 @@ export interface KnowledgePage {
   verified_at?: string | null;
   /** The version/date the claims are valid as-of, e.g. "Syntakt OS 1.21". */
   freshness_anchor?: string | null;
+  /** ours/ class: who created or last owned this artifact (e.g. "art", "jonathan"). */
+  created_by?: string | null;
+  /** ours/ class: artifact version or revision tag (e.g. "v2", "2026-08-19"). */
+  version?: string | null;
 }
 
 export interface KnowledgeCitation {

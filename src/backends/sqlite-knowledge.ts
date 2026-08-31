@@ -112,17 +112,18 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
         // only moves it when the writer explicitly claims verification.
         // (Creation still stamps write time — the page was just synthesized
         // against its sources.)
+        // created_by / version are preserved across upserts when omitted.
         db.prepare(
-          `UPDATE pages SET title = ?, domain = ?, body = ?, sourcing = ?, verified_at = COALESCE(?, verified_at), freshness_anchor = COALESCE(?, freshness_anchor), updated = ? WHERE id = ?`,
-        ).run(title, input.domain, newBody, sourcing, input.verified_at ?? null, input.freshness_anchor ?? null, timestamp, pageId);
+          `UPDATE pages SET title = ?, domain = ?, body = ?, sourcing = ?, verified_at = COALESCE(?, verified_at), freshness_anchor = COALESCE(?, freshness_anchor), created_by = COALESCE(?, created_by), version = COALESCE(?, version), updated = ? WHERE id = ?`,
+        ).run(title, input.domain, newBody, sourcing, input.verified_at ?? null, input.freshness_anchor ?? null, input.created_by ?? null, input.version ?? null, timestamp, pageId);
       } else {
         uuid = randomUUID();
         title = input.title;
         sourcing = input.sourcing ?? 'sourced';
         appliedMode = 'create';
         const result = db.prepare(
-          `INSERT INTO pages (uuid, slug, title, domain, body, sourcing, provenance, verified_at, freshness_anchor, created, updated)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO pages (uuid, slug, title, domain, body, sourcing, provenance, verified_at, freshness_anchor, created_by, version, created, updated)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(
           uuid,
           input.slug,
@@ -133,6 +134,8 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
           input.provenance ?? null,
           input.verified_at ?? timestamp,
           input.freshness_anchor ?? null,
+          input.created_by ?? null,
+          input.version ?? null,
           timestamp,
           timestamp,
         );
@@ -1069,6 +1072,13 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
     }
     if (!pageCols.includes('tombstone_note')) {
       this.db!.prepare('ALTER TABLE pages ADD COLUMN tombstone_note TEXT').run();
+    }
+    // ours/ class metadata (t-81, 2026-08-31).
+    if (!pageCols.includes('created_by')) {
+      this.db!.prepare('ALTER TABLE pages ADD COLUMN created_by TEXT').run();
+    }
+    if (!pageCols.includes('version')) {
+      this.db!.prepare('ALTER TABLE pages ADD COLUMN version TEXT').run();
     }
   }
 }
