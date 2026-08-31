@@ -1,2 +1,11 @@
+# GitHub CODEOWNERS — LAST matching pattern wins, so the specific rules
+# must come AFTER the wildcard.
+
 # Default reviewer for all changes.
-*       @jbarket
+*                   @jbarket
+
+# Dependency manifests: Art owns these so dependabot bumps don't need
+# Jonathan's click. A PR that touches code as well still matches `*`
+# and therefore still needs him.
+/package.json       @art-e-fish
+/package-lock.json  @art-e-fish
