@@ -17,6 +17,14 @@ import { createHash } from 'node:crypto';
 import type { HarnessPreset } from './harnesses.js';
 
 /**
+ * The subset of a harness that rendering actually needs: the tool prefix
+ * (used throughout the block body) and the key (stamped into the start
+ * marker). Widened from HarnessPreset so harness_init can render a block
+ * for a harness name that is not one of the built-in presets.
+ */
+export type RenderableHarness = Pick<HarnessPreset, 'toolPrefix'> & { readonly key: string };
+
+/**
  * Compute the truncated SHA-256 that appears in the `<!-- loom:hash … -->`
  * line. Input is the raw inner content (between start marker and hash line).
  * Exported so callers can verify a block without re-rendering it.
@@ -25,7 +33,7 @@ export function hashBlockContent(inner: string): string {
   return createHash('sha256').update(inner, 'utf-8').digest('hex').slice(0, 16);
 }
 
-export function renderBlock(harness: HarnessPreset, contextDir: string): string {
+export function renderBlock(harness: RenderableHarness, contextDir: string): string {
   const p = harness.toolPrefix;
   // Inner content — everything between the start marker line and the hash line.
   const inner =
