@@ -1,17 +1,37 @@
 /**
  * MCP tool handler for harness-manifest initialization.
  * Thin wrapper over src/blocks/harness.initHarness.
+ *
+ * When `target` is supplied the tool also writes a loom-managed block
+ * (bounded by <!-- loom:start / loom:end --> markers with an embedded
+ * <!-- loom:hash --> line) into that file.  Re-runnable: returns
+ * "no-change" when the block is already present and intact, "updated"
+ * when it was missing or corrupted.
  */
 import { initHarness, describeHarness, resolvePeerToHarness, normalizePeer } from '../blocks/harness.js';
+import { renderBlock } from '../injection/render.js';
+import { writeManagedBlock } from '../injection/writer.js';
+import { HARNESSES, isHarnessKey } from '../injection/harnesses.js';
 
 export async function harnessInit(
   contextDir: string,
-  input: { name: string; overwrite?: boolean },
+  input: { name: string; overwrite?: boolean; target?: string },
 ): Promise<string> {
-  const result = await initHarness(contextDir, input.name, {
+  const manifestResult = await initHarness(contextDir, input.name, {
     overwrite: input.overwrite,
   });
-  return `Harness manifest ${result.name}: ${result.path} (${result.action})`;
+  const lines = [`Harness manifest ${manifestResult.name}: ${manifestResult.path} (${manifestResult.action})`];
+
+  if (input.target !== undefined) {
+    const preset = isHarnessKey(input.name)
+      ? HARNESSES[input.name]
+      : { key: input.name, display: input.name, defaultPath: input.target, toolPrefix: 'mcp__loom__' as const };
+    const block = renderBlock(preset, contextDir);
+    const blockResult = await writeManagedBlock(input.target, block);
+    lines.push(`Managed block: ${blockResult.path} (${blockResult.action})`);
+  }
+
+  return lines.join('\n');
 }
 
 /**
