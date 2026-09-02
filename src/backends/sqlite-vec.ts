@@ -42,6 +42,7 @@ import { computeExpiresAt, isExpired } from './ttl.js';
 import { mmrSelect, DEFAULT_DIVERSITY } from './mmr.js';
 import { globToMatcher } from './glob.js';
 import { runMigrations } from './migrations.js';
+import { retryWrite } from './retry.js';
 
 function slugify(text: string): string {
   return text
@@ -143,7 +144,7 @@ export class SqliteVecBackend implements MemoryBackend {
       );
       insertVec.run(BigInt(result.lastInsertRowid), toVecBuffer(vector));
     });
-    tx();
+    retryWrite(() => tx());
 
     return {
       ref,
@@ -201,7 +202,7 @@ export class SqliteVecBackend implements MemoryBackend {
       const tx = this.db.transaction((ids: number[]) => {
         for (const id of ids) stamp.run(now, id);
       });
-      tx(hitIds);
+      retryWrite(() => tx(hitIds));
     }
 
     this.observeRecall({
@@ -312,7 +313,7 @@ export class SqliteVecBackend implements MemoryBackend {
       updateStmt.run(newContent, JSON.stringify(newMeta), updatedAt, row!.id);
       updateVec.run(toVecBuffer(vector), BigInt(row!.id));
     });
-    tx();
+    retryWrite(() => tx());
 
     return { updated: true, ref: row.ref };
   }
@@ -573,7 +574,7 @@ export class SqliteVecBackend implements MemoryBackend {
         delVec.run(BigInt(row.id));
       }
     });
-    tx();
+    retryWrite(() => tx());
 
     return { archived: rows.map((r) => r.ref) };
   }
@@ -619,7 +620,7 @@ export class SqliteVecBackend implements MemoryBackend {
         insVec.run(BigInt(row.id), toVecBuffer(vectors[i]));
       });
     });
-    tx();
+    retryWrite(() => tx());
 
     return { restored: rows.map((r) => r.ref) };
   }
@@ -779,7 +780,7 @@ export class SqliteVecBackend implements MemoryBackend {
       delMem.run(...ids);
       delVec.run(...bigIds);
     });
-    tx();
+    retryWrite(() => tx());
   }
 }
 
