@@ -15,6 +15,7 @@ import BetterSqlite3, { type Database } from 'better-sqlite3';
 import { resolveSqliteDbPath } from '../config.js';
 import { runMigrations } from './migrations.js';
 import { EPISODE_CATEGORY } from '../categories.js';
+import { retryWrite } from './retry.js';
 
 function hasColumn(db: Database, table: string, column: string): boolean {
   return (db.pragma(`table_info(${table})`) as { name: string }[]).some((c) => c.name === column);
@@ -78,7 +79,9 @@ export function recomputeSalience(db: Database, nowMs: number): number {
   const tx = db.transaction(() => {
     for (const r of rows) upd.run(temperature(lastTouch(r), r.category, nowMs), r.id);
   });
-  tx();
+  // The nightly full-table recompute is the heaviest write in loom; wrap it so
+  // a concurrent remember() call during the recompute retries instead of throwing.
+  retryWrite(() => tx());
   return rows.length;
 }
 

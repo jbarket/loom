@@ -10,6 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import BetterSqlite3, { type Database } from 'better-sqlite3';
+import { retryWrite } from './retry.js';
 import type {
   KnowledgeBackend,
   KnowledgePageInput,
@@ -105,7 +106,9 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
         // page is recoverable (the 2026-06-01 verify run stomped 13 bodies
         // with no recovery path other than transcript archaeology).
         if (appliedMode === 'replace' && newBody !== existing.body) {
-          this.snapshotRevision(db, pageId, input.slug, existing.body, 'write-replace', timestamp);
+          retryWrite(() =>
+            this.snapshotRevision(db, pageId, input.slug, existing.body, 'write-replace', timestamp),
+          );
         }
 
         // verified_at is a verification stamp, not a write stamp: an update
@@ -113,31 +116,35 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
         // (Creation still stamps write time — the page was just synthesized
         // against its sources.)
         // created_by / version are preserved across upserts when omitted.
-        db.prepare(
-          `UPDATE pages SET title = ?, domain = ?, body = ?, sourcing = ?, verified_at = COALESCE(?, verified_at), freshness_anchor = COALESCE(?, freshness_anchor), created_by = COALESCE(?, created_by), version = COALESCE(?, version), updated = ? WHERE id = ?`,
-        ).run(title, input.domain, newBody, sourcing, input.verified_at ?? null, input.freshness_anchor ?? null, input.created_by ?? null, input.version ?? null, timestamp, pageId);
+        retryWrite(() =>
+          db.prepare(
+            `UPDATE pages SET title = ?, domain = ?, body = ?, sourcing = ?, verified_at = COALESCE(?, verified_at), freshness_anchor = COALESCE(?, freshness_anchor), created_by = COALESCE(?, created_by), version = COALESCE(?, version), updated = ? WHERE id = ?`,
+          ).run(title, input.domain, newBody, sourcing, input.verified_at ?? null, input.freshness_anchor ?? null, input.created_by ?? null, input.version ?? null, timestamp, pageId),
+        );
       } else {
         uuid = randomUUID();
         title = input.title;
         sourcing = input.sourcing ?? 'sourced';
         appliedMode = 'create';
-        const result = db.prepare(
-          `INSERT INTO pages (uuid, slug, title, domain, body, sourcing, provenance, verified_at, freshness_anchor, created_by, version, created, updated)
+        const result = retryWrite(() =>
+          db.prepare(
+            `INSERT INTO pages (uuid, slug, title, domain, body, sourcing, provenance, verified_at, freshness_anchor, created_by, version, created, updated)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        ).run(
-          uuid,
-          input.slug,
-          title,
-          input.domain,
-          input.body,
-          sourcing,
-          input.provenance ?? null,
-          input.verified_at ?? timestamp,
-          input.freshness_anchor ?? null,
-          input.created_by ?? null,
-          input.version ?? null,
-          timestamp,
-          timestamp,
+          ).run(
+            uuid,
+            input.slug,
+            title,
+            input.domain,
+            input.body,
+            sourcing,
+            input.provenance ?? null,
+            input.verified_at ?? timestamp,
+            input.freshness_anchor ?? null,
+            input.created_by ?? null,
+            input.version ?? null,
+            timestamp,
+            timestamp,
+          ),
         );
         pageId = Number(result.lastInsertRowid);
       }
@@ -188,7 +195,7 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
             citationsAdded++;
           }
         });
-        tx();
+        retryWrite(() => tx());
       }
 
       return Promise.resolve({
@@ -217,9 +224,11 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
 
       if (opts?.stampAccess) {
         const now = new Date().toISOString();
-        db.prepare(
-          'UPDATE pages SET last_accessed = ?, hit_count = hit_count + 1 WHERE id = ?',
-        ).run(now, page.id);
+        retryWrite(() =>
+          db.prepare(
+            'UPDATE pages SET last_accessed = ?, hit_count = hit_count + 1 WHERE id = ?',
+          ).run(now, page.id),
+        );
         page.last_accessed = now;
         page.hit_count += 1;
       }
@@ -328,7 +337,7 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
         const tx = db.transaction((ids: number[]) => {
           for (const id of ids) stamp.run(now, id);
         });
-        tx(rows.map((r) => r.id));
+        retryWrite(() => tx(rows.map((r) => r.id)));
       }
 
       return Promise.resolve(rows.map((page) => ({
@@ -353,9 +362,11 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
         return Promise.resolve({ slug: input.slug, archived: false });
       }
 
-      db.prepare(
-        "UPDATE pages SET status = 'archived', tombstone_note = ?, updated = ? WHERE slug = ?",
-      ).run(input.note ?? null, timestamp, input.slug);
+      retryWrite(() =>
+        db.prepare(
+          "UPDATE pages SET status = 'archived', tombstone_note = ?, updated = ? WHERE slug = ?",
+        ).run(input.note ?? null, timestamp, input.slug),
+      );
 
       return Promise.resolve({ slug: input.slug, archived: true });
     } catch (e) {
@@ -376,9 +387,11 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
         return Promise.resolve({ slug: input.slug, restored: false });
       }
 
-      db.prepare(
-        "UPDATE pages SET status = 'active', tombstone_note = NULL, updated = ? WHERE slug = ?",
-      ).run(timestamp, input.slug);
+      retryWrite(() =>
+        db.prepare(
+          "UPDATE pages SET status = 'active', tombstone_note = NULL, updated = ? WHERE slug = ?",
+        ).run(timestamp, input.slug),
+      );
 
       return Promise.resolve({ slug: input.slug, restored: true });
     } catch (e) {
@@ -426,7 +439,7 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
           "INSERT INTO supersessions (old_slug, new_slug, note, created) VALUES (?, ?, ?, ?)",
         ).run(input.old_slug, input.new_slug, input.note ?? null, timestamp);
       });
-      tx();
+      retryWrite(() => tx());
 
       return Promise.resolve({
         old_slug: input.old_slug,
@@ -465,7 +478,7 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
             pages.push({ slug: p.slug, old_domain: p.domain, new_domain: newDomain });
           }
         });
-        tx();
+        retryWrite(() => tx());
 
         return Promise.resolve({ moved: pages.length, pages, pointers_written: 0 });
       }
@@ -494,7 +507,7 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
             pages.push({ slug, old_domain: page.domain, new_domain: input.new_domain! });
           }
         });
-        tx();
+        retryWrite(() => tx());
 
         return Promise.resolve({ moved: pages.length, pages, pointers_written: 0 });
       }
@@ -556,7 +569,7 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
           );
         }
       });
-      tx();
+      retryWrite(() => tx());
 
       return Promise.resolve({
         moved: 1,
@@ -636,7 +649,8 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
 
       const tx = db.transaction(() => {
         for (const source of sourceRows) {
-          // Count total source citations before dedup.
+          // Count total source citations before dedup. (Within the transaction,
+          // reads are consistent with the write lock we hold.)
           const before = (db.prepare(
             'SELECT COUNT(*) as count FROM citations WHERE page_id = ?',
           ).get(source.id) as { count: number }).count;
@@ -704,7 +718,7 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
           }
         }
       });
-      tx();
+      retryWrite(() => tx());
 
       return Promise.resolve({
         target_slug: input.target_slug,
@@ -758,7 +772,7 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
           db.prepare('DELETE FROM pages WHERE id = ?').run(row.id);
         }
       });
-      tx();
+      retryWrite(() => tx());
 
       return Promise.resolve({ purged: input.slugs.length, slugs: input.slugs });
     } catch (e) {
@@ -829,7 +843,7 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
           }
         }
       });
-      tx();
+      retryWrite(() => tx());
 
       return Promise.resolve({
         verified: rows.length,
@@ -909,7 +923,7 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
           revision.body, timestamp, page.id,
         );
       });
-      tx();
+      retryWrite(() => tx());
 
       return Promise.resolve({
         slug: input.slug,
@@ -922,7 +936,11 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
     }
   }
 
-  /** Insert a body snapshot and prune beyond the per-page cap. Caller owns the transaction. */
+  /**
+   * Insert a body snapshot and prune beyond the per-page cap. Caller owns the
+   * transaction when called from restoreRevision; called bare from writePage.
+   * Each statement is wrapped in retryWrite so both call sites are safe.
+   */
   private snapshotRevision(
     db: Database,
     pageId: number,
@@ -931,14 +949,18 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
     op: string,
     timestamp: string,
   ): number {
-    const result = db.prepare(
-      'INSERT INTO page_revisions (page_id, slug, body, op, replaced_at) VALUES (?, ?, ?, ?, ?)',
-    ).run(pageId, slug, body, op, timestamp);
-    db.prepare(
-      `DELETE FROM page_revisions WHERE page_id = ? AND id NOT IN (
-         SELECT id FROM page_revisions WHERE page_id = ? ORDER BY id DESC LIMIT ?
-       )`,
-    ).run(pageId, pageId, MAX_REVISIONS_PER_PAGE);
+    const result = retryWrite(() =>
+      db.prepare(
+        'INSERT INTO page_revisions (page_id, slug, body, op, replaced_at) VALUES (?, ?, ?, ?, ?)',
+      ).run(pageId, slug, body, op, timestamp),
+    );
+    retryWrite(() =>
+      db.prepare(
+        `DELETE FROM page_revisions WHERE page_id = ? AND id NOT IN (
+           SELECT id FROM page_revisions WHERE page_id = ? ORDER BY id DESC LIMIT ?
+         )`,
+      ).run(pageId, pageId, MAX_REVISIONS_PER_PAGE),
+    );
     return Number(result.lastInsertRowid);
   }
 
@@ -977,7 +999,7 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
           added++;
         }
       });
-      tx();
+      retryWrite(() => tx());
 
       return Promise.resolve(added);
     } catch (e) {
