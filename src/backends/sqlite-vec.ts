@@ -37,11 +37,18 @@ import type {
   RestoreInput,
   RestoreResult,
   RecallObservation,
+  MemoryRevisionMeta,
+  MemoryRevision,
+  MemoryRevisionRestoreInput,
+  MemoryRevisionRestoreResult,
+  MemorySupersededInput,
+  MemorySupersededResult,
 } from './types.js';
 import { computeExpiresAt, isExpired } from './ttl.js';
 import { mmrSelect, DEFAULT_DIVERSITY } from './mmr.js';
 import { globToMatcher } from './glob.js';
 import { runMigrations } from './migrations.js';
+import { retryWrite } from './retry.js';
 
 function slugify(text: string): string {
   return text
@@ -61,6 +68,9 @@ export interface SqliteVecConfig {
    */
   onRecall?: (obs: RecallObservation) => void;
 }
+
+/** Body snapshots retained per memory; oldest pruned beyond this cap (mirrors knowledge wing). */
+const MAX_REVISIONS_PER_MEMORY = 10;
 
 interface MemoryRow {
   id: number;
@@ -143,7 +153,7 @@ export class SqliteVecBackend implements MemoryBackend {
       );
       insertVec.run(BigInt(result.lastInsertRowid), toVecBuffer(vector));
     });
-    tx();
+    retryWrite(() => tx());
 
     return {
       ref,
@@ -201,7 +211,7 @@ export class SqliteVecBackend implements MemoryBackend {
       const tx = this.db.transaction((ids: number[]) => {
         for (const id of ids) stamp.run(now, id);
       });
-      tx(hitIds);
+      retryWrite(() => tx(hitIds));
     }
 
     this.observeRecall({
@@ -308,13 +318,21 @@ export class SqliteVecBackend implements MemoryBackend {
 
     const vector = await this.embedder.embed(`${row.title}\n\n${newContent}`);
 
+    // Snapshot the current body before overwriting — same protection the knowledge
+    // wing added after the 2026-06-01 verify run stomped 13 pages with no recovery.
+    // Only snapshot when content actually changes to avoid noise in the history.
+    let snapshotId: number | undefined;
+    if (input.content !== undefined && input.content !== row.content) {
+      snapshotId = this.snapshotRevision(row.id, row.ref, row.content, 'update', updatedAt);
+    }
+
     const tx = this.db.transaction(() => {
       updateStmt.run(newContent, JSON.stringify(newMeta), updatedAt, row!.id);
       updateVec.run(toVecBuffer(vector), BigInt(row!.id));
     });
-    tx();
+    retryWrite(() => tx());
 
-    return { updated: true, ref: row.ref };
+    return { updated: true, ref: row.ref, snapshotId };
   }
 
   async prune(options?: {
@@ -573,7 +591,7 @@ export class SqliteVecBackend implements MemoryBackend {
         delVec.run(BigInt(row.id));
       }
     });
-    tx();
+    retryWrite(() => tx());
 
     return { archived: rows.map((r) => r.ref) };
   }
@@ -619,9 +637,129 @@ export class SqliteVecBackend implements MemoryBackend {
         insVec.run(BigInt(row.id), toVecBuffer(vectors[i]));
       });
     });
-    tx();
+    retryWrite(() => tx());
 
     return { restored: rows.map((r) => r.ref) };
+  }
+
+  listRevisions(ref: string): Promise<MemoryRevisionMeta[]> {
+    const row = this.db
+      .prepare('SELECT id FROM memories WHERE ref = ?')
+      .get(ref) as { id: number } | undefined;
+    if (!row) return Promise.resolve([]);
+
+    const rows = this.db
+      .prepare(
+        `SELECT id, memory_id, ref, op, replaced_at, LENGTH(content) AS content_length
+         FROM memory_revisions WHERE memory_id = ? ORDER BY id DESC`,
+      )
+      .all(row.id) as (Omit<MemoryRevisionMeta, 'content_length'> & { content_length: number })[];
+
+    return Promise.resolve(
+      rows.map((r) => ({
+        id: r.id,
+        memory_id: r.memory_id,
+        ref: r.ref,
+        op: r.op,
+        replaced_at: r.replaced_at,
+        content_length: r.content_length,
+      })),
+    );
+  }
+
+  getRevision(revisionId: number): Promise<MemoryRevision | null> {
+    const row = this.db
+      .prepare('SELECT id, memory_id, ref, op, replaced_at, content FROM memory_revisions WHERE id = ?')
+      .get(revisionId) as MemoryRevision | undefined;
+    return Promise.resolve(row ?? null);
+  }
+
+  async restoreRevision(
+    input: MemoryRevisionRestoreInput,
+  ): Promise<MemoryRevisionRestoreResult> {
+    const mem = this.db
+      .prepare('SELECT * FROM memories WHERE ref = ?')
+      .get(input.ref) as MemoryRow | undefined;
+    if (!mem) return { ref: input.ref, revision_id: input.revision_id, restored: false, snapshot_id: 0 };
+
+    const rev = this.db
+      .prepare('SELECT id, memory_id, content FROM memory_revisions WHERE id = ?')
+      .get(input.revision_id) as { id: number; memory_id: number; content: string } | undefined;
+    if (!rev || rev.memory_id !== mem.id) {
+      return { ref: input.ref, revision_id: input.revision_id, restored: false, snapshot_id: 0 };
+    }
+
+    const timestamp = new Date().toISOString();
+    // Snapshot the current body before replacing it.
+    const snapshotId = this.snapshotRevision(mem.id, mem.ref, mem.content, 'revision-restore', timestamp);
+
+    const vector = await this.embedder.embed(`${mem.title}\n\n${rev.content}`);
+
+    const updateStmt = this.db.prepare(
+      'UPDATE memories SET content = ?, updated = ? WHERE id = ?',
+    );
+    const updateVec = this.db.prepare(
+      'UPDATE vec_memories SET embedding = ? WHERE rowid = ?',
+    );
+    const tx = this.db.transaction(() => {
+      updateStmt.run(rev.content, timestamp, mem.id);
+      updateVec.run(toVecBuffer(vector), BigInt(mem.id));
+    });
+    retryWrite(() => tx());
+
+    return { ref: input.ref, revision_id: input.revision_id, restored: true, snapshot_id: snapshotId };
+  }
+
+  supersede(input: MemorySupersededInput): Promise<MemorySupersededResult> {
+    const oldRow = this.db
+      .prepare('SELECT id, archived FROM memories WHERE ref = ?')
+      .get(input.old_ref) as { id: number; archived: number } | undefined;
+    if (!oldRow) {
+      return Promise.reject(new Error(`supersede: old_ref not found: ${input.old_ref}`));
+    }
+
+    const newRow = this.db
+      .prepare('SELECT id FROM memories WHERE ref = ?')
+      .get(input.new_ref) as { id: number } | undefined;
+    if (!newRow) {
+      return Promise.reject(new Error(`supersede: new_ref not found: ${input.new_ref}`));
+    }
+
+    if (oldRow.archived === 1) {
+      // Already retired — record the supersession edge but don't re-archive.
+      const timestamp = new Date().toISOString();
+      retryWrite(() =>
+        this.db
+          .prepare(
+            'INSERT INTO memory_supersessions (old_ref, new_ref, note, created) VALUES (?, ?, ?, ?)',
+          )
+          .run(input.old_ref, input.new_ref, input.note ?? null, timestamp),
+      );
+      return Promise.resolve({ old_ref: input.old_ref, new_ref: input.new_ref, archived: false });
+    }
+
+    const timestamp = new Date().toISOString();
+    const tombstone = JSON.stringify({
+      note: `Superseded by ${input.new_ref}.${input.note ? ' ' + input.note : ''}`,
+      archived_at: timestamp,
+    });
+
+    const archiveStmt = this.db.prepare(
+      'UPDATE memories SET archived = 1, archive_note = ?, updated = ? WHERE id = ?',
+    );
+    const delVec = this.db.prepare('DELETE FROM vec_memories WHERE rowid = ?');
+    const insertSup = this.db.prepare(
+      'INSERT INTO memory_supersessions (old_ref, new_ref, note, created) VALUES (?, ?, ?, ?)',
+    );
+
+    const tx = this.db.transaction(() => {
+      archiveStmt.run(tombstone, timestamp, oldRow.id);
+      delVec.run(BigInt(oldRow.id));
+      insertSup.run(input.old_ref, input.new_ref, input.note ?? null, timestamp);
+    });
+    retryWrite(() => tx());
+
+    return Promise.resolve({ old_ref: input.old_ref, new_ref: input.new_ref, archived: true });
   }
 
   close(): void {
@@ -633,6 +771,36 @@ export class SqliteVecBackend implements MemoryBackend {
   }
 
   // ── Internals ──
+
+  /**
+   * Insert a content snapshot into memory_revisions and prune beyond the per-memory
+   * cap. Mirrors the knowledge wing's snapshotRevision() in sqlite-knowledge.ts.
+   */
+  private snapshotRevision(
+    memoryId: number,
+    ref: string,
+    content: string,
+    op: string,
+    timestamp: string,
+  ): number {
+    const result = retryWrite(() =>
+      this.db
+        .prepare(
+          'INSERT INTO memory_revisions (memory_id, ref, content, op, replaced_at) VALUES (?, ?, ?, ?, ?)',
+        )
+        .run(memoryId, ref, content, op, timestamp),
+    );
+    retryWrite(() =>
+      this.db
+        .prepare(
+          `DELETE FROM memory_revisions WHERE memory_id = ? AND id NOT IN (
+             SELECT id FROM memory_revisions WHERE memory_id = ? ORDER BY id DESC LIMIT ?
+           )`,
+        )
+        .run(memoryId, memoryId, MAX_REVISIONS_PER_MEMORY),
+    );
+    return Number(result.lastInsertRowid);
+  }
 
   /**
    * KNN search with a growing-k loop.
@@ -779,7 +947,7 @@ export class SqliteVecBackend implements MemoryBackend {
       delMem.run(...ids);
       delVec.run(...bigIds);
     });
-    tx();
+    retryWrite(() => tx());
   }
 }
 

@@ -79,6 +79,28 @@ function buildCurrentDb(dir: string): string {
     )
   `).run();
   db.prepare(`
+    CREATE TABLE memory_revisions (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      memory_id   INTEGER NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+      ref         TEXT NOT NULL,
+      content     TEXT NOT NULL,
+      op          TEXT NOT NULL,
+      replaced_at TEXT NOT NULL
+    )
+  `).run();
+  db.prepare(`CREATE INDEX idx_memory_revisions_memory ON memory_revisions(memory_id)`).run();
+  db.prepare(`
+    CREATE TABLE memory_supersessions (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      old_ref   TEXT NOT NULL,
+      new_ref   TEXT NOT NULL,
+      note      TEXT,
+      created   TEXT NOT NULL
+    )
+  `).run();
+  db.prepare(`CREATE INDEX idx_memory_supersessions_old ON memory_supersessions(old_ref)`).run();
+  db.prepare(`CREATE INDEX idx_memory_supersessions_new ON memory_supersessions(new_ref)`).run();
+  db.prepare(`
     CREATE VIRTUAL TABLE vec_memories USING vec0(embedding float[4] distance_metric=cosine)
   `).run();
   db.close();

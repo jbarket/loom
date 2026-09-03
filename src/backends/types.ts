@@ -146,6 +146,57 @@ export interface UpdateResult {
   updated: boolean;
   /** The ref of the updated memory (when found) */
   ref?: string;
+  /** Id of the body snapshot taken before content was overwritten (if any). */
+  snapshotId?: number;
+}
+
+// ─── Memory Revision Types ───────────────────────────────────────────────────
+
+/** Revision listing entry — metadata only, no body payload. */
+export interface MemoryRevisionMeta {
+  id: number;
+  memory_id: number;
+  /** Ref the memory had when the snapshot was taken. */
+  ref: string;
+  /** What displaced this body: 'update' or 'revision-restore'. */
+  op: string;
+  replaced_at: string;
+  content_length: number;
+}
+
+export interface MemoryRevision extends Omit<MemoryRevisionMeta, 'content_length'> {
+  content: string;
+}
+
+export interface MemoryRevisionRestoreInput {
+  ref: string;
+  revision_id: number;
+}
+
+export interface MemoryRevisionRestoreResult {
+  ref: string;
+  revision_id: number;
+  restored: boolean;
+  /** Id of the snapshot taken of the body that was just displaced. */
+  snapshot_id: number;
+}
+
+// ─── Memory Supersession Types ───────────────────────────────────────────────
+
+export interface MemorySupersededInput {
+  /** Ref of the memory being retired (the loser / stale version). */
+  old_ref: string;
+  /** Ref of the memory replacing it (the canonical version). */
+  new_ref: string;
+  /** Optional note explaining why this supersession happened. */
+  note?: string;
+}
+
+export interface MemorySupersededResult {
+  old_ref: string;
+  new_ref: string;
+  /** True when old_ref was archived by this call; false if already archived. */
+  archived: boolean;
 }
 
 export interface PruneResult {
@@ -237,6 +288,14 @@ export interface MemoryBackend {
   archive(input: ArchiveInput): Promise<ArchiveResult>;
   /** Restore a previously archived memory to the active set. */
   restore(input: RestoreInput): Promise<RestoreResult>;
+  /** List body snapshots for a memory (metadata only, newest-first). */
+  listRevisions(ref: string): Promise<MemoryRevisionMeta[]>;
+  /** Fetch a single body snapshot including its content. */
+  getRevision(revisionId: number): Promise<MemoryRevision | null>;
+  /** Roll back a memory to a prior body snapshot. Snapshots the current body first. */
+  restoreRevision(input: MemoryRevisionRestoreInput): Promise<MemoryRevisionRestoreResult>;
+  /** Archive old_ref with a tombstone and record that new_ref supersedes it. */
+  supersede(input: MemorySupersededInput): Promise<MemorySupersededResult>;
   /** Release the underlying store handle. Cached backends evict on close. */
   close(): void;
 }

@@ -104,6 +104,59 @@ export const MIGRATIONS: readonly Migration[] = [
       `).run();
     },
   },
+  {
+    id: 'add_memory_revisions',
+    description:
+      'Add memory_revisions table — snapshots displaced body on every update(), ' +
+      'capped at 10 per memory (parity with knowledge wing page_revisions, t-327)',
+    pending: (db) => !hasTable(db, 'memory_revisions'),
+    run: (db) => {
+      // Body snapshots retained per memory; oldest pruned beyond this cap.
+      // op codes: 'update' (displaced by update()) | 'revision-restore' (displaced
+      // by a rollback to a prior snapshot).
+      db.prepare(`
+        CREATE TABLE memory_revisions (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          memory_id   INTEGER NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+          ref         TEXT NOT NULL,
+          content     TEXT NOT NULL,
+          op          TEXT NOT NULL,
+          replaced_at TEXT NOT NULL
+        )
+      `).run();
+      db.prepare(
+        'CREATE INDEX idx_memory_revisions_memory ON memory_revisions(memory_id)',
+      ).run();
+    },
+  },
+  {
+    id: 'add_memory_supersessions',
+    description:
+      'Add memory_supersessions table — records that new_ref replaced old_ref, ' +
+      'so the supersession edge survives archive (parity with knowledge wing, t-327)',
+    pending: (db) => !hasTable(db, 'memory_supersessions'),
+    run: (db) => {
+      // A supersession is an explicit durable link: old_ref was retired because
+      // new_ref is the canonical replacement. old_ref is archived by the supersede()
+      // call; this table is the record that B replaced A (survives forever, refs
+      // are strings so they outlive archive/restore cycles).
+      db.prepare(`
+        CREATE TABLE memory_supersessions (
+          id        INTEGER PRIMARY KEY AUTOINCREMENT,
+          old_ref   TEXT NOT NULL,
+          new_ref   TEXT NOT NULL,
+          note      TEXT,
+          created   TEXT NOT NULL
+        )
+      `).run();
+      db.prepare(
+        'CREATE INDEX idx_memory_supersessions_old ON memory_supersessions(old_ref)',
+      ).run();
+      db.prepare(
+        'CREATE INDEX idx_memory_supersessions_new ON memory_supersessions(new_ref)',
+      ).run();
+    },
+  },
 ];
 
 /**

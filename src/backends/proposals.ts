@@ -21,6 +21,7 @@ import { resolveSqliteDbPath } from '../config.js';
 import { runMigrations } from './migrations.js';
 import { remember } from '../tools/remember.js';
 import type { MemoryRef } from './types.js';
+import { retryWrite } from './retry.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -116,23 +117,25 @@ export function propose(contextDir: string, input: ProposalInput): ProposalRef {
   try {
     const uuid = randomUUID();
     const created = new Date().toISOString();
-    const result = db
-      .prepare(`
-        INSERT INTO proposals (
-          uuid, category, title, content, project, ttl, metadata, source, created, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
-      `)
-      .run(
-        uuid,
-        input.category,
-        input.title,
-        input.content,
-        input.project ?? null,
-        input.ttl ?? null,
-        JSON.stringify(input.metadata ?? {}),
-        input.source ?? null,
-        created,
-      );
+    const result = retryWrite(() =>
+      db
+        .prepare(`
+          INSERT INTO proposals (
+            uuid, category, title, content, project, ttl, metadata, source, created, status
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+        `)
+        .run(
+          uuid,
+          input.category,
+          input.title,
+          input.content,
+          input.project ?? null,
+          input.ttl ?? null,
+          JSON.stringify(input.metadata ?? {}),
+          input.source ?? null,
+          created,
+        ),
+    );
     return { id: Number(result.lastInsertRowid), uuid };
   } finally {
     db.close();
@@ -180,9 +183,11 @@ export function rejectProposal(contextDir: string, id: number): boolean {
   if (!existsSync(dbPath)) return false;
   const db = openProposalsDb(contextDir);
   try {
-    const result = db
-      .prepare("DELETE FROM proposals WHERE id = ? AND status = 'pending'")
-      .run(id);
+    const result = retryWrite(() =>
+      db
+        .prepare("DELETE FROM proposals WHERE id = ? AND status = 'pending'")
+        .run(id),
+    );
     return result.changes > 0;
   } finally {
     db.close();
@@ -226,7 +231,7 @@ export async function ratifyProposal(
   // Committed as canon — drop the staging row.
   const db = openProposalsDb(contextDir);
   try {
-    db.prepare('DELETE FROM proposals WHERE id = ?').run(id);
+    retryWrite(() => db.prepare('DELETE FROM proposals WHERE id = ?').run(id));
   } finally {
     db.close();
   }
