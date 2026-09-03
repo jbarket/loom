@@ -7,9 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 > **Publish status:** `loomai@0.4.1` is **not yet published to npm** (confirmed 2026-05-26).
 > The release pipeline is tag-triggered; publish will happen when Jonathan pushes `v0.4.1`.
-> Until then, install via `npx github:jbarket/loom install`.
+> Until then, install via `npx github:sleepunit-agents/loom install`.
 
 ## [Unreleased]
+
+### Fixed
+
+- **Every packaged install of loom was a silent no-op.** The entry-point guard
+  in `src/index.ts` compared `process.argv[1]` against `import.meta.url` as raw
+  strings. `npm i -g`, `npm link` and `npx` all install the bin as a *symlink*
+  into a bin directory, so `argv[1]` was the symlink path while
+  `import.meta.url` resolved to the real file — never equal, so `main()` never
+  ran. `loom --version` exited 0 printing nothing, and `loom serve` started no
+  server. Only `node dist/index.js` worked, which is exactly what every test
+  and every dev checkout does, so nothing caught it. Both sides are now
+  resolved with `realpathSync` before comparing, and
+  `src/entry.integration.test.ts` invokes the built bin through a symlink so
+  the packaged shape is exercised in CI.
 
 ### Added
 
