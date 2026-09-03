@@ -192,6 +192,138 @@ describe('SqliteVecBackend', () => {
     expect(meta).toEqual({ tier: 2, extra: 'x' });
   });
 
+  // ── Revision snapshots (t-327) ─────────────────────────────────────────────
+
+  it('snapshots content before update and returns snapshotId', async () => {
+    const { ref } = await backend.remember({
+      category: 'project',
+      title: 'Revisable',
+      content: 'original content',
+    });
+    const result = await backend.update({ ref, content: 'updated content' });
+    expect(result.updated).toBe(true);
+    expect(result.snapshotId).toBeGreaterThan(0);
+
+    const revisions = await backend.listRevisions(ref);
+    expect(revisions).toHaveLength(1);
+    expect(revisions[0].op).toBe('update');
+
+    const full = await backend.getRevision(revisions[0].id);
+    expect(full?.content).toBe('original content');
+  });
+
+  it('does not snapshot when content is unchanged on update', async () => {
+    const { ref } = await backend.remember({
+      category: 'project',
+      title: 'Stable',
+      content: 'same content',
+    });
+    // Update metadata only — content not passed, so no snapshot.
+    const result = await backend.update({ ref, metadata: { tag: 'x' } });
+    expect(result.updated).toBe(true);
+    expect(result.snapshotId).toBeUndefined();
+
+    const revisions = await backend.listRevisions(ref);
+    expect(revisions).toHaveLength(0);
+  });
+
+  it('can restore a revision and snapshots the displaced body', async () => {
+    const { ref } = await backend.remember({
+      category: 'project',
+      title: 'Rollback target',
+      content: 'v1 content',
+    });
+    await backend.update({ ref, content: 'v2 content' });
+    const revisions = await backend.listRevisions(ref);
+    expect(revisions).toHaveLength(1);
+    const revId = revisions[0].id;
+
+    const restored = await backend.restoreRevision({ ref, revision_id: revId });
+    expect(restored.restored).toBe(true);
+    expect(restored.snapshot_id).toBeGreaterThan(0);
+
+    // Two snapshots now: 'update' (v1→v2) and 'revision-restore' (v2→v1).
+    const after = await backend.listRevisions(ref);
+    expect(after).toHaveLength(2);
+    const ops = after.map((r) => r.op);
+    expect(ops).toContain('update');
+    expect(ops).toContain('revision-restore');
+
+    // The live content rolled back to v1.
+    const hits = await backend.recall({ query: 'rollback target' });
+    const hit = hits.find((h) => h.title === 'Rollback target');
+    expect(hit?.content).toBe('v1 content');
+  });
+
+  it('prunes revisions beyond the 10-per-memory cap', async () => {
+    const { ref } = await backend.remember({
+      category: 'project',
+      title: 'Capped',
+      content: 'v0',
+    });
+    // Produce 12 updates → 12 snapshots, cap at 10.
+    for (let i = 1; i <= 12; i++) {
+      await backend.update({ ref, content: `v${i}` });
+    }
+    const revisions = await backend.listRevisions(ref);
+    expect(revisions.length).toBeLessThanOrEqual(10);
+  });
+
+  // ── Supersession edge (t-327) ──────────────────────────────────────────────
+
+  it('supersedes an old memory and records the edge', async () => {
+    const { ref: oldRef } = await backend.remember({
+      category: 'project',
+      title: 'Old version',
+      content: 'stale content',
+    });
+    const { ref: newRef } = await backend.remember({
+      category: 'project',
+      title: 'New version',
+      content: 'canonical content',
+    });
+
+    const result = await backend.supersede({ old_ref: oldRef, new_ref: newRef, note: 'corrected' });
+    expect(result.archived).toBe(true);
+    expect(result.old_ref).toBe(oldRef);
+    expect(result.new_ref).toBe(newRef);
+
+    // old_ref should no longer appear in recall.
+    const hits = await backend.recall({ query: 'stale content' });
+    expect(hits.some((h) => h.title === 'Old version')).toBe(false);
+
+    // Supersession edge persists in the DB.
+    const db = backend.getDatabase();
+    const edge = db
+      .prepare('SELECT * FROM memory_supersessions WHERE old_ref = ?')
+      .get(oldRef) as { old_ref: string; new_ref: string; note: string } | undefined;
+    expect(edge?.new_ref).toBe(newRef);
+    expect(edge?.note).toBe('corrected');
+  });
+
+  it('supersede on already-archived memory still writes the edge but archived=false', async () => {
+    const { ref: oldRef } = await backend.remember({
+      category: 'project',
+      title: 'Already gone',
+      content: 'archived already',
+    });
+    const { ref: newRef } = await backend.remember({
+      category: 'project',
+      title: 'New canonical',
+      content: 'canonical',
+    });
+    await backend.archive({ ref: oldRef, note: 'retired' });
+
+    const result = await backend.supersede({ old_ref: oldRef, new_ref: newRef });
+    expect(result.archived).toBe(false); // was already archived
+
+    const db = backend.getDatabase();
+    const edge = db
+      .prepare('SELECT new_ref FROM memory_supersessions WHERE old_ref = ?')
+      .get(oldRef) as { new_ref: string } | undefined;
+    expect(edge?.new_ref).toBe(newRef);
+  });
+
   it('lists memories', async () => {
     await backend.remember({
       category: 'project',
