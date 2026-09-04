@@ -175,9 +175,12 @@ loom ships one opinionated stack:
 
 - **Storage** — `better-sqlite3` + the `sqlite-vec` vec0 virtual
   table. One `memories.db` per agent, real cosine similarity.
-- **Embeddings** — `fastembed` with BGE-small-en-v1.5 (384-dim, ~33MB
-  ONNX, CPU-only). First run downloads the model to
-  `~/.cache/loom/fastembed/`.
+- **Embeddings** — BGE-small-en-v1.5 (384-dim, ~33MB ONNX, CPU-only)
+  run through `onnxruntime-node`. First run downloads the model to
+  `~/.cache/loom/fastembed/`. The runtime is vendored in
+  `src/backends/embedding-runtime.ts` — it started as the `fastembed`
+  package, which was archived upstream while pinned to a `tar` line
+  that will never be patched.
 - **Transport** — MCP over stdio.
 
 If you need a different backend, implement the `MemoryBackend` and
@@ -555,6 +558,7 @@ All configuration is through environment variables:
 | `LOOM_RECALL_LOG` | *(on)* | Set to `0` to stop `recall` appending to the local `<context>/telemetry/recall.jsonl` observation log |
 | `LOOM_FASTEMBED_MODEL` | `fast-bge-small-en-v1.5` | fastembed model ID |
 | `LOOM_FASTEMBED_CACHE_DIR` | `~/.cache/loom/fastembed/` | Where to cache ONNX models |
+| `LOOM_MODEL_BASE_URL` | `https://storage.googleapis.com/qdrant-fastembed` | Where model tarballs are fetched from on first run |
 | `LOOM_MODEL` | *(unset)* | Model identifier for model-manifest context: `claude-opus`, `gemma4`, etc. |
 | `LOOM_CLIENT` | *(unset)* | Client adapter hint: `claude-code`, `gemini-cli`, etc. |
 | `LOOM_HTTP_HOST` | `127.0.0.1` | Bind host for `loom serve --http` (bind-safety enforced) |
@@ -665,7 +669,8 @@ src/
 │   ├── types.ts       # MemoryBackend + EmbeddingProvider interfaces
 │   ├── index.ts       # single-stack factory (sqlite-vec + fastembed)
 │   ├── sqlite-vec.ts  # the backend
-│   ├── fastembed.ts   # the embedder
+│   ├── fastembed.ts   # the embedder (EmbeddingProvider adapter)
+│   ├── embedding-runtime.ts # vendored ONNX + tokenizer runtime
 │   ├── ttl.ts         # TTL parsing + expiry
 │   └── glob.ts        # title pattern matching for bulk forget
 └── tools/             # one file per MCP tool

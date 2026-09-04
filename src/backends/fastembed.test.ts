@@ -3,15 +3,16 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-// Mock the fastembed package entirely — tests must never download the
-// real ONNX model. The provider only touches FlagEmbedding.init and the
-// instance methods embed()/queryEmbed().
-vi.mock('fastembed', () => ({
+// Mock the vendored embedding runtime entirely — these tests must never
+// download the real ONNX model. The provider only touches FlagEmbedding.init
+// and the instance methods embed()/queryEmbed(). The runtime itself is
+// exercised for real in embedding-runtime.parity.test.ts.
+vi.mock('./embedding-runtime.js', () => ({
   FlagEmbedding: { init: vi.fn() },
   EmbeddingModel: {},
 }));
 
-import { FlagEmbedding } from 'fastembed';
+import { FlagEmbedding } from './embedding-runtime.js';
 import { FastEmbedProvider } from './fastembed.js';
 
 const initMock = vi.mocked(FlagEmbedding.init);

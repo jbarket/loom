@@ -11,10 +11,8 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
-import {
-  FlagEmbedding,
-  EmbeddingModel,
-} from 'fastembed';
+import { FlagEmbedding } from './embedding-runtime.js';
+import type { EmbeddingModelName } from './embedding-runtime.js';
 import type { EmbeddingProvider } from './types.js';
 
 export interface FastEmbedConfig {
@@ -82,7 +80,7 @@ export class FastEmbedProvider implements EmbeddingProvider {
         `fastembed: embedQuery() produced no vector for a ${text.length}-char input (model ${this.config.model})`,
       );
     }
-    return vector;
+    return Array.from(vector);
   }
 
   private ensureEmbedder(): Promise<FlagEmbedding> {
@@ -92,9 +90,8 @@ export class FastEmbedProvider implements EmbeddingProvider {
         this.config.cacheDir ?? join(homedir(), '.cache', 'loom', 'fastembed');
       mkdirSync(cacheDir, { recursive: true });
       this.initPromise = FlagEmbedding.init({
-        model: this.config.model as Exclude<EmbeddingModel, EmbeddingModel.CUSTOM>,
+        model: this.config.model as EmbeddingModelName,
         cacheDir,
-        showDownloadProgress: false,
       }).then(
         (e) => {
           this.embedder = e;
@@ -114,9 +111,11 @@ export class FastEmbedProvider implements EmbeddingProvider {
 }
 
 async function collectBatches(
-  gen: AsyncGenerator<number[][], void, unknown>,
+  gen: AsyncGenerator<Float32Array[]>,
 ): Promise<number[][]> {
   const out: number[][] = [];
-  for await (const batch of gen) out.push(...batch);
+  for await (const batch of gen) {
+    for (const vector of batch) out.push(Array.from(vector));
+  }
   return out;
 }
