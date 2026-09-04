@@ -13,6 +13,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **The onboarding interview is four questions, and `bootstrap` writes a real
+  identity.** The interview now asks for the *user's* name as well as the
+  agent's name, purpose line and voice line — and nothing else. In exchange,
+  `bootstrap` no longer emits a six-line IDENTITY.md: it writes the full
+  scaffold underneath the four answers (what a persistent agent is and where
+  its continuity lives, the three memory tiers, the reflection loop, honesty
+  about what it knows, delegation, and a "Working with <user>" floor).
+  `preferences.md` is seeded with the user's name. New optional `user` param
+  on the `bootstrap` tool and `loom bootstrap --user`; the loom-setup skill
+  shows an example answer *before* each question. Rationale: the structural
+  half of an identity is the same for every loom agent, so asking for it wastes
+  the interview — handing over the architecture is a hypothesis the agent can
+  falsify, handing over a personality would be a verdict. (Art, 2026-09-04)
+
 - **MMR diversity re-ranking on `recall`** — after the vector search, the
   candidate pool (`max(limit*3, 12)`) is re-ranked with Maximal Marginal
   Relevance (`λ·relevance − (1−λ)·max cosine sim to already-picked`,

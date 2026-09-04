@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, access, writeFile, lstat, readlink, mkdir } from 'node:fs/promises';
+import { mkdtemp, rm, access, readFile, writeFile, lstat, readlink, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCliCaptured } from './test-helpers.js';
@@ -24,6 +24,40 @@ describe('loom bootstrap', () => {
     await access(join(tempDir, 'preferences.md'));
     await access(join(tempDir, 'self-model.md'));
     expect(stdout.length).toBeGreaterThan(0);
+  });
+
+  it('accepts --user and writes it into the identity', async () => {
+    const { code } = await runCliCaptured([
+      'bootstrap',
+      '--user', 'Jonathan',
+      '--name', 'sage',
+      '--purpose', 'Help me code',
+      '--voice', 'Direct, terse',
+      '--context-dir', tempDir,
+    ]);
+    expect(code).toBe(0);
+    const identity = await readFile(join(tempDir, 'IDENTITY.md'), 'utf-8');
+    expect(identity).toContain('## Working with Jonathan');
+  });
+
+  it('errors instead of silently dropping --user when the other flags are missing', async () => {
+    const { code } = await runCliCaptured([
+      'bootstrap', '--user', 'Jonathan', '--context-dir', tempDir,
+    ]);
+    expect(code).toBe(2);
+  });
+
+  it('carries user through piped JSON', async () => {
+    const payload = JSON.stringify({
+      user: 'Jonathan', name: 'oak', purpose: 'p', voice: 'v',
+    });
+    const { code } = await runCliCaptured(
+      ['bootstrap', '--context-dir', tempDir],
+      { stdin: payload },
+    );
+    expect(code).toBe(0);
+    const identity = await readFile(join(tempDir, 'IDENTITY.md'), 'utf-8');
+    expect(identity).toContain('## Working with Jonathan');
   });
 
   it('reads params from piped JSON on stdin', async () => {

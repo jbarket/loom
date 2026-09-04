@@ -39,6 +39,62 @@ describe('bootstrap', () => {
     expect(selfModel).toContain('Strengths');
   });
 
+  it('writes the structural scaffold into IDENTITY.md, not just the four answers', async () => {
+    await bootstrap(tempDir, BASE);
+    const identity = await readFile(join(tempDir, 'IDENTITY.md'), 'utf-8');
+
+    // The interview answers lead...
+    expect(identity.startsWith('# Test Agent')).toBe(true);
+    // ...and the scaffold follows. These sections are never asked for.
+    expect(identity).toContain('## What you are');
+    expect(identity).toContain('## Memory');
+    expect(identity).toContain('## Reflection');
+    expect(identity).toContain('## Honesty about what you know');
+    expect(identity).toContain('## Delegation');
+    expect(identity).toContain('the stack');
+  });
+
+  it('names the user throughout IDENTITY.md when user is supplied', async () => {
+    await bootstrap(tempDir, { ...BASE, user: 'Jonathan' });
+    const identity = await readFile(join(tempDir, 'IDENTITY.md'), 'utf-8');
+
+    expect(identity).toContain('## Working with Jonathan');
+    expect(identity).toContain('what Jonathan prefers');
+    expect(identity).not.toContain('## Working with the user');
+  });
+
+  it('falls back to generic phrasing when no user is supplied', async () => {
+    await bootstrap(tempDir, BASE);
+    const identity = await readFile(join(tempDir, 'IDENTITY.md'), 'utf-8');
+
+    expect(identity).toContain('## Working with the user');
+    expect(identity).not.toContain('undefined');
+  });
+
+  it('seeds preferences.md with the user when supplied', async () => {
+    await bootstrap(tempDir, { ...BASE, user: 'Jonathan' });
+    const prefs = await readFile(join(tempDir, 'preferences.md'), 'utf-8');
+
+    expect(prefs).toContain('# Test Agent — Preferences');
+    expect(prefs).toContain('You work with **Jonathan**');
+  });
+
+  it('leaves preferences.md unchanged in shape when no user is supplied', async () => {
+    await bootstrap(tempDir, BASE);
+    const prefs = await readFile(join(tempDir, 'preferences.md'), 'utf-8');
+
+    expect(prefs).toContain('# Test Agent — Preferences');
+    expect(prefs).toContain('No initial preferences set');
+    expect(prefs).not.toContain('You work with');
+  });
+
+  it('leaves no unfilled placeholder anywhere in the scaffold', async () => {
+    await bootstrap(tempDir, { ...BASE, user: 'Jonathan' });
+    const identity = await readFile(join(tempDir, 'IDENTITY.md'), 'utf-8');
+
+    expect(identity).not.toMatch(/<[A-Z_]+>/);
+  });
+
   it('includes seed preferences in preferences.md when provided', async () => {
     await bootstrap(tempDir, { ...BASE, preferences: 'Prefers short answers' });
     const prefs = await readFile(join(tempDir, 'preferences.md'), 'utf-8');
