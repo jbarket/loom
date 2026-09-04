@@ -31,11 +31,12 @@ current roadmap, see the
 ### Case-by-case (PRs welcome but bring justification)
 
 Alternate memory backends or embedders. loom ships one opinionated
-stack — sqlite-vec + fastembed — because it travels with a single
-`npm install`, needs no daemon, no GPU, no cloud account. A replacement
-or addition needs to be **at least as portable** and needs to expand
-what loom can do or who can run it: larger corpora, less RAM,
-multi-modal embeddings, runs on a platform the current stack can't.
+stack — sqlite-vec + a vendored ONNX embedding runtime — because it
+travels with a single `npm install`, needs no daemon, no GPU, no cloud
+account. A replacement or addition needs to be **at least as portable**
+and needs to expand what loom can do or who can run it: larger corpora,
+less RAM, multi-modal embeddings, runs on a platform the current stack
+can't.
 "I already run pgvector at work" is not that. Fork instead — the
 `MemoryBackend` / `EmbeddingProvider` interfaces exist for exactly
 this case.

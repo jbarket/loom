@@ -1,7 +1,7 @@
 {
   "name": "loomai",
   "version": "0.5.0",
-  "description": "MCP server for persistent AI agent identity and memory. Single-file sqlite-vec + fastembed; zero external services.",
+  "description": "MCP server for persistent AI agent identity and memory. Single-file sqlite-vec + local ONNX embeddings; zero external services.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
