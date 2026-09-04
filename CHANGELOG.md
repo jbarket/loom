@@ -60,10 +60,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
      against the building repository and refuses to publish on a mismatch —
      so the very first tagged release would have failed at the publish step
      after a full build and test run.
-  2. `NPM_TOKEN` is not set as a repository or organization secret, so
-     `npm publish` would have failed with `ENEEDAUTH`. `release.yml` now
-     checks for it as its first step, before Node setup, so the failure is
-     immediate and names the fix instead of surfacing five minutes in.
+  2. There were no publish credentials of any kind — no `NPM_TOKEN` repository
+     or organization secret — so `npm publish` would have failed with
+     `ENEEDAUTH`. Rather than add a 90-day token to rotate forever,
+     `release.yml` now publishes with **npm trusted publishing** (OIDC): the
+     workflow authenticates as `sleepunit-agents/loom` + `release.yml`, there
+     is no secret to store or expire, and provenance is attested from the run
+     itself. This requires npm >= 11.5.1, which Node 22.x does not ship, so
+     the workflow upgrades npm before installing. See `docs/releasing.md` —
+     trusted publishing cannot perform a package's *first* publish
+     ([npm/cli#8544](https://github.com/npm/cli/issues/8544)), so `0.4.1` has
+     to go up from a laptop once.
   3. The README advertised **Node.js ≥ 20 ("tested on 20 and 22")** while
      `engines` requires `>= 22` and CI only tests 22 and 24. A reader on
      Node 20 following the README would have hit `EBADENGINE`.

@@ -16,21 +16,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Verify npm credentials are configured
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -z "$NPM_TOKEN" ]; then
-            echo "::error::secrets.NPM_TOKEN is not set on this repository. npm publish would fail with ENEEDAUTH after a full build+test. Add a granular-access npm token (Read and write on the 'loomai' package) as the NPM_TOKEN repository secret." >&2
-            exit 1
-          fi
-
       - name: Use Node.js 22.x
         uses: actions/setup-node@v7
         with:
           node-version: 22.x
           registry-url: 'https://registry.npmjs.org'
           cache: npm
+
+      # Trusted publishing (OIDC) needs npm >= 11.5.1; Node 22.x still ships npm 10.x.
+      - name: Upgrade npm
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: npm ci
@@ -52,10 +47,11 @@ jobs:
             exit 1
           fi
 
+      # Authenticates via the trusted publisher configured on npmjs.com for
+      # sleepunit-agents/loom + release.yml. No NPM_TOKEN, nothing to rotate,
+      # and provenance is attested from this run.
       - name: Publish to npm
         run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Detect prerelease
         id: prerelease

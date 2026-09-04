@@ -635,6 +635,9 @@ and `docs/archive/plans/` — implementation history, frozen after merge.
   over the network (only the fastembed model download), the no-telemetry
   policy, and how to verify release provenance with `npm audit
   signatures`.
+- [`docs/releasing.md`](docs/releasing.md) — how a release is cut: npm
+  trusted publishing (OIDC, no stored token), the one-time first publish,
+  and the tag-push flow for everything after.
 - [`docs/archive/`](docs/archive/) — historical material: the rebirth
   letter and rescue notes from the v0.3.1 sqlite-vec migration, and
   per-feature specs and plans from the v0.4 arc.
