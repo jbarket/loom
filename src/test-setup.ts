@@ -1,10 +1,11 @@
 /**
  * Vitest global setup.
  *
- * Stubs the `fastembed` npm package with a deterministic in-process
+ * Stubs the vendored embedding runtime with a deterministic in-process
  * encoder so the test suite doesn't download the BGE ONNX model on
- * CI. Real fastembed behavior is integration-tested separately; tests
- * here only need stable vectors for sqlite-vec storage/recall plumbing.
+ * CI. The real runtime is exercised in embedding-runtime.parity.test.ts
+ * (opt-in, LOOM_TEST_REAL_EMBEDDINGS=1); tests here only need stable
+ * vectors for sqlite-vec storage/recall plumbing.
  */
 import { vi } from 'vitest';
 
@@ -38,7 +39,7 @@ class FakeFlagEmbedding {
   }
 }
 
-vi.mock('fastembed', () => ({
+vi.mock('./backends/embedding-runtime.js', () => ({
   FlagEmbedding: FakeFlagEmbedding,
   EmbeddingModel: {
     AllMiniLML6V2: 'fast-all-MiniLM-L6-v2',
@@ -48,6 +49,5 @@ vi.mock('fastembed', () => ({
     BGESmallENV15: 'fast-bge-small-en-v1.5',
     BGESmallZH: 'fast-bge-small-zh-v1.5',
     MLE5Large: 'fast-multilingual-e5-large',
-    CUSTOM: 'custom',
   },
 }));
