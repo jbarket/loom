@@ -1,8 +1,8 @@
 # loom
 
-[![CI](https://github.com/jbarket/loom/actions/workflows/ci.yml/badge.svg)](https://github.com/jbarket/loom/actions/workflows/ci.yml)
+[![CI](https://github.com/sleepunit-agents/loom/actions/workflows/ci.yml/badge.svg)](https://github.com/sleepunit-agents/loom/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/loomai.svg?label=npm%3A%20loomai)](https://www.npmjs.com/package/loomai)
-[![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
+[![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](package.json)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-compatible-orange.svg)](https://modelcontextprotocol.io)
 
@@ -192,11 +192,16 @@ deliberately no env-driven backend selector — opinionated by design.
 
 ### Prerequisites
 
-- **Node.js ≥ 20** (tested on 20 and 22).
+- **Node.js ≥ 22** (tested on 22 and 24; `engines` requires ≥ 22).
 
 That's it.
 
 ### Install the setup skill
+
+> **Not on npm yet.** `loomai` has never been published — the release
+> pipeline is tag-triggered and no tag has been cut. Until it is, replace
+> `loomai` with `github:sleepunit-agents/loom` in every `npx` command below:
+> `npx github:sleepunit-agents/loom install`.
 
 ```bash
 npx loomai install
@@ -610,7 +615,7 @@ Still tracked in the open:
 
 - [Project board](https://github.com/users/jbarket/projects/1/views/1) —
   live status of what's in flight, queued, and shipped.
-- [v0.4 roadmap discussion](https://github.com/jbarket/loom/discussions/10) —
+- [v0.4 roadmap discussion](https://github.com/sleepunit-agents/loom/discussions/10) —
   the arc: why v0.4 exists, what's in scope, how the pieces fit.
 
 Historical per-feature specs and plans live under `docs/archive/specs/`

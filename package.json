@@ -19,11 +19,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jbarket/loom.git"
+    "url": "git+https://github.com/sleepunit-agents/loom.git"
   },
-  "homepage": "https://github.com/jbarket/loom#readme",
+  "homepage": "https://github.com/sleepunit-agents/loom#readme",
   "bugs": {
-    "url": "https://github.com/jbarket/loom/issues"
+    "url": "https://github.com/sleepunit-agents/loom/issues"
   },
   "scripts": {
     "build": "tsc && node scripts/build-widgets.mjs",

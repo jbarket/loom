@@ -16,6 +16,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Verify npm credentials are configured
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "::error::secrets.NPM_TOKEN is not set on this repository. npm publish would fail with ENEEDAUTH after a full build+test. Add a granular-access npm token (Read and write on the 'loomai' package) as the NPM_TOKEN repository secret." >&2
+            exit 1
+          fi
+
       - name: Use Node.js 22.x
         uses: actions/setup-node@v7
         with:

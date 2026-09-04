@@ -51,6 +51,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The npm release path could never have worked, and the docs said it had.**
+  Three separate blockers, none of which had ever been exercised because no
+  `v*` tag has ever been pushed and `release.yml` has zero runs:
+  1. `package.json` still declared `repository.url`, `homepage` and `bugs` as
+     `jbarket/loom`, but the repo moved to `sleepunit-agents/loom`. With
+     `publishConfig.provenance: true`, npm validates the manifest repository
+     against the building repository and refuses to publish on a mismatch —
+     so the very first tagged release would have failed at the publish step
+     after a full build and test run.
+  2. `NPM_TOKEN` is not set as a repository or organization secret, so
+     `npm publish` would have failed with `ENEEDAUTH`. `release.yml` now
+     checks for it as its first step, before Node setup, so the failure is
+     immediate and names the fix instead of surfacing five minutes in.
+  3. The README advertised **Node.js ≥ 20 ("tested on 20 and 22")** while
+     `engines` requires `>= 22` and CI only tests 22 and 24. A reader on
+     Node 20 following the README would have hit `EBADENGINE`.
+- Stale `jbarket/loom` links across `README.md`, `CHANGELOG.md` and
+  `docs/privacy.md` now point at `sleepunit-agents/loom`, including the
+  `gh attestation verify --owner` example (which named the wrong owner and
+  a version that was never published).
+- The README install section now states plainly that `loomai` is not on npm
+  and gives the working `npx github:sleepunit-agents/loom` form. Remove that
+  note in the commit that cuts the first real tag.
+
 - **Every packaged install of loom was a silent no-op.** The entry-point guard
   in `src/index.ts` compared `process.argv[1]` against `import.meta.url` as raw
   strings. `npm i -g`, `npm link` and `npx` all install the bin as a *symlink*
@@ -349,7 +373,7 @@ the canonical Quick Start path.
 
 - Documentation reshuffle: v0.4 arc docs moved out of the repo. The
   roadmap now lives in the
-  [v0.4 discussion](https://github.com/jbarket/loom/discussions/10) and
+  [v0.4 discussion](https://github.com/sleepunit-agents/loom/discussions/10) and
   the [project board](https://github.com/users/jbarket/projects/1/views/1).
   Per-feature specs and plans moved from `docs/superpowers/{specs,plans}/`
   to `docs/{specs,plans}/` — tool-neutral paths, same content.
@@ -417,13 +441,13 @@ Initial public release.
   stack and all added external-service dependencies or operational
   overhead.
 
-[Unreleased]: https://github.com/jbarket/loom/compare/v0.4.1...HEAD
-[0.4.1]: https://github.com/jbarket/loom/compare/v0.3.1...v0.4.1
-[0.4.0-alpha.7]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.6...v0.4.0-alpha.7
-[0.4.0-alpha.6]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.5...v0.4.0-alpha.6
-[0.4.0-alpha.5]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.4...v0.4.0-alpha.5
-[0.4.0-alpha.4]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.3...v0.4.0-alpha.4
-[0.4.0-alpha.3]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.2...v0.4.0-alpha.3
-[0.4.0-alpha.2]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.1...v0.4.0-alpha.2
-[0.4.0-alpha.1]: https://github.com/jbarket/loom/compare/v0.3.1...v0.4.0-alpha.1
-[0.3.1]: https://github.com/jbarket/loom/releases/tag/v0.3.1
+[Unreleased]: https://github.com/sleepunit-agents/loom/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/sleepunit-agents/loom/compare/v0.3.1...v0.4.1
+[0.4.0-alpha.7]: https://github.com/sleepunit-agents/loom/compare/v0.4.0-alpha.6...v0.4.0-alpha.7
+[0.4.0-alpha.6]: https://github.com/sleepunit-agents/loom/compare/v0.4.0-alpha.5...v0.4.0-alpha.6
+[0.4.0-alpha.5]: https://github.com/sleepunit-agents/loom/compare/v0.4.0-alpha.4...v0.4.0-alpha.5
+[0.4.0-alpha.4]: https://github.com/sleepunit-agents/loom/compare/v0.4.0-alpha.3...v0.4.0-alpha.4
+[0.4.0-alpha.3]: https://github.com/sleepunit-agents/loom/compare/v0.4.0-alpha.2...v0.4.0-alpha.3
+[0.4.0-alpha.2]: https://github.com/sleepunit-agents/loom/compare/v0.4.0-alpha.1...v0.4.0-alpha.2
+[0.4.0-alpha.1]: https://github.com/sleepunit-agents/loom/compare/v0.3.1...v0.4.0-alpha.1
+[0.3.1]: https://github.com/sleepunit-agents/loom/releases/tag/v0.3.1
