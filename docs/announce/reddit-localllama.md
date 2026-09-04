@@ -65,7 +65,7 @@ agent's stack (identity + memory + pursuits) outlives any individual
 harness. Rebirth letter has the long version:
 https://github.com/jbarket/loom/blob/main/docs/archive/rebirth-letter-2026-04-19.md
 
-**Install:** `npx loomai install`, pick your harness, run
+**Install:** `npx @jbarket/loomai install`, pick your harness, run
 `/loom-setup` inside it. Or use the CLI directly:
 `loom wake --context-dir ~/.config/loom/<agent>` dumps the identity
 markdown to stdout — any tool that can read stdin can load the agent

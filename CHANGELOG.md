@@ -5,14 +5,27 @@ All notable changes to loom are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-> **Publish status:** `loomai@0.5.0` is the first version published to npm.
-> `0.4.1` and everything before it exists only as a git tag — those versions were
-> never on the registry, so the four months of work between `0.4.1` (2026-04-23)
-> and this release ship together as `0.5.0`.
+> **Publish status:** `@jbarket/loomai@0.5.0` is the first version published to
+> npm. `0.4.1` and everything before it exists only as a git tag — those versions
+> were never on the registry, so the four months of work between `0.4.1`
+> (2026-04-23) and this release ship together as `0.5.0`.
 
 ## [Unreleased]
 
 ## [0.5.0] - 2026-09-04
+
+### Changed
+
+- **npm package renamed `loomai` → `@jbarket/loomai`.** The registry refused the
+  unscoped name on publish: `403 Forbidden — Package name too similar to existing
+  package loom-ai`. `loom-ai` is an unrelated, apparently abandoned package
+  (0.1.1, 2026-06-03), and npm's similarity check is mechanical and applies only
+  to unscoped names — so there is no appeal and no unscoped name in this family
+  that is safe from it. Scoping settles it permanently. Nothing else moves: the
+  brand is still `loom`, the CLI is still `loom`, the MCP server is still `loom`,
+  the repo is still `sleepunit-agents/loom`. Only the install word changes:
+  `npx loomai install` → `npx @jbarket/loomai install`. No version has ever been
+  published under either name, so no installed tree anywhere needs migrating.
 
 ### Security
 

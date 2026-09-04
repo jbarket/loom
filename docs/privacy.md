@@ -71,7 +71,7 @@ opt-out telemetry will be closed.
 
 ## Verifying what you install
 
-loom's tagged npm releases (`loomai` on npm) are published with
+loom's tagged npm releases (`@jbarket/loomai` on npm) are published with
 [Sigstore provenance](https://docs.npmjs.com/generating-provenance-statements)
 from the [release workflow](../.github/workflows/release.yml). The
 workflow runs on GitHub Actions with `id-token: write`, and
@@ -83,7 +83,7 @@ You can verify that before (or after) installing.
 
 ### Verify an installed tree
 
-After `npm install loomai` or `npx loomai …`, run inside the
+After `npm install @jbarket/loomai` or `npx @jbarket/loomai …`, run inside the
 project where loom is installed:
 
 ```bash
@@ -105,7 +105,7 @@ wrong with the release.
 
 > `npm audit signatures` checks **every** package in the tree, not
 > just loom. Other packages in your project may not emit provenance
-> yet; that's fine. What you're confirming is that `loomai` itself
+> yet; that's fine. What you're confirming is that `@jbarket/loomai` itself
 > has a verified attestation.
 
 > **`0.5.0` is the exception.** npm's trusted publishing cannot perform a
@@ -119,7 +119,7 @@ To see what was signed without installing:
 
 ```bash
 # Fetch the attestation for a specific version
-npm view loomai@latest --json \
+npm view @jbarket/loomai@latest --json \
   | jq '.dist.attestations'
 ```
 
@@ -130,8 +130,8 @@ download it and inspect it with
 
 ```bash
 # With the GitHub CLI:
-npm pack loomai@latest
-gh attestation verify loomai-<version>.tgz \
+npm pack @jbarket/loomai@latest
+gh attestation verify jbarket-loomai-<version>.tgz \
   --owner sleepunit-agents
 ```
 

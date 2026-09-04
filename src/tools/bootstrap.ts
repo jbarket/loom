@@ -86,7 +86,7 @@ Add to \`.mcp.json\` (or \`~/.claude/.mcp.json\` for global):
   "mcpServers": {
     "loom": {
       "command": "npx",
-      "args": ["-y", "loomai"],
+      "args": ["-y", "@jbarket/loomai"],
       "env": {
         "LOOM_CONTEXT_DIR": "${contextDir}"
       }
@@ -113,7 +113,7 @@ At session start, call the \`identity\` tool from the loom MCP server before doi
 
 Configure loom in your Gemini CLI MCP settings with:
 - Command: \`npx\`
-- Args: \`-y loomai\`
+- Args: \`-y @jbarket/loomai\`
 - Env: \`LOOM_CONTEXT_DIR=${contextDir}\``;
 
     default:
@@ -121,7 +121,7 @@ Configure loom in your Gemini CLI MCP settings with:
 
 Add loom as an MCP server:
 - Command: \`npx\`
-- Args: \`-y loomai\`
+- Args: \`-y @jbarket/loomai\`
 - Env: \`LOOM_CONTEXT_DIR=${contextDir}\`
 
 At session start, call \`identity\` (or the runtime-prefixed equivalent) before doing anything else.`;

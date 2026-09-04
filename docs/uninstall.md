@@ -21,8 +21,8 @@ path, your data is wherever that variable points.
 To delete all memories in a specific category:
 
 ```bash
-npx loomai forget --category user --context-dir ~/.config/loom/<agent>
-npx loomai forget --category project --context-dir ~/.config/loom/<agent>
+npx @jbarket/loomai forget --category user --context-dir ~/.config/loom/<agent>
+npx @jbarket/loomai forget --category project --context-dir ~/.config/loom/<agent>
 # repeat for each category
 ```
 

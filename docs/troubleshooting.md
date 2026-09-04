@@ -2,7 +2,7 @@
 
 Common problems and how to fix them.
 
-## `npx loomai install` fails
+## `npx @jbarket/loomai install` fails
 
 **Missing or wrong Node version.** loom requires Node.js ≥ 20.
 
@@ -61,7 +61,7 @@ show up in the next session, work through this checklist:
 5. **Run `loom doctor`** to verify the basics:
 
    ```bash
-   npx loomai doctor
+   npx @jbarket/loomai doctor
    ```
 
    All lines should show `ok` or a populated agent list (see below for what each
@@ -151,4 +151,4 @@ If `npm audit signatures` reports a **mismatch**, stop and [file a security
 report](../SECURITY.md).
 
 Other packages in the tree may not emit provenance yet; that's fine. You're
-confirming that `loomai` itself has a verified attestation.
+confirming that `@jbarket/loomai` itself has a verified attestation.

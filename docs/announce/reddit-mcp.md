@@ -14,7 +14,7 @@ CPU-only. AGPL.
 Storage: SQLite + sqlite-vec. Embeddings: fastembed + BGE-small. No
 daemon, no hosted service, no GPU.
 
-Install: `npx loomai install`.
+Install: `npx @jbarket/loomai install`.
 
 Repo: https://github.com/jbarket/loom
 

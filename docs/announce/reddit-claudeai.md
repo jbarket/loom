@@ -7,7 +7,7 @@
 Setup transcript first, prose second.
 
 ```
-$ npx loomai install
+$ npx @jbarket/loomai install
 ? Which harness?
 > Claude Code
   Codex
