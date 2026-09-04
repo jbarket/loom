@@ -196,4 +196,13 @@ describe('loom knowledge', () => {
       expect(stdout).toMatch(/Total active pages.*0/);
     });
   });
+  describe('subcommand --help', () => {
+    it('prints usage instead of an Unknown option error', async () => {
+      const { stdout, code } = await runCliCaptured(
+        ['knowledge', 'maintain', '--help', '--context-dir', tempDir],
+      );
+      expect(code).toBe(0);
+      expect(stdout).toMatch(/Usage: loom knowledge/);
+    });
+  });
 });
