@@ -198,11 +198,6 @@ That's it.
 
 ### Install the setup skill
 
-> **Not on npm yet.** `loomai` has never been published — the release
-> pipeline is tag-triggered and no tag has been cut. Until it is, replace
-> `loomai` with `github:sleepunit-agents/loom` in every `npx` command below:
-> `npx github:sleepunit-agents/loom install`.
-
 ```bash
 npx loomai install
 ```

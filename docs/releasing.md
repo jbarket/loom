@@ -15,13 +15,13 @@ CI-only.
 
 [8544]: https://github.com/npm/cli/issues/8544
 
-### 1. Publish `0.4.1` from a workstation
+### 1. Publish the first version by hand
 
 Keep 2FA enabled on the npm account — this flow does not need it disabled.
 
 ```bash
 npm login                     # browser auth
-git checkout v0.4.1           # or main at the release commit
+git checkout main             # at the release commit
 npm ci && npm run build && npm test
 npm publish --provenance=false
 ```
@@ -37,7 +37,13 @@ This is the only release that ships without provenance.
 
 ### 2. Configure the trusted publisher
 
-On <https://www.npmjs.com/package/loomai/access>, add a GitHub Actions
+Either from the CLI (npm >= 11.15):
+
+```bash
+npm trust github sleepunit-agents/loom --workflow release.yml
+```
+
+or on <https://www.npmjs.com/package/loomai/access>, add a GitHub Actions
 trusted publisher:
 
 | Field | Value |

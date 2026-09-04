@@ -5,11 +5,14 @@ All notable changes to loom are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-> **Publish status:** `loomai@0.4.1` is **not yet published to npm** (confirmed 2026-05-26).
-> The release pipeline is tag-triggered; publish will happen when Jonathan pushes `v0.4.1`.
-> Until then, install via `npx github:sleepunit-agents/loom install`.
+> **Publish status:** `loomai@0.5.0` is the first version published to npm.
+> `0.4.1` and everything before it exists only as a git tag — those versions were
+> never on the registry, so the four months of work between `0.4.1` (2026-04-23)
+> and this release ship together as `0.5.0`.
 
 ## [Unreleased]
+
+## [0.5.0] - 2026-09-04
 
 ### Security
 
@@ -49,8 +52,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `node_modules` and inflated the reported total from 950 tests to ~2600.
   Excluded in `vitest.config.ts`.
 
-### Fixed
-
 - **The npm release path could never have worked, and the docs said it had.**
   Three separate blockers, none of which had ever been exercised because no
   `v*` tag has ever been pushed and `release.yml` has zero runs:
@@ -69,8 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
      itself. This requires npm >= 11.5.1, which Node 22.x does not ship, so
      the workflow upgrades npm before installing. See `docs/releasing.md` —
      trusted publishing cannot perform a package's *first* publish
-     ([npm/cli#8544](https://github.com/npm/cli/issues/8544)), so `0.4.1` has
-     to go up from a laptop once.
+     ([npm/cli#8544](https://github.com/npm/cli/issues/8544)), so the first
+     release has to go up by hand once.
   3. The README advertised **Node.js ≥ 20 ("tested on 20 and 22")** while
      `engines` requires `>= 22` and CI only tests 22 and 24. A reader on
      Node 20 following the README would have hit `EBADENGINE`.
@@ -448,7 +449,8 @@ Initial public release.
   stack and all added external-service dependencies or operational
   overhead.
 
-[Unreleased]: https://github.com/sleepunit-agents/loom/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/sleepunit-agents/loom/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/sleepunit-agents/loom/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/sleepunit-agents/loom/compare/v0.3.1...v0.4.1
 [0.4.0-alpha.7]: https://github.com/sleepunit-agents/loom/compare/v0.4.0-alpha.6...v0.4.0-alpha.7
 [0.4.0-alpha.6]: https://github.com/sleepunit-agents/loom/compare/v0.4.0-alpha.5...v0.4.0-alpha.6
