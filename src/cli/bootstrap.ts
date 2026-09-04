@@ -2,7 +2,7 @@
  * loom bootstrap — initialize a fresh agent.
  *
  * Param sources (precedence):
- *   1. flags (--name, --purpose, --voice, --preferences, --clients)
+ *   1. flags (--user, --name, --purpose, --voice, --preferences, --clients)
  *   2. piped JSON on stdin
  *   3. interactive readline prompts (only when stdin is a TTY)
  */
@@ -25,10 +25,11 @@ in the context directory.
 
 Param sources (first match wins):
   1. Flags (--name / --purpose / --voice)
-  2. Piped JSON on stdin: {"name","purpose","voice","clients"?}
+  2. Piped JSON on stdin: {"name","purpose","voice","user"?,"clients"?}
   3. Interactive prompts when stdin is a TTY and nothing else is set
 
 Options:
+  --user <str>           The human this agent works with (their name)
   --name <str>           Agent name (required)
   --purpose <str>        One-line purpose
   --voice <str>          Short voice descriptor
@@ -65,6 +66,8 @@ async function promptInteractive(io: IOStreams): Promise<BootstrapParams | null>
 
   try {
     if (closed) return null;
+    const user = ((await ask('Your name (the human): ')) ?? '').trim();
+    if (closed) return null;
     const name = ((await ask('Agent name: ')) ?? '').trim();
     if (!name) return null;
     const purpose = ((await ask('Purpose (one line): ')) ?? '').trim();
@@ -73,7 +76,7 @@ async function promptInteractive(io: IOStreams): Promise<BootstrapParams | null>
     if (!voice) return null;
     const clientsRaw = ((await ask('Clients (comma-separated, e.g. claude-code): ')) ?? '').trim();
     const clients = clientsRaw ? clientsRaw.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
-    return { name, purpose, voice, clients };
+    return { user: user || undefined, name, purpose, voice, clients };
   } finally {
     rl.close();
   }
@@ -86,6 +89,7 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
     parsed = parseArgs({
       args: rest,
       options: {
+        user:        { type: 'string' },
         name:        { type: 'string' },
         purpose:     { type: 'string' },
         voice:       { type: 'string' },
@@ -109,13 +113,14 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
 
   let params: BootstrapParams | null = null;
 
-  if (parsed.values.name || parsed.values.purpose || parsed.values.voice) {
+  if (parsed.values.name || parsed.values.purpose || parsed.values.voice || parsed.values.user) {
     if (!parsed.values.name || !parsed.values.purpose || !parsed.values.voice) {
       io.stderr(`When using flags, --name, --purpose, and --voice are all required.\n`);
       return 2;
     }
     const clientsCsv = parsed.values.clients;
     params = {
+      user:        parsed.values.user,
       name:        parsed.values.name,
       purpose:     parsed.values.purpose,
       voice:       parsed.values.voice,
@@ -137,6 +142,7 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
         return 2;
       }
       params = {
+        user: body.user,
         name: body.name, purpose: body.purpose, voice: body.voice,
         preferences: body.preferences, clients: body.clients,
         force: Boolean(parsed.values.force),

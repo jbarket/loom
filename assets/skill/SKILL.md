@@ -56,14 +56,52 @@ Step 3.
 
 ## Step 3 — Interview
 
-Ask, one question at a time:
+**Four questions. That is the whole interview.** Everything else a first
+identity needs — what a persistent agent *is*, where its continuity lives,
+how memory is tiered, the reflection loop, honesty about what it knows —
+is written by `bootstrap` from a fixed scaffold. Don't ask about any of
+it, and don't invent extra questions.
 
-1. Agent name — must be lowercase alphanumeric + hyphens, 1–64 chars,
-   not a reserved word (`current`, `default`, `config`, `backups`,
-   `cache`, `tmp`, `shared`). Re-ask on any collision with an existing
-   dir.
-2. One-line purpose (what is this agent for).
-3. Short voice descriptor (how does it communicate).
+Ask one at a time, and **show the example before the question**. A cold
+"what is this agent for?" gets a blank answer back.
+
+**1. The user's name.**
+
+> For example: `Jonathan`.
+>
+> What should this agent call you?
+
+**2. The agent's name.**
+
+> For example: `art`, `visual-mark`, `sage`.
+>
+> What do you want to call it?
+
+Must be lowercase alphanumeric + hyphens, 1–64 chars, not a reserved word
+(`current`, `default`, `config`, `backups`, `cache`, `tmp`, `shared`).
+Re-ask on any collision with an existing dir.
+
+**3. Purpose — one line.** What it exists to do.
+
+> For example: *"Jonathan's primary assistant and the coordinator of all
+> work — holds memory across sessions and runs parallel worker agents."*
+>
+> What is yours for?
+
+**4. Voice — one line.** How it talks.
+
+> For example: *"Direct. Brief when brief is right, thorough when the task
+> demands it. Has opinions and pushes back — never a yes-machine."*
+>
+> How should it sound?
+
+Two rules about the examples:
+
+- They are a **shape, not a menu**. If the answer comes back as the example
+  with a name swapped in, ask once more for it in their own words. A copied
+  purpose line produces a copied agent, and this has actually happened.
+- The answers are **theirs**. Pass them through verbatim. Don't polish them
+  into your own prose, and don't expand a one-liner into a paragraph.
 
 The context dir will be `~/.config/loom/<name>/` unless the user
 overrides.
@@ -73,9 +111,13 @@ overrides.
 Run:
 
 ```
-echo '{"name":"<NAME>","purpose":"<PURPOSE>","voice":"<VOICE>"}' \
+echo '{"user":"<USER>","name":"<NAME>","purpose":"<PURPOSE>","voice":"<VOICE>"}' \
   | loom bootstrap --context-dir ~/.config/loom/<NAME>
 ```
+
+This writes the full IDENTITY.md — the four answers at the top, the
+structural scaffold below them — plus `preferences.md` seeded with the
+user's name and `self-model.md`.
 
 Then scaffold the harness manifest for this harness:
 

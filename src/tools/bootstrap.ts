@@ -1,7 +1,7 @@
 /**
  * Bootstrap tool — initialize a new loom identity from scratch.
  *
- * Runs an onboarding interview (name, purpose, voice, preferences) and
+ * Runs an onboarding interview (user, name, purpose, voice) and
  * generates the three core identity files:
  *   - IDENTITY.md  — the terminal creed (who this agent is)
  *   - preferences.md — working style with the user
@@ -15,10 +15,13 @@
 import { readFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { atomicWriteWithBackup } from '../path-safety.js';
+import { buildIdentityMd } from './identity-scaffold.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface BootstrapParams {
+  /** The human this agent works with — their name, not the agent's. */
+  user?: string;
   name: string;
   purpose: string;
   voice: string;
@@ -29,25 +32,30 @@ export interface BootstrapParams {
 
 // ─── Identity file templates ──────────────────────────────────────────────────
 
-function buildIdentityMd(name: string, purpose: string, voice: string): string {
-  return `# ${name}
-
-${purpose}
-
-## Voice
-
-${voice}
-`;
-}
-
-function buildPreferencesMd(name: string, preferences?: string): string {
+function buildPreferencesMd(name: string, preferences?: string, user?: string): string {
+  const who = user?.trim();
   const body = preferences?.trim()
     ? preferences.trim()
     : '*No initial preferences set. Update this file as you learn what works.*';
 
-  return `# ${name} — Preferences
+  if (!who) {
+    return `# ${name} — Preferences
 
 ${body}
+`;
+  }
+
+  const seeded = preferences?.trim()
+    ? preferences.trim()
+    : `*What you learn about how ${who} works belongs here: communication style, what to
+decide alone, what to bring to them, decisions already made. Write it as you go —
+this file is read into your identity on every wake.*`;
+
+  return `# ${name} — Preferences
+
+You work with **${who}**.
+
+${seeded}
 `;
 }
 
@@ -132,7 +140,7 @@ async function fileExists(path: string): Promise<boolean> {
 }
 
 export async function bootstrap(contextDir: string, params: BootstrapParams): Promise<string> {
-  const { name, purpose, voice, preferences, clients = [], force = false } = params;
+  const { user, name, purpose, voice, preferences, clients = [], force = false } = params;
 
   const identityPath = join(contextDir, 'IDENTITY.md');
   const prefsPath = join(contextDir, 'preferences.md');
@@ -158,8 +166,8 @@ export async function bootstrap(contextDir: string, params: BootstrapParams): Pr
 
   // Write identity files — atomic, with a .bak of any prior version
   // (only relevant under force: true, when existing files are overwritten)
-  await atomicWriteWithBackup(identityPath, buildIdentityMd(name, purpose, voice));
-  await atomicWriteWithBackup(prefsPath, buildPreferencesMd(name, preferences));
+  await atomicWriteWithBackup(identityPath, buildIdentityMd({ name, purpose, voice, user }));
+  await atomicWriteWithBackup(prefsPath, buildPreferencesMd(name, preferences, user));
   await atomicWriteWithBackup(selfModelPath, buildSelfModelMd());
 
   const parts: string[] = [

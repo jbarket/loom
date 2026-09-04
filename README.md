@@ -67,7 +67,7 @@ an agent's persistent state:
   authored model intact while getting auto-capture ergonomics.
 - **`update_identity`** — section-level edits to `preferences.md` and
   `self-model.md`. The terminal creed stays immutable through the tool layer.
-- **`bootstrap`** — initialize a fresh agent from a short interview.
+- **`bootstrap`** — initialize a fresh agent from a four-question interview.
 - **`harness_init`** — scaffold a harness manifest (a harness is the
   MCP-capable runtime the agent runs in: Claude Code, Codex, Gemini CLI, etc.).
 - **`harness_describe`** — let the currently connected harness self-describe:
@@ -222,8 +222,8 @@ Open your chosen harness. Run the skill:
 - **Claude Code** — `/loom-setup`
 - **Codex / Gemini CLI / OpenCode** — "use the loom-setup skill"
 
-The skill drives the rest: probes the environment, interviews you for a
-name/purpose/voice, bootstraps identity files, scaffolds a harness manifest,
+The skill drives the rest: probes the environment, asks four questions (your
+name, the agent's name, a purpose line, a voice line), bootstraps identity files, scaffolds a harness manifest,
 edits the harness's MCP config (with verification), and verifies wake. Restart
 the harness when it tells you to. Your agent will wake on its next session.
 

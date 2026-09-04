@@ -490,19 +490,23 @@ export function createLoomServer(config: LoomServerConfig): LoomServerInstance {
     'bootstrap',
     'Initialize a new loom identity from scratch. Generates IDENTITY.md, preferences.md, ' +
     'and self-model.md from an onboarding interview, then returns setup instructions for ' +
-    'the requested runtimes. Will not overwrite existing files unless force is true.',
+    'the requested runtimes. The interview is four questions — the user\'s name, the ' +
+    "agent's name, a one-line purpose, a one-line voice; everything structural (continuity " +
+    'model, memory tiers, reflection, honesty) is written by the scaffold, so do not ask ' +
+    'for it. Will not overwrite existing files unless force is true.',
     {
+      user: z.string().optional().describe("The human this agent works with — their name, not the agent's"),
       name: z.string().describe('Name for the agent identity (e.g. "Aria")'),
-      purpose: z.string().describe('What this agent exists to do — its reason for being'),
-      voice: z.string().describe('Communication style and personality'),
+      purpose: z.string().describe('What this agent exists to do — its reason for being, one line'),
+      voice: z.string().describe('Communication style and personality, one line'),
       preferences: z.string().optional().describe('Seed preferences about the user or working style'),
       clients: z.array(z.string()).optional().describe(
         'Runtimes to generate setup instructions for: "claude-code", "gemini-cli", or any custom runtime name (uses a generic template)'
       ),
       force: z.boolean().optional().describe('Overwrite existing identity files (default: false)'),
     },
-    async ({ name, purpose, voice, preferences, clients, force }) => {
-      const result = await bootstrap(contextDir, { name, purpose, voice, preferences, clients, force });
+    async ({ user, name, purpose, voice, preferences, clients, force }) => {
+      const result = await bootstrap(contextDir, { user, name, purpose, voice, preferences, clients, force });
       return { content: [{ type: 'text' as const, text: result }] };
     },
   );
