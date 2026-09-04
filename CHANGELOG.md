@@ -11,6 +11,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+
+- **The `fastembed` dependency is gone; its ONNX runtime is vendored.** Six
+  open Dependabot alerts (one critical, `GHSA-23hp-3jrh-7fpw`) all came from a
+  single path: `fastembed@2.1.0` pins `tar: ^6.2.0`, and the 6.x line carries
+  twelve unpatched advisories. `Anush008/fastembed-js` was archived on GitHub
+  on 2025-12-15, so no upstream fix is coming, and an `overrides` bump to
+  tar 7 does not work — fastembed does `import tar from "tar"`, which tar 7
+  (no default export) turns into a `SyntaxError` at import, killing loom
+  before it starts. The ~200 lines loom actually used now live in
+  `src/backends/embedding-runtime.ts`, depending directly on
+  `onnxruntime-node`, `@anush008/tokenizers` and `tar@^7.5.22`. `npm audit`
+  is clean and the dependency tree loses `progress` and `@huggingface/hub`
+  (both only reachable from the unused sparse-embedding path).
+
+  Embedding output is **bit-for-bit identical** to `fastembed@2.1.0` — vectors
+  already stored in a `memories.db` stay comparable to new ones. Two upstream
+  quirks are preserved deliberately and marked in the source: vectors stay
+  `Float32Array` through normalisation (so rounding matches), and `queryEmbed`
+  keeps its E5-style `query: ` prefix even though BGE does not use one.
+  `src/backends/embedding-runtime.parity.test.ts` asserts this against golden
+  vectors captured from the upstream package before it was removed.
+
+### Fixed
+
+- **A failed model download poisoned the cache directory permanently.** The
+  vendored downloader checks the HTTP status and deletes the partial file on
+  failure. Previously a 403 or 404 from the model bucket was written into
+  `<model>.tar.gz` as if it were the archive; the next run saw the file
+  existed, skipped the download, and failed in `tar` — forever, until someone
+  cleared the cache by hand. The error now names the URL, the status, and the
+  new `LOOM_MODEL_BASE_URL` override.
+
+- **The test suite was counting three abandoned worktrees.** `vitest` collected
+  `.claude/worktrees/**`, so stale copies of the repo ran against current
+  `node_modules` and inflated the reported total from 950 tests to ~2600.
+  Excluded in `vitest.config.ts`.
+
 ### Fixed
 
 - **Every packaged install of loom was a silent no-op.** The entry-point guard

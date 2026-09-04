@@ -26,12 +26,16 @@ harness exits, loom exits.
 
 ## What crosses the network
 
-**Exactly one thing:** on first run, [`fastembed`](https://github.com/Anush008/fastembed-js)
-downloads the BGE-small-en-v1.5 ONNX model (~33 MB) from Hugging
-Face into the cache dir above. After that download, every embedding
-— for `remember`, `recall`, and anywhere else semantic similarity is
-used — is computed entirely in-process on CPU. No further traffic
-leaves loom.
+**Exactly one thing:** on first run, loom downloads the
+BGE-small-en-v1.5 ONNX model (~33 MB) into the cache dir above, over
+HTTPS, from
+`https://storage.googleapis.com/qdrant-fastembed/fast-bge-small-en-v1.5.tar.gz`
+— a Google Cloud Storage bucket published by Qdrant. (Earlier versions
+of this page said Hugging Face. That was wrong; the host has always
+been the GCS bucket.) Set `LOOM_MODEL_BASE_URL` to fetch from
+somewhere else. After that download, every embedding — for `remember`,
+`recall`, and anywhere else semantic similarity is used — is computed
+entirely in-process on CPU. No further traffic leaves loom.
 
 If you want to pre-seed the cache on an air-gapped machine, copy the
 cache directory from a machine that has run loom once.
