@@ -1,6 +1,6 @@
 # Releasing loom
 
-`loomai` publishes to npm from `.github/workflows/release.yml`, triggered by
+`@jbarket/loomai` publishes to npm from `.github/workflows/release.yml`, triggered by
 pushing a `v*` tag. There is **no npm token anywhere in this repo** — the
 workflow authenticates with npm *trusted publishing* (OIDC), which is why
 nothing here expires.
@@ -43,7 +43,7 @@ Either from the CLI (npm >= 11.15):
 npm trust github sleepunit-agents/loom --workflow release.yml
 ```
 
-or on <https://www.npmjs.com/package/loomai/access>, add a GitHub Actions
+or on <https://www.npmjs.com/package/@jbarket/loomai/access>, add a GitHub Actions
 trusted publisher:
 
 | Field | Value |

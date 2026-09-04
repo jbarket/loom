@@ -53,7 +53,7 @@ coexist, with a visible seam.
   binary blobs.
 - Setup skill that auto-detects the harness, runs a short interview,
   scaffolds the context directory, edits the harness MCP config, and
-  verifies wake. `npx loomai install` and then `/loom-setup` inside
+  verifies wake. `npx @jbarket/loomai install` and then `/loom-setup` inside
   the harness.
 - A CLI binary that mirrors every MCP tool. If MCP dies tomorrow,
   `loom wake` still dumps your identity to stdout and any harness

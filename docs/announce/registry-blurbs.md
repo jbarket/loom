@@ -6,7 +6,7 @@ batch.
 
 ## Status
 
-- Package: `loomai` on npm — **not yet published.** Until SLE-13 is
+- Package: `@jbarket/loomai` on npm — **not yet published.** Until SLE-13 is
   green, every install command below uses the `github:jbarket/loom`
   spec, which is what the README currently promises and what works on
   a clean machine today.
@@ -16,10 +16,10 @@ batch.
 
 ## Pre-publish swap checklist
 
-The day `loomai` goes live on npm, before filing any PR in this file:
+The day `@jbarket/loomai` goes live on npm, before filing any PR in this file:
 
-1. Find/replace `npx github:jbarket/loom install` → `npx loomai install`.
-2. Find/replace `npx github:jbarket/loom <cmd>` → `npx loomai <cmd>`
+1. Find/replace `npx github:jbarket/loom install` → `npx @jbarket/loomai install`.
+2. Find/replace `npx github:jbarket/loom <cmd>` → `npx @jbarket/loomai <cmd>`
    in any per-registry instructions or screenshots.
 3. Add the npm badge / npm package link to entries that take one.
 4. Drop the "(GitHub-only install — npm publish pending)" caveat in
@@ -29,7 +29,7 @@ The day `loomai` goes live on npm, before filing any PR in this file:
    reality.
 
 If we end up shipping under a different name (`loom`, `@loom/cli`,
-etc.) instead of `loomai`, the swap target changes — verify the
+etc.) instead of `@jbarket/loomai`, the swap target changes — verify the
 published name with `npm view <name> version` before mass-editing.
 
 ---
@@ -66,7 +66,7 @@ across sessions, models, and harnesses.
 
 Tested end-to-end on Claude Code, Codex, Gemini CLI, and OpenCode
 (SLE-14 cold-test). Install via `npx github:jbarket/loom install`
-today; `npx loomai install` once the npm release lands.
+today; `npx @jbarket/loomai install` once the npm release lands.
 
 Repo: https://github.com/jbarket/loom
 Spec: docs/loom-stack-v1.md in repo
@@ -172,7 +172,7 @@ against Cursor as part of our cold-test pass.
 
 Stack: sqlite-vec + fastembed, single-file storage, no external deps.
 Install command in the snippet uses the GitHub spec while we finish
-the npm publish; will update to `npx -y loomai` once that lands.
+the npm publish; will update to `npx -y @jbarket/loomai` once that lands.
 
 Suggested category: Memory (or Agent Infrastructure if available).
 Logo: assets/loom-logo.png in the repo (200×200, transparent PNG).

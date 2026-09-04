@@ -1,7 +1,7 @@
 # loom
 
 [![CI](https://github.com/sleepunit-agents/loom/actions/workflows/ci.yml/badge.svg)](https://github.com/sleepunit-agents/loom/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/loomai.svg?label=npm%3A%20loomai)](https://www.npmjs.com/package/loomai)
+[![npm](https://img.shields.io/npm/v/@jbarket/loomai.svg)](https://www.npmjs.com/package/@jbarket/loomai)
 [![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](package.json)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-compatible-orange.svg)](https://modelcontextprotocol.io)
@@ -199,7 +199,7 @@ That's it.
 ### Install the setup skill
 
 ```bash
-npx loomai install
+npx @jbarket/loomai install
 ```
 
 A single-select picker asks which harness you want loom wired into.
@@ -210,9 +210,9 @@ harness isn't listed, pick "Other" and loom writes
 Scripting:
 
 ```bash
-npx loomai install --harness claude-code
-npx loomai install --harness codex --json
-npx loomai install --harness claude-code --to ~/my/skills/loom-setup.md
+npx @jbarket/loomai install --harness claude-code
+npx @jbarket/loomai install --harness codex --json
+npx @jbarket/loomai install --harness claude-code --to ~/my/skills/loom-setup.md
 ```
 
 ### Finish setup inside the harness
@@ -336,16 +336,16 @@ mcp__loom__recall(query = "how verbose should I be?")
 
 ```bash
 # Dump the agent's full identity to stdout (works without MCP or a harness)
-npx loomai wake --context-dir ~/.config/loom/my-agent
+npx @jbarket/loomai wake --context-dir ~/.config/loom/my-agent
 
 # Store a memory
 echo "Sarah owns the data pipeline; ping her for schema questions" \
-  | npx loomai remember "Sarah - data pipeline owner" \
+  | npx @jbarket/loomai remember "Sarah - data pipeline owner" \
       --category user \
       --context-dir ~/.config/loom/my-agent
 
 # Retrieve by semantic similarity
-npx loomai recall "who manages the pipeline" \
+npx @jbarket/loomai recall "who manages the pipeline" \
   --context-dir ~/.config/loom/my-agent
 ```
 
@@ -417,48 +417,48 @@ or running without a harness.
 
 ```bash
 # Dump identity markdown (works even when MCP is dead)
-npx loomai wake --context-dir ~/.config/loom/my-agent
+npx @jbarket/loomai wake --context-dir ~/.config/loom/my-agent
 
 # Save a memory (body from stdin)
-echo "Prefers async updates over live standups" | npx loomai remember "working style" \
+echo "Prefers async updates over live standups" | npx @jbarket/loomai remember "working style" \
   --category user --context-dir ~/.config/loom/my-agent
 
 # Search (MMR-diversified by default; --diversity 0 for pure relevance order)
-npx loomai recall "meeting preferences" --context-dir ~/.config/loom/my-agent
-npx loomai recall "meeting preferences" --diversity 0.5 --context-dir ~/.config/loom/my-agent
+npx @jbarket/loomai recall "meeting preferences" --context-dir ~/.config/loom/my-agent
+npx @jbarket/loomai recall "meeting preferences" --diversity 0.5 --context-dir ~/.config/loom/my-agent
 
 # Is recall working? Hit rate, latency, scores, recent misses from the local observation log
-npx loomai memory recall-stats --since 7d --context-dir ~/.config/loom/my-agent
+npx @jbarket/loomai memory recall-stats --since 7d --context-dir ~/.config/loom/my-agent
 
 # List all memories in a category
-npx loomai memory list --category feedback --context-dir ~/.config/loom/my-agent
+npx @jbarket/loomai memory list --category feedback --context-dir ~/.config/loom/my-agent
 
 # Preview the boot digest (and recompute stored salience)
-npx loomai memory digest --context-dir ~/.config/loom/my-agent
-npx loomai memory recompute-salience --context-dir ~/.config/loom/my-agent
+npx @jbarket/loomai memory digest --context-dir ~/.config/loom/my-agent
+npx @jbarket/loomai memory recompute-salience --context-dir ~/.config/loom/my-agent
 
 # Capture-propose queue: list pending drafts, ratify or reject one
-npx loomai memory proposals --context-dir ~/.config/loom/my-agent
-npx loomai memory ratify 3 --context-dir ~/.config/loom/my-agent
-npx loomai memory reject 4 --context-dir ~/.config/loom/my-agent
+npx @jbarket/loomai memory proposals --context-dir ~/.config/loom/my-agent
+npx @jbarket/loomai memory ratify 3 --context-dir ~/.config/loom/my-agent
+npx @jbarket/loomai memory reject 4 --context-dir ~/.config/loom/my-agent
 
 # Run loom as an HTTP MCP daemon (mesh-reachable; default stays stdio)
-npx loomai serve --http --host 127.0.0.1 --port 8787
+npx @jbarket/loomai serve --http --host 127.0.0.1 --port 8787
 
 # Initialize a fresh agent
-npx loomai bootstrap --context-dir ~/.config/loom/new-agent
+npx @jbarket/loomai bootstrap --context-dir ~/.config/loom/new-agent
 
 # Inject loom identity pointer into harness dotfiles
-npx loomai inject --all --context-dir ~/.config/loom/my-agent
+npx @jbarket/loomai inject --all --context-dir ~/.config/loom/my-agent
 
 # Scaffold a harness manifest
-npx loomai harness init claude-code --context-dir ~/.config/loom/my-agent
+npx @jbarket/loomai harness init claude-code --context-dir ~/.config/loom/my-agent
 
 # Edit identity sections (preferences.md or self-model.md)
-npx loomai update-identity preferences --context-dir ~/.config/loom/my-agent
+npx @jbarket/loomai update-identity preferences --context-dir ~/.config/loom/my-agent
 ```
 
-`npx loomai --help` lists subcommands; `npx loomai <cmd> --help` shows
+`npx @jbarket/loomai --help` lists subcommands; `npx @jbarket/loomai <cmd> --help` shows
 per-command usage. All global env vars (`LOOM_CONTEXT_DIR`,
 `LOOM_CLIENT`, `LOOM_MODEL`) are honored.
 

@@ -22,14 +22,14 @@ In v2, pursuits are memories with `category=pursuit`. There is no separate
 ```bash
 # Save a pursuit
 echo "ship the 0.4 release with provenance" | \
-  npx loomai remember "loomai release" --category pursuit \
+  npx @jbarket/loomai remember "@jbarket/loomai release" --category pursuit \
   --context-dir ~/.config/loom/<agent>
 
 # List active pursuits
-npx loomai memory list --category pursuit --context-dir ~/.config/loom/<agent>
+npx @jbarket/loomai memory list --category pursuit --context-dir ~/.config/loom/<agent>
 
 # Close out a pursuit
-npx loomai forget --category pursuit --title "loomai release" \
+npx @jbarket/loomai forget --category pursuit --title "@jbarket/loomai release" \
   --context-dir ~/.config/loom/<agent>
 ```
 
@@ -53,7 +53,7 @@ If your agent had a `pursuits.md` file, import its content as individual memorie
 ```bash
 # For each pursuit in pursuits.md, run something like:
 echo "<pursuit content>" | \
-  npx loomai remember "<pursuit title>" --category pursuit \
+  npx @jbarket/loomai remember "<pursuit title>" --category pursuit \
   --context-dir ~/.config/loom/<agent>
 ```
 
