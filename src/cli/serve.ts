@@ -12,16 +12,39 @@ import { startHttpServer } from '../transport/http-server.js';
 import { resolveContextDir } from '../config.js';
 import type { IOStreams } from './io.js';
 
+const USAGE = `Usage: loom serve [options]
+
+Start the MCP server. Default transport is stdio; --http starts the
+mesh-reachable HTTP daemon instead.
+
+Options:
+  --http                 Serve over HTTP instead of stdio
+  --host <h>             HTTP bind host (env LOOM_HTTP_HOST, default 127.0.0.1)
+  --port <n>             HTTP port (env LOOM_HTTP_PORT, default 8787)
+  --help, -h             Show this help
+
+Bearer token comes from LOOM_BEARER_TOKEN. Bind-safety refuses a public host.
+`;
+
 export async function run(argv: string[], io: IOStreams): Promise<number> {
-  const { values } = parseArgs({
-    args: argv,
-    options: {
-      http: { type: 'boolean', default: false },
-      host: { type: 'string' },
-      port: { type: 'string' },
-    },
-    allowPositionals: true,
-  });
+  let values;
+  try {
+    ({ values } = parseArgs({
+      args: argv,
+      options: {
+        http: { type: 'boolean', default: false },
+        host: { type: 'string' },
+        port: { type: 'string' },
+        help: { type: 'boolean', short: 'h' },
+      },
+      strict: true,
+      allowPositionals: true,
+    }));
+  } catch (err) {
+    io.stderr(`${(err as Error).message}\n${USAGE}`);
+    return 2;
+  }
+  if (values.help) { io.stdout(USAGE); return 0; }
 
   const contextDir = resolveContextDir();
 
