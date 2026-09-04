@@ -217,4 +217,58 @@ describe('loom memory', () => {
       expect(stderr).toMatch(/not found/);
     });
   });
+  // Regression: `loom memory recompute-salience --help` used to fall through
+  // to the subcommand body and recompute — asking for help mutated the store.
+  // Found by Mark (CT 113) on 2026-09-04.
+  describe('subcommand --help', () => {
+    it('recompute-salience --help prints usage without recomputing', async () => {
+      const { stdout, code } = await runCliCaptured(
+        ['memory', 'recompute-salience', '--help', '--context-dir', tempDir],
+      );
+      expect(code).toBe(0);
+      expect(stdout).toMatch(/Usage: loom memory/);
+      expect(stdout).not.toMatch(/recomputed salience/);
+    });
+
+    it('digest --help prints usage without emitting the digest', async () => {
+      const { stdout, code } = await runCliCaptured(
+        ['memory', 'digest', '--help', '--context-dir', tempDir],
+      );
+      expect(code).toBe(0);
+      expect(stdout).toMatch(/Usage: loom memory/);
+      expect(stdout).not.toMatch(/Top of mind/);
+    });
+
+    it('-h works the same as --help', async () => {
+      const { stdout, code } = await runCliCaptured(
+        ['memory', 'recompute-salience', '-h', '--context-dir', tempDir],
+      );
+      expect(code).toBe(0);
+      expect(stdout).toMatch(/Usage: loom memory/);
+    });
+
+    it('a flag-parsing subcommand gets help too, not an Unknown option error', async () => {
+      const { stdout, code } = await runCliCaptured(
+        ['memory', 'list', '--help', '--context-dir', tempDir],
+      );
+      expect(code).toBe(0);
+      expect(stdout).toMatch(/Usage: loom memory/);
+    });
+
+    it('recompute-salience rejects arguments it cannot act on', async () => {
+      const { stderr, code } = await runCliCaptured(
+        ['memory', 'recompute-salience', '--dry-run', '--context-dir', tempDir],
+      );
+      expect(code).toBe(2);
+      expect(stderr).toMatch(/takes no arguments/);
+    });
+
+    it('digest rejects arguments it cannot act on', async () => {
+      const { stderr, code } = await runCliCaptured(
+        ['memory', 'digest', '--hours', '4', '--context-dir', tempDir],
+      );
+      expect(code).toBe(2);
+      expect(stderr).toMatch(/takes no arguments/);
+    });
+  });
 });
