@@ -55,6 +55,11 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
     io.stderr(`Unknown knowledge subcommand: ${sub}\n${USAGE}`);
     return 2;
   }
+  // Subcommand-level --help, honoured before any side effect (see memory.ts).
+  if (subRest[0] === '--help' || subRest[0] === '-h') {
+    io.stdout(USAGE);
+    return 0;
+  }
 
   const env = resolveEnv(global, io.env);
 

@@ -137,6 +137,13 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
     io.stderr(`Unknown memory subcommand: ${sub}\n${USAGE}`);
     return 2;
   }
+  // Subcommand-level --help, honoured BEFORE any side effect. Without this,
+  // the subcommands that take no flags (recompute-salience, digest) fell
+  // through to their body and ran: asking for help mutated the store.
+  if (subRest[0] === '--help' || subRest[0] === '-h') {
+    io.stdout(USAGE);
+    return 0;
+  }
 
   const env = resolveEnv(global, io.env);
   try { assertStackVersionCompatible(env.contextDir); }
@@ -145,12 +152,20 @@ export async function run(argv: string[], io: IOStreams): Promise<number> {
   // recompute-salience — the consolidation lane's entry point (it-loom-salience):
   // refresh the stored temperature for every memory from its timestamps.
   if (sub === 'recompute-salience') {
+    if (subRest.length) {
+      io.stderr(`memory recompute-salience takes no arguments.\n${USAGE}`);
+      return 2;
+    }
     const n = recomputeSalienceForContext(env.contextDir, Date.now());
     io.stdout(`recomputed salience for ${n ?? 0} memories\n`);
     return 0;
   }
   // digest — preview the assembled boot digest (the same view injected at identity-load).
   if (sub === 'digest') {
+    if (subRest.length) {
+      io.stderr(`memory digest takes no arguments.\n${USAGE}`);
+      return 2;
+    }
     const d = digestForContext(env.contextDir);
     io.stdout((d ?? '(no digest — empty store)') + '\n');
     return 0;
