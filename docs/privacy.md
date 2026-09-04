@@ -108,13 +108,18 @@ wrong with the release.
 > yet; that's fine. What you're confirming is that `loomai` itself
 > has a verified attestation.
 
+> **`0.5.0` is the exception.** npm's trusted publishing cannot perform a
+> package's first publish, so `0.5.0` went up by hand with
+> `--provenance=false` and has no attestation. Every version after it is
+> published by `release.yml` and does.
+
 ### Inspect the attestation directly
 
 To see what was signed without installing:
 
 ```bash
 # Fetch the attestation for a specific version
-npm view loomai@0.4.0-alpha.7 --json \
+npm view loomai@latest --json \
   | jq '.dist.attestations'
 ```
 
@@ -125,13 +130,13 @@ download it and inspect it with
 
 ```bash
 # With the GitHub CLI:
-npm pack loomai@0.4.0-alpha.7
-gh attestation verify loomai-0.4.0-alpha.7.tgz \
-  --owner jbarket
+npm pack loomai@latest
+gh attestation verify loomai-<version>.tgz \
+  --owner sleepunit-agents
 ```
 
 A successful verification confirms the tarball was built by the
-`jbarket/loom` release workflow on a tagged commit, and matches the
+`sleepunit-agents/loom` release workflow on a tagged commit, and matches the
 SHA-256 hash the registry serves.
 
 ### What provenance does not tell you

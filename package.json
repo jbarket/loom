@@ -1,7 +1,7 @@
 {
   "name": "loomai",
-  "version": "0.4.1",
-  "description": "MCP server for persistent AI agent identity and memory. Single-file sqlite-vec + fastembed; zero external services.",
+  "version": "0.5.0",
+  "description": "MCP server for persistent AI agent identity and memory. Single-file sqlite-vec + local ONNX embeddings; zero external services.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -19,11 +19,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jbarket/loom.git"
+    "url": "git+https://github.com/sleepunit-agents/loom.git"
   },
-  "homepage": "https://github.com/jbarket/loom#readme",
+  "homepage": "https://github.com/sleepunit-agents/loom#readme",
   "bugs": {
-    "url": "https://github.com/jbarket/loom/issues"
+    "url": "https://github.com/sleepunit-agents/loom/issues"
   },
   "scripts": {
     "build": "tsc && node scripts/build-widgets.mjs",

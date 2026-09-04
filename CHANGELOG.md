@@ -5,11 +5,14 @@ All notable changes to loom are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-> **Publish status:** `loomai@0.4.1` is **not yet published to npm** (confirmed 2026-05-26).
-> The release pipeline is tag-triggered; publish will happen when Jonathan pushes `v0.4.1`.
-> Until then, install via `npx github:sleepunit-agents/loom install`.
+> **Publish status:** `loomai@0.5.0` is the first version published to npm.
+> `0.4.1` and everything before it exists only as a git tag — those versions were
+> never on the registry, so the four months of work between `0.4.1` (2026-04-23)
+> and this release ship together as `0.5.0`.
 
 ## [Unreleased]
+
+## [0.5.0] - 2026-09-04
 
 ### Security
 
@@ -49,7 +52,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `node_modules` and inflated the reported total from 950 tests to ~2600.
   Excluded in `vitest.config.ts`.
 
-### Fixed
+- **The npm release path could never have worked, and the docs said it had.**
+  Three separate blockers, none of which had ever been exercised because no
+  `v*` tag has ever been pushed and `release.yml` has zero runs:
+  1. `package.json` still declared `repository.url`, `homepage` and `bugs` as
+     `jbarket/loom`, but the repo moved to `sleepunit-agents/loom`. With
+     `publishConfig.provenance: true`, npm validates the manifest repository
+     against the building repository and refuses to publish on a mismatch —
+     so the very first tagged release would have failed at the publish step
+     after a full build and test run.
+  2. There were no publish credentials of any kind — no `NPM_TOKEN` repository
+     or organization secret — so `npm publish` would have failed with
+     `ENEEDAUTH`. Rather than add a 90-day token to rotate forever,
+     `release.yml` now publishes with **npm trusted publishing** (OIDC): the
+     workflow authenticates as `sleepunit-agents/loom` + `release.yml`, there
+     is no secret to store or expire, and provenance is attested from the run
+     itself. This requires npm >= 11.5.1, which Node 22.x does not ship, so
+     the workflow upgrades npm before installing. See `docs/releasing.md` —
+     trusted publishing cannot perform a package's *first* publish
+     ([npm/cli#8544](https://github.com/npm/cli/issues/8544)), so the first
+     release has to go up by hand once.
+  3. The README advertised **Node.js ≥ 20 ("tested on 20 and 22")** while
+     `engines` requires `>= 22` and CI only tests 22 and 24. A reader on
+     Node 20 following the README would have hit `EBADENGINE`.
+- Stale `jbarket/loom` links across `README.md`, `CHANGELOG.md` and
+  `docs/privacy.md` now point at `sleepunit-agents/loom`, including the
+  `gh attestation verify --owner` example (which named the wrong owner and
+  a version that was never published).
+- The README install section now states plainly that `loomai` is not on npm
+  and gives the working `npx github:sleepunit-agents/loom` form. Remove that
+  note in the commit that cuts the first real tag.
 
 - **Every packaged install of loom was a silent no-op.** The entry-point guard
   in `src/index.ts` compared `process.argv[1]` against `import.meta.url` as raw
@@ -349,7 +381,7 @@ the canonical Quick Start path.
 
 - Documentation reshuffle: v0.4 arc docs moved out of the repo. The
   roadmap now lives in the
-  [v0.4 discussion](https://github.com/jbarket/loom/discussions/10) and
+  [v0.4 discussion](https://github.com/sleepunit-agents/loom/discussions/10) and
   the [project board](https://github.com/users/jbarket/projects/1/views/1).
   Per-feature specs and plans moved from `docs/superpowers/{specs,plans}/`
   to `docs/{specs,plans}/` — tool-neutral paths, same content.
@@ -417,13 +449,14 @@ Initial public release.
   stack and all added external-service dependencies or operational
   overhead.
 
-[Unreleased]: https://github.com/jbarket/loom/compare/v0.4.1...HEAD
-[0.4.1]: https://github.com/jbarket/loom/compare/v0.3.1...v0.4.1
-[0.4.0-alpha.7]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.6...v0.4.0-alpha.7
-[0.4.0-alpha.6]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.5...v0.4.0-alpha.6
-[0.4.0-alpha.5]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.4...v0.4.0-alpha.5
-[0.4.0-alpha.4]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.3...v0.4.0-alpha.4
-[0.4.0-alpha.3]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.2...v0.4.0-alpha.3
-[0.4.0-alpha.2]: https://github.com/jbarket/loom/compare/v0.4.0-alpha.1...v0.4.0-alpha.2
-[0.4.0-alpha.1]: https://github.com/jbarket/loom/compare/v0.3.1...v0.4.0-alpha.1
-[0.3.1]: https://github.com/jbarket/loom/releases/tag/v0.3.1
+[Unreleased]: https://github.com/sleepunit-agents/loom/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/sleepunit-agents/loom/compare/v0.4.1...v0.5.0
+[0.4.1]: https://github.com/sleepunit-agents/loom/compare/v0.3.1...v0.4.1
+[0.4.0-alpha.7]: https://github.com/sleepunit-agents/loom/compare/v0.4.0-alpha.6...v0.4.0-alpha.7
+[0.4.0-alpha.6]: https://github.com/sleepunit-agents/loom/compare/v0.4.0-alpha.5...v0.4.0-alpha.6
+[0.4.0-alpha.5]: https://github.com/sleepunit-agents/loom/compare/v0.4.0-alpha.4...v0.4.0-alpha.5
+[0.4.0-alpha.4]: https://github.com/sleepunit-agents/loom/compare/v0.4.0-alpha.3...v0.4.0-alpha.4
+[0.4.0-alpha.3]: https://github.com/sleepunit-agents/loom/compare/v0.4.0-alpha.2...v0.4.0-alpha.3
+[0.4.0-alpha.2]: https://github.com/sleepunit-agents/loom/compare/v0.4.0-alpha.1...v0.4.0-alpha.2
+[0.4.0-alpha.1]: https://github.com/sleepunit-agents/loom/compare/v0.3.1...v0.4.0-alpha.1
+[0.3.1]: https://github.com/sleepunit-agents/loom/releases/tag/v0.3.1
