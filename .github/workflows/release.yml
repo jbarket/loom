@@ -47,10 +47,27 @@ jobs:
             exit 1
           fi
 
+      # 0.5.0 was published by hand before the trusted publisher existed, and a
+      # re-run of this workflow on any already-released tag would otherwise die
+      # on EPUBLISHCONFLICT. Skip the publish when the exact version is already
+      # on the registry; still cut the GitHub release below.
+      - name: Check whether this version is already published
+        id: published
+        run: |
+          pkg_name=$(node -p "require('./package.json').name")
+          pkg_version=$(node -p "require('./package.json').version")
+          if npm view "${pkg_name}@${pkg_version}" version >/dev/null 2>&1; then
+            echo "Already on the registry: ${pkg_name}@${pkg_version} - skipping publish."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # Authenticates via the trusted publisher configured on npmjs.com for
       # sleepunit-agents/loom + release.yml. No NPM_TOKEN, nothing to rotate,
       # and provenance is attested from this run.
       - name: Publish to npm
+        if: steps.published.outputs.skip != 'true'
         run: npm publish
 
       - name: Detect prerelease
