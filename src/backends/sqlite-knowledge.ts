@@ -82,60 +82,86 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
         'SELECT id, uuid, title, body FROM pages WHERE slug = ?',
       ).get(input.slug) as { id: number; uuid: string; title: string; body: string } | undefined;
 
-      let pageId: number;
-      let uuid: string;
-      let title: string;
-      let sourcing: string;
-      let appliedMode: 'create' | 'replace' | 'append';
+      // Resolve write mode and body before touching the DB — pure logic, no I/O.
+      // Title and domain follow the write — the page is addressed by slug,
+      // so a differing title/domain on upsert is an intentional revision.
+      const uuid: string = existing?.uuid ?? randomUUID();
+      const title: string = input.title;
+      const sourcing: string = input.sourcing ?? 'sourced';
+      const appliedMode: 'create' | 'replace' | 'append' = existing
+        ? (input.bodyMode ?? 'replace')
+        : 'create';
+      const newBody: string = (existing && appliedMode === 'append')
+        ? `${existing.body}\n\n${input.body}`
+        : input.body;
+      if (existing) enforcePageBodyCap(newBody);
 
-      if (existing) {
-        uuid = existing.uuid;
-        // Title and domain follow the write — the page is addressed by slug,
-        // so a differing title/domain on upsert is an intentional revision.
-        title = input.title;
-        sourcing = input.sourcing ?? 'sourced';
-        pageId = existing.id;
-        appliedMode = input.bodyMode ?? 'replace';
+      // pageId is set inside the transaction for INSERTs; reads after tx() are safe.
+      let pageId: number = existing?.id ?? 0;
 
-        const newBody = appliedMode === 'append'
-          ? `${existing.body}\n\n${input.body}`
-          : input.body;
-        enforcePageBodyCap(newBody);
-
-        // Replace-writes destroy the stored body — snapshot it first so the
-        // page is recoverable (the 2026-06-01 verify run stomped 13 bodies
-        // with no recovery path other than transcript archaeology).
-        if (appliedMode === 'replace' && newBody !== existing.body) {
-          retryWrite(() =>
-            this.snapshotRevision(db, pageId, input.slug, existing.body, 'write-replace', timestamp),
-          );
+      // Validate all citations before opening the transaction.
+      if (input.citations && input.citations.length > 0) {
+        for (const cit of input.citations) {
+          enforceExcerptCap(cit.excerpt);
         }
+      }
 
-        // verified_at is a verification stamp, not a write stamp: an update
-        // only moves it when the writer explicitly claims verification.
-        // (Creation still stamps write time — the page was just synthesized
-        // against its sources.)
-        // created_by / version are preserved across upserts when omitted.
-        retryWrite(() =>
+      let citationsAdded = 0;
+      let citationsDeduped = 0;
+
+      // Pre-prepare citation statements — compiled once, safe to reuse on retry.
+      // Exact-duplicate guard: re-sending a page's citations on upsert must not
+      // multiply them. A citation is a duplicate when claim, kind, locator, and
+      // excerpt all match an existing row on the same page.
+      const dupCheck = db.prepare(
+        `SELECT 1 FROM citations
+         WHERE page_id = ? AND claim = ? AND source_kind = ?
+           AND COALESCE(source_locator, '') = COALESCE(?, '')
+           AND excerpt = ?`,
+      );
+      const insertCit = db.prepare(
+        `INSERT INTO citations (page_id, claim, source_kind, source_locator, excerpt, retrieved_at, created)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      );
+
+      // ── Single transaction: snapshot + page write + citation replacement ──────
+      // All three sub-operations must commit atomically — a crash between any two
+      // leaves a partial state: a page with no citations, or a snapshot with no
+      // corresponding page update. Every other mutating method uses db.transaction;
+      // writePage — the hottest path — now does too (t-329).
+      //
+      // Counter variables (citationsAdded, citationsDeduped) are reset at the top
+      // of the callback so a SQLITE_BUSY retry never double-counts.
+      const tx = db.transaction(() => {
+        citationsAdded = 0;
+        citationsDeduped = 0;
+
+        if (existing) {
+          // Replace-writes destroy the stored body — snapshot it first so the
+          // page is recoverable (the 2026-06-01 verify run stomped 13 bodies
+          // with no recovery path other than transcript archaeology).
+          if (appliedMode === 'replace' && newBody !== existing.body) {
+            this.snapshotRevision(db, pageId, input.slug, existing.body, 'write-replace', timestamp);
+          }
+
+          // verified_at is a verification stamp, not a write stamp: an update
+          // only moves it when the writer explicitly claims verification.
+          // (Creation still stamps write time — the page was just synthesized
+          // against its sources.)
+          // created_by / version are preserved across upserts when omitted.
           db.prepare(
             `UPDATE pages SET title = ?, domain = ?, body = ?, sourcing = ?, verified_at = COALESCE(?, verified_at), freshness_anchor = COALESCE(?, freshness_anchor), created_by = COALESCE(?, created_by), version = COALESCE(?, version), updated = ? WHERE id = ?`,
-          ).run(title, input.domain, newBody, sourcing, input.verified_at ?? null, input.freshness_anchor ?? null, input.created_by ?? null, input.version ?? null, timestamp, pageId),
-        );
-      } else {
-        uuid = randomUUID();
-        title = input.title;
-        sourcing = input.sourcing ?? 'sourced';
-        appliedMode = 'create';
-        const result = retryWrite(() =>
-          db.prepare(
+          ).run(title, input.domain, newBody, sourcing, input.verified_at ?? null, input.freshness_anchor ?? null, input.created_by ?? null, input.version ?? null, timestamp, pageId);
+        } else {
+          const result = db.prepare(
             `INSERT INTO pages (uuid, slug, title, domain, body, sourcing, provenance, verified_at, freshness_anchor, created_by, version, created, updated)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           ).run(
             uuid,
             input.slug,
             title,
             input.domain,
-            input.body,
+            newBody,
             sourcing,
             input.provenance ?? null,
             input.verified_at ?? timestamp,
@@ -144,33 +170,11 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
             input.version ?? null,
             timestamp,
             timestamp,
-          ),
-        );
-        pageId = Number(result.lastInsertRowid);
-      }
-
-      let citationsAdded = 0;
-      let citationsDeduped = 0;
-      if (input.citations && input.citations.length > 0) {
-        for (const cit of input.citations) {
-          enforceExcerptCap(cit.excerpt);
+          );
+          pageId = Number(result.lastInsertRowid);
         }
 
-        // Exact-duplicate guard: re-sending a page's citations on upsert must
-        // not multiply them. A citation is a duplicate when claim, kind,
-        // locator, and excerpt all match an existing row on the same page
-        // (same identity tuple mergePages dedupes on).
-        const dupCheck = db.prepare(
-          `SELECT 1 FROM citations
-           WHERE page_id = ? AND claim = ? AND source_kind = ?
-             AND COALESCE(source_locator, '') = COALESCE(?, '')
-             AND excerpt = ?`,
-        );
-        const insertCit = db.prepare(
-          `INSERT INTO citations (page_id, claim, source_kind, source_locator, excerpt, retrieved_at, created)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        );
-        const tx = db.transaction(() => {
+        if (input.citations && input.citations.length > 0) {
           for (const cit of input.citations!) {
             const dup = dupCheck.get(
               pageId,
@@ -194,9 +198,9 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
             );
             citationsAdded++;
           }
-        });
-        retryWrite(() => tx());
-      }
+        }
+      });
+      retryWrite(() => tx());
 
       return Promise.resolve({
         uuid,
@@ -937,9 +941,10 @@ export class SqliteKnowledgeBackend implements KnowledgeBackend {
   }
 
   /**
-   * Insert a body snapshot and prune beyond the per-page cap. Caller owns the
-   * transaction when called from restoreRevision; called bare from writePage.
-   * Each statement is wrapped in retryWrite so both call sites are safe.
+   * Insert a body snapshot and prune beyond the per-page cap. Always called
+   * inside a transaction owned by the caller (writePage or restoreRevision).
+   * The inner retryWrite calls run bare statements — safe inside an outer
+   * transaction; the outer transaction is the atomicity boundary.
    */
   private snapshotRevision(
     db: Database,
